@@ -36,6 +36,7 @@ class Ticker:
         self._symbol = symbol.upper().replace(".IS", "").replace(".E", "")
         self._paratic = get_paratic_provider()
         self._isyatirim = None  # Lazy load for financial statements
+        self._kap = None  # Lazy load for KAP disclosures
         self._info_cache: dict[str, Any] | None = None
 
     def _get_isyatirim(self):
@@ -45,6 +46,14 @@ class Ticker:
 
             self._isyatirim = get_isyatirim_provider()
         return self._isyatirim
+
+    def _get_kap(self):
+        """Lazy load KAP provider for disclosures and calendar."""
+        if self._kap is None:
+            from borsapy._providers.kap import get_kap_provider
+
+            self._kap = get_kap_provider()
+        return self._kap
 
     @property
     def symbol(self) -> str:
@@ -286,6 +295,93 @@ class Ticker:
             statement_type="cashflow",
             quarterly=True,
         )
+
+    @cached_property
+    def major_holders(self) -> pd.DataFrame:
+        """
+        Get major shareholders (ortaklık yapısı).
+
+        Returns:
+            DataFrame with shareholder names and percentages:
+            - Index: Holder name
+            - Percentage: Ownership percentage (%)
+
+        Examples:
+            >>> stock = Ticker("THYAO")
+            >>> stock.major_holders
+                                     Percentage
+            Holder
+            Diğer                        50.88
+            Türkiye Varlık Fonu          49.12
+        """
+        return self._get_isyatirim().get_major_holders(self._symbol)
+
+    @cached_property
+    def recommendations(self) -> dict:
+        """
+        Get analyst recommendations and target price.
+
+        Returns:
+            Dictionary with:
+            - recommendation: Buy/Hold/Sell (AL/TUT/SAT)
+            - target_price: Analyst target price (TL)
+            - upside_potential: Expected upside (%)
+
+        Examples:
+            >>> stock = Ticker("THYAO")
+            >>> stock.recommendations
+            {'recommendation': 'AL', 'target_price': 579.99, 'upside_potential': 116.01}
+        """
+        return self._get_isyatirim().get_recommendations(self._symbol)
+
+    @cached_property
+    def news(self) -> pd.DataFrame:
+        """
+        Get recent KAP (Kamuyu Aydınlatma Platformu) disclosures for the stock.
+
+        Fetches directly from KAP - the official disclosure platform for
+        publicly traded companies in Turkey.
+
+        Returns:
+            DataFrame with columns:
+            - Date: Disclosure date and time
+            - Title: Disclosure headline
+            - URL: Link to full disclosure on KAP
+
+        Examples:
+            >>> stock = Ticker("THYAO")
+            >>> stock.news
+                              Date                                         Title                                         URL
+            0  29.12.2025 19:21:18  Haber ve Söylentilere İlişkin Açıklama  https://www.kap.org.tr/tr/Bildirim/1530826
+            1  29.12.2025 16:11:36  Payların Geri Alınmasına İlişkin Bildirim  https://www.kap.org.tr/tr/Bildirim/1530656
+        """
+        return self._get_kap().get_disclosures(self._symbol)
+
+    @cached_property
+    def calendar(self) -> pd.DataFrame:
+        """
+        Get expected disclosure calendar for the stock from KAP.
+
+        Returns upcoming expected disclosures like financial reports,
+        annual reports, sustainability reports, and corporate governance reports.
+
+        Returns:
+            DataFrame with columns:
+            - StartDate: Expected disclosure window start
+            - EndDate: Expected disclosure window end
+            - Subject: Type of disclosure (e.g., "Finansal Rapor")
+            - Period: Report period (e.g., "Yıllık", "3 Aylık")
+            - Year: Fiscal year
+
+        Examples:
+            >>> stock = Ticker("THYAO")
+            >>> stock.calendar
+                  StartDate       EndDate               Subject   Period  Year
+            0  01.01.2026  11.03.2026       Finansal Rapor   Yıllık  2025
+            1  01.01.2026  11.03.2026    Faaliyet Raporu  Yıllık  2025
+            2  01.04.2026  11.05.2026       Finansal Rapor  3 Aylık  2026
+        """
+        return self._get_kap().get_calendar(self._symbol)
 
     def _parse_date(self, date: str | datetime) -> datetime:
         """Parse a date string to datetime."""

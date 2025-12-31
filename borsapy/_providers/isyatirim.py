@@ -620,6 +620,126 @@ class IsYatirimProvider(BaseProvider):
 
         return df
 
+    def get_major_holders(self, symbol: str) -> pd.DataFrame:
+        """
+        Get major shareholders (ortaklık yapısı) for a stock.
+
+        Args:
+            symbol: Stock symbol (e.g., "THYAO").
+
+        Returns:
+            DataFrame with columns: Holder, Percentage.
+        """
+        import json
+        import re
+
+        symbol = symbol.upper().replace(".IS", "").replace(".E", "")
+
+        cache_key = f"isyatirim:major_holders:{symbol}"
+        cached = self._cache_get(cache_key)
+        if cached is not None:
+            return cached
+
+        # Fetch the stock page HTML
+        stock_page_url = f"https://www.isyatirim.com.tr/tr-tr/analiz/hisse/Sayfalar/sirket-karti.aspx?hisse={symbol}"
+
+        try:
+            response = self._client.get(stock_page_url, timeout=15)
+            response.raise_for_status()
+            html = response.text
+        except Exception as e:
+            raise APIError(f"Failed to fetch major holders for {symbol}: {e}") from e
+
+        # Parse JavaScript variable: var OrtaklikYapisidata = [{name: 'xxx', y: 50.88}, ...]
+        pattern = r"var OrtaklikYapisidata = \[(.*?)\];"
+        match = re.search(pattern, html, re.DOTALL)
+
+        if not match:
+            return pd.DataFrame(columns=["Holder", "Percentage"])
+
+        js_array = match.group(1).strip()
+        if not js_array:
+            return pd.DataFrame(columns=["Holder", "Percentage"])
+
+        # Convert JS object to valid JSON: {name: 'x'} -> {"name": "x"}
+        json_str = re.sub(r"([{,])(\w+):", r'\1"\2":', js_array)
+        json_str = json_str.replace("'", '"')
+
+        try:
+            data = json.loads(f"[{json_str}]")
+        except json.JSONDecodeError:
+            return pd.DataFrame(columns=["Holder", "Percentage"])
+
+        records = []
+        for item in data:
+            holder = item.get("name", "Unknown")
+            percentage = float(item.get("y", 0))
+            records.append({"Holder": holder, "Percentage": round(percentage, 2)})
+
+        df = pd.DataFrame(records)
+        if not df.empty:
+            df.set_index("Holder", inplace=True)
+
+        self._cache_set(cache_key, df, TTL.FINANCIAL_STATEMENTS)
+        return df
+
+    def get_recommendations(self, symbol: str) -> dict[str, Any]:
+        """
+        Get analyst recommendations and target price for a stock.
+
+        Args:
+            symbol: Stock symbol (e.g., "THYAO").
+
+        Returns:
+            Dictionary with:
+            - recommendation: Buy/Hold/Sell (AL/TUT/SAT)
+            - target_price: Analyst target price
+            - upside_potential: Expected upside (%)
+        """
+        symbol = symbol.upper().replace(".IS", "").replace(".E", "")
+
+        cache_key = f"isyatirim:recommendations:{symbol}"
+        cached = self._cache_get(cache_key)
+        if cached is not None:
+            return cached
+
+        try:
+            data = self._fetch_sermaye_data(symbol)
+        except APIError:
+            return {
+                "recommendation": None,
+                "target_price": None,
+                "upside_potential": None,
+            }
+
+        # Parse recommendations from sermaye response
+        items = self._parse_sermaye_response(data)
+
+        result = {
+            "recommendation": None,
+            "target_price": None,
+            "upside_potential": None,
+        }
+
+        # Get the most recent entry with recommendation data
+        for item in items:
+            oneri = item.get("ONERI")
+            hedef_fiyat = item.get("HEDEF_FIYAT")
+            getiri_pot = item.get("GETIRI_POT")
+
+            if oneri:
+                result["recommendation"] = oneri
+            if hedef_fiyat:
+                result["target_price"] = round(float(hedef_fiyat), 2)
+            if getiri_pot:
+                result["upside_potential"] = round(float(getiri_pot) * 100, 2)
+
+            # Break on first item with data
+            if oneri or hedef_fiyat:
+                break
+
+        self._cache_set(cache_key, result, TTL.REALTIME_PRICE)
+        return result
 
 # Singleton instance
 _provider: IsYatirimProvider | None = None
