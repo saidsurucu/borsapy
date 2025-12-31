@@ -17,13 +17,38 @@ class IsYatirimProvider(BaseProvider):
     APIs:
         - OneEndeks: Real-time OHLCV data
         - MaliTablo: Financial statements (balance sheet, income, cash flow)
+        - GetSermayeArttirimlari: Dividends and capital increases
     """
 
     BASE_URL = "https://www.isyatirim.com.tr/_Layouts/15/IsYatirim.Website/Common"
+    STOCK_INFO_URL = "https://www.isyatirim.com.tr/_layouts/15/IsYatirim.Website/StockInfo/CompanyInfoAjax.aspx"
 
     # Financial statement groups
     FINANCIAL_GROUP_INDUSTRIAL = "XI_29"  # Sanayi şirketleri
     FINANCIAL_GROUP_BANK = "UFRS"  # Bankalar
+
+    # Known market indices
+    INDICES = {
+        "XU100": "BIST 100",
+        "XU050": "BIST 50",
+        "XU030": "BIST 30",
+        "XBANK": "BIST Banka",
+        "XUSIN": "BIST Sınai",
+        "XHOLD": "BIST Holding ve Yatırım",
+        "XUTEK": "BIST Teknoloji",
+        "XGIDA": "BIST Gıda",
+        "XTRZM": "BIST Turizm",
+        "XULAS": "BIST Ulaştırma",
+        "XSGRT": "BIST Sigorta",
+        "XMANA": "BIST Metal Ana",
+        "XKMYA": "BIST Kimya",
+        "XMADN": "BIST Maden",
+        "XELKT": "BIST Elektrik",
+        "XTEKS": "BIST Tekstil",
+        "XILTM": "BIST İletişim",
+        "XUMAL": "BIST Mali",
+        "XUTUM": "BIST Tüm",
+    }
 
     def get_realtime_quote(self, symbol: str) -> dict[str, Any]:
         """
@@ -70,6 +95,343 @@ class IsYatirimProvider(BaseProvider):
         self._cache_set(cache_key, result, TTL.REALTIME_PRICE)
 
         return result
+
+    def get_index_history(
+        self,
+        index_code: str,
+        start: datetime | None = None,
+        end: datetime | None = None,
+    ) -> pd.DataFrame:
+        """
+        Get historical data for an index.
+
+        Args:
+            index_code: Index code (e.g., "XU100", "XU030", "XBANK").
+            start: Start date.
+            end: End date.
+
+        Returns:
+            DataFrame with columns: Open, High, Low, Close, Volume.
+        """
+        index_code = index_code.upper()
+
+        # Default date range
+        if end is None:
+            end = datetime.now()
+        if start is None:
+            from datetime import timedelta
+
+            start = end - timedelta(days=365)
+
+        start_str = start.strftime("%d-%m-%Y")
+        end_str = end.strftime("%d-%m-%Y")
+
+        cache_key = f"isyatirim:index_history:{index_code}:{start_str}:{end_str}"
+        cached = self._cache_get(cache_key)
+        if cached is not None:
+            return cached
+
+        url = f"{self.BASE_URL}/ChartData.aspx/IndexHistoricalAll"
+        params = {
+            "endeks": index_code,
+            "startdate": start_str,
+            "enddate": end_str,
+        }
+
+        try:
+            response = self._get(url, params=params)
+            data = response.json()
+        except Exception as e:
+            raise APIError(f"Failed to fetch index history for {index_code}: {e}") from e
+
+        if not data:
+            raise DataNotAvailableError(f"No data for index: {index_code}")
+
+        df = self._parse_index_history(data)
+        self._cache_set(cache_key, df, TTL.OHLCV_HISTORY)
+
+        return df
+
+    def _parse_index_history(self, data: list[dict[str, Any]]) -> pd.DataFrame:
+        """Parse index history response into DataFrame."""
+        records = []
+        for item in data:
+            try:
+                # Parse timestamp from JavaScript date format
+                date_str = item.get("date", "")
+                if date_str:
+                    dt = datetime.strptime(date_str[:10], "%Y-%m-%d")
+                else:
+                    continue
+
+                records.append(
+                    {
+                        "Date": dt,
+                        "Open": float(item.get("open", 0)),
+                        "High": float(item.get("high", 0)),
+                        "Low": float(item.get("low", 0)),
+                        "Close": float(item.get("close", 0)),
+                        "Volume": int(item.get("volume", 0)),
+                    }
+                )
+            except (ValueError, TypeError):
+                continue
+
+        df = pd.DataFrame(records)
+        if not df.empty:
+            df.set_index("Date", inplace=True)
+            df.sort_index(inplace=True)
+
+        return df
+
+    def get_index_info(self, index_code: str) -> dict[str, Any]:
+        """
+        Get current information for an index.
+
+        Args:
+            index_code: Index code (e.g., "XU100").
+
+        Returns:
+            Dictionary with index information.
+        """
+        index_code = index_code.upper()
+
+        if index_code not in self.INDICES:
+            raise TickerNotFoundError(f"Unknown index: {index_code}")
+
+        # Use the same quote endpoint for indices
+        quote = self.get_realtime_quote(index_code)
+        quote["name"] = self.INDICES.get(index_code, index_code)
+        quote["type"] = "index"
+
+        return quote
+
+    def _get_session_for_stock(self, symbol: str) -> None:
+        """Initialize session by visiting stock page to get cookies."""
+        stock_page_url = f"https://www.isyatirim.com.tr/tr-tr/analiz/hisse/Sayfalar/sirket-karti.aspx?hisse={symbol}"
+        try:
+            # Just make a GET request to establish session cookies
+            self._client.get(stock_page_url, timeout=10)
+        except Exception:
+            pass  # Ignore errors, we'll try the API anyway
+
+    def _fetch_sermaye_data(self, symbol: str) -> dict:
+        """
+        Fetch dividend and capital increase data from İş Yatırım API.
+
+        Returns combined data with both temettuList and sermayeList.
+        """
+        import json
+
+        symbol = symbol.upper().replace(".IS", "").replace(".E", "")
+
+        # First establish session to get ASP.NET_SessionId cookie
+        self._get_session_for_stock(symbol)
+
+        url = f"{self.STOCK_INFO_URL}/GetSermayeArttirimlari"
+
+        # ASP.NET WebMethod expects specific format
+        headers = {
+            "Content-Type": "application/json; charset=UTF-8",
+            "Accept": "application/json, text/javascript, */*; q=0.01",
+            "X-Requested-With": "XMLHttpRequest",
+            "Referer": f"https://www.isyatirim.com.tr/tr-tr/analiz/hisse/Sayfalar/sirket-karti.aspx?hisse={symbol}",
+            "Origin": "https://www.isyatirim.com.tr",
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+        }
+
+        # Correct payload format with hisseKodu
+        payload = json.dumps({
+            "hisseKodu": symbol,
+            "hisseTanimKodu": "",
+            "yil": 0,
+            "zaman": "HEPSI",
+            "endeksKodu": "09",
+            "sektorKodu": "",
+        })
+
+        try:
+            response = self._client.post(url, content=payload, headers=headers, timeout=15)
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            raise APIError(f"Failed to fetch sermaye data for {symbol}: {e}") from e
+
+    def get_dividends(self, symbol: str) -> pd.DataFrame:
+        """
+        Get dividend history for a stock.
+
+        Args:
+            symbol: Stock symbol (e.g., "THYAO").
+
+        Returns:
+            DataFrame with columns: Date, Amount, GrossRate, TotalDividend.
+        """
+        symbol = symbol.upper().replace(".IS", "").replace(".E", "")
+
+        cache_key = f"isyatirim:dividends:{symbol}"
+        cached = self._cache_get(cache_key)
+        if cached is not None:
+            return cached
+
+        try:
+            data = self._fetch_sermaye_data(symbol)
+        except APIError:
+            # Return empty DataFrame if API fails
+            return pd.DataFrame(columns=["Amount", "GrossRate", "NetRate", "TotalDividend"])
+
+        # Parse dividends from response
+        df = self._parse_dividends(data)
+        self._cache_set(cache_key, df, TTL.FINANCIAL_STATEMENTS)
+
+        return df
+
+    def _parse_sermaye_response(self, data: dict[str, Any]) -> list[dict[str, Any]]:
+        """Parse GetSermayeArttirimlari response into list of records."""
+        import json
+
+        # Response structure: {"d": "[{...}, {...}]"} - JSON string inside JSON
+        d_value = data.get("d", "[]")
+
+        if isinstance(d_value, str):
+            try:
+                return json.loads(d_value)
+            except json.JSONDecodeError:
+                return []
+        elif isinstance(d_value, list):
+            return d_value
+        return []
+
+    def _parse_dividends(self, data: dict[str, Any]) -> pd.DataFrame:
+        """Parse dividend data from GetSermayeArttirimlari response."""
+        records = []
+        items = self._parse_sermaye_response(data)
+
+        for item in items:
+            try:
+                # Filter for cash dividend type only: 04 (Nakit Temettü)
+                tip = item.get("SHT_KODU", "")
+                if tip != "04":
+                    continue
+
+                # Parse date from timestamp (milliseconds) - strip time
+                timestamp = item.get("SHHE_TARIH", 0)
+                if timestamp:
+                    dt = datetime.fromtimestamp(timestamp / 1000).replace(
+                        hour=0, minute=0, second=0, microsecond=0
+                    )
+                else:
+                    continue
+
+                # Cash dividend rate and amount
+                gross_rate = float(item.get("SHHE_NAKIT_TM_ORAN", 0) or 0)
+                net_rate = float(item.get("SHHE_NAKIT_TM_ORAN_NET", 0) or 0)
+                total_dividend = float(item.get("SHHE_NAKIT_TM_TUTAR", 0) or 0)
+
+                # Calculate per-share amount (rate / 100 since it's percentage of nominal)
+                amount = gross_rate / 100 if gross_rate else 0
+
+                records.append(
+                    {
+                        "Date": dt,
+                        "Amount": round(amount, 4),
+                        "GrossRate": round(gross_rate, 2),
+                        "NetRate": round(net_rate, 2),
+                        "TotalDividend": total_dividend,
+                    }
+                )
+            except (ValueError, TypeError):
+                continue
+
+        df = pd.DataFrame(records)
+        if not df.empty:
+            df.set_index("Date", inplace=True)
+            df.sort_index(ascending=False, inplace=True)
+
+        return df
+
+    def get_capital_increases(self, symbol: str) -> pd.DataFrame:
+        """
+        Get capital increase (split) history for a stock.
+
+        Args:
+            symbol: Stock symbol (e.g., "THYAO").
+
+        Returns:
+            DataFrame with columns: Date, Capital, RightsIssue, BonusFromCapital, BonusFromDividend.
+        """
+        symbol = symbol.upper().replace(".IS", "").replace(".E", "")
+
+        cache_key = f"isyatirim:splits:{symbol}"
+        cached = self._cache_get(cache_key)
+        if cached is not None:
+            return cached
+
+        try:
+            data = self._fetch_sermaye_data(symbol)
+        except APIError:
+            # Return empty DataFrame if API fails
+            return pd.DataFrame(columns=["Capital", "RightsIssue", "BonusFromCapital", "BonusFromDividend"])
+
+        # Parse capital increases from response
+        df = self._parse_capital_increases(data)
+        self._cache_set(cache_key, df, TTL.FINANCIAL_STATEMENTS)
+
+        return df
+
+    def _parse_capital_increases(self, data: dict[str, Any]) -> pd.DataFrame:
+        """Parse capital increase data from GetSermayeArttirimlari response."""
+        records = []
+        items = self._parse_sermaye_response(data)
+
+        for item in items:
+            try:
+                # Filter for:
+                # - Type 03: Bedelli ve Bedelsiz Sermaye Artırımı (rights + bonus issue)
+                # - Type 09: Bedelsiz Temettü (stock dividend / bonus from dividend)
+                tip = item.get("SHT_KODU", "")
+                if tip not in ("03", "09"):
+                    continue
+
+                # Parse date from timestamp (milliseconds) - strip time
+                timestamp = item.get("SHHE_TARIH", 0)
+                if timestamp:
+                    dt = datetime.fromtimestamp(timestamp / 1000).replace(
+                        hour=0, minute=0, second=0, microsecond=0
+                    )
+                else:
+                    continue
+
+                # Get capital after increase
+                capital = float(item.get("HSP_BOLUNME_SONRASI_SERMAYE", 0) or 0)
+
+                # Rights issue rate (Bedelli)
+                rights_issue = float(item.get("SHHE_BDLI_ORAN", 0) or 0)
+
+                # Bonus from capital reserves (Bedelsiz İç Kaynak)
+                bonus_capital = float(item.get("SHHE_BDSZ_IK_ORAN", 0) or 0)
+
+                # Bonus from dividend (Bedelsiz Temettüden)
+                bonus_dividend = float(item.get("SHHE_BDSZ_TM_ORAN", 0) or 0)
+
+                records.append(
+                    {
+                        "Date": dt,
+                        "Capital": capital,
+                        "RightsIssue": round(rights_issue, 2),
+                        "BonusFromCapital": round(bonus_capital, 2),
+                        "BonusFromDividend": round(bonus_dividend, 2),
+                    }
+                )
+            except (ValueError, TypeError):
+                continue
+
+        df = pd.DataFrame(records)
+        if not df.empty:
+            df.set_index("Date", inplace=True)
+            df.sort_index(ascending=False, inplace=True)
+
+        return df
 
     def _parse_quote(self, data: dict[str, Any]) -> dict[str, Any]:
         """Parse OneEndeks response into standardized format."""

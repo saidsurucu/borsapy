@@ -115,6 +115,95 @@ class Ticker:
         )
 
     @cached_property
+    def dividends(self) -> pd.DataFrame:
+        """
+        Get dividend history.
+
+        Returns:
+            DataFrame with dividend history:
+            - Amount: Dividend per share (TL)
+            - GrossRate: Gross dividend rate (%)
+            - NetRate: Net dividend rate (%)
+            - TotalDividend: Total dividend distributed (TL)
+
+        Examples:
+            >>> stock = Ticker("THYAO")
+            >>> stock.dividends
+                           Amount  GrossRate  NetRate  TotalDividend
+            Date
+            2025-09-02     3.442    344.20   292.57  4750000000.0
+            2025-06-16     3.442    344.20   292.57  4750000000.0
+        """
+        return self._get_isyatirim().get_dividends(self._symbol)
+
+    @cached_property
+    def splits(self) -> pd.DataFrame:
+        """
+        Get capital increase (split) history.
+
+        Note: Turkish market uses capital increases instead of traditional splits.
+        - RightsIssue: Paid capital increase (bedelli)
+        - BonusFromCapital: Free shares from capital reserves (bedelsiz iç kaynak)
+        - BonusFromDividend: Free shares from dividend (bedelsiz temettüden)
+
+        Returns:
+            DataFrame with capital increase history:
+            - Capital: New capital after increase (TL)
+            - RightsIssue: Rights issue rate (%)
+            - BonusFromCapital: Bonus from capital (%)
+            - BonusFromDividend: Bonus from dividend (%)
+
+        Examples:
+            >>> stock = Ticker("THYAO")
+            >>> stock.splits
+                             Capital  RightsIssue  BonusFromCapital  BonusFromDividend
+            Date
+            2013-06-26  1380000000.0         0.0             15.00               0.0
+            2011-07-11  1200000000.0         0.0              0.00              20.0
+        """
+        return self._get_isyatirim().get_capital_increases(self._symbol)
+
+    @cached_property
+    def actions(self) -> pd.DataFrame:
+        """
+        Get combined dividends and splits history.
+
+        Returns:
+            DataFrame with combined dividend and split actions:
+            - Dividends: Dividend per share (TL) or 0
+            - Splits: Combined split ratio (0 if no split)
+
+        Examples:
+            >>> stock = Ticker("THYAO")
+            >>> stock.actions
+                         Dividends  Splits
+            Date
+            2025-09-02      3.442    0.0
+            2013-06-26      0.000   15.0
+        """
+        dividends = self.dividends
+        splits = self.splits
+
+        # Merge on index (Date)
+        if dividends.empty and splits.empty:
+            return pd.DataFrame(columns=["Dividends", "Splits"])
+
+        # Extract relevant columns
+        div_series = dividends["Amount"] if not dividends.empty else pd.Series(dtype=float)
+        split_series = (
+            splits["BonusFromCapital"] + splits["BonusFromDividend"]
+            if not splits.empty
+            else pd.Series(dtype=float)
+        )
+
+        # Combine into single DataFrame
+        result = pd.DataFrame({"Dividends": div_series, "Splits": split_series})
+        result = result.fillna(0)
+        result = result.sort_index(ascending=False)
+
+        return result
+
+    @cached_property
     def balance_sheet(self) -> pd.DataFrame:
         """
         Get annual balance sheet data.

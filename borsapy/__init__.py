@@ -52,8 +52,10 @@ from borsapy.exceptions import (
 )
 from borsapy.fund import Fund, search_funds
 from borsapy.fx import FX
+from borsapy.index import Index, index, indices
 from borsapy.inflation import Inflation
 from borsapy.market import companies, search_companies
+from borsapy.multi import Tickers, download
 from borsapy.ticker import Ticker
 
 __version__ = "0.1.0"
@@ -62,15 +64,20 @@ __author__ = "Said Surucu"
 __all__ = [
     # Main classes
     "Ticker",
+    "Tickers",
     "FX",
     "Crypto",
     "Fund",
+    "Index",
     "Inflation",
     # Market functions
     "companies",
     "search_companies",
     "crypto_pairs",
     "search_funds",
+    "download",
+    "index",
+    "indices",
     # Exceptions
     "BorsapyError",
     "TickerNotFoundError",
