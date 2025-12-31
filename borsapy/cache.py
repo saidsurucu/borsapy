@@ -2,8 +2,8 @@
 
 import time
 from dataclasses import dataclass, field
-from typing import Any, TypeVar, Generic
 from threading import Lock
+from typing import Any, Generic, TypeVar
 
 T = TypeVar("T")
 
@@ -37,10 +37,7 @@ class Cache:
     def set(self, key: str, value: Any, ttl_seconds: int) -> None:
         """Set a value in cache with TTL in seconds."""
         with self._lock:
-            self._store[key] = CacheEntry(
-                value=value,
-                expires_at=time.time() + ttl_seconds
-            )
+            self._store[key] = CacheEntry(value=value, expires_at=time.time() + ttl_seconds)
 
     def delete(self, key: str) -> bool:
         """Delete a key from cache. Returns True if key existed."""

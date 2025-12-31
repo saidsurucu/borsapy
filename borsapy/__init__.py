@@ -12,31 +12,49 @@ Examples:
     >>> stock.history(period="1mo")  # OHLCV data
     >>> stock.balance_sheet  # Financial statements
 
-    # Get forex/commodity data (coming soon)
+    # Get forex/commodity data
     >>> usd = bp.FX("USD")
+    >>> usd.current  # Current rate
+    >>> usd.history(period="1mo")  # Historical data
     >>> gold = bp.FX("gram-altin")
 
-    # Get crypto data (coming soon)
+    # List all BIST companies
+    >>> bp.companies()
+    >>> bp.search_companies("banka")
+
+    # Get crypto data
     >>> btc = bp.Crypto("BTCTRY")
+    >>> btc.current  # Current price
+    >>> btc.history(period="1mo")  # Historical OHLCV
+    >>> bp.crypto_pairs()  # List available pairs
 
-    # Get fund data (coming soon)
+    # Get fund data
     >>> fund = bp.Fund("AAK")
+    >>> fund.info  # Fund details
+    >>> fund.history(period="1mo")  # Price history
 
-    # Get inflation data (coming soon)
-    >>> inflation = bp.Inflation()
+    # Get inflation data
+    >>> inf = bp.Inflation()
+    >>> inf.latest()  # Latest TÜFE data
+    >>> inf.calculate(100000, "2020-01", "2024-01")  # Inflation calculation
 """
 
-from borsapy.ticker import Ticker
+from borsapy.crypto import Crypto, crypto_pairs
 from borsapy.exceptions import (
-    BorsapyError,
-    TickerNotFoundError,
-    DataNotAvailableError,
     APIError,
     AuthenticationError,
-    RateLimitError,
-    InvalidPeriodError,
+    BorsapyError,
+    DataNotAvailableError,
     InvalidIntervalError,
+    InvalidPeriodError,
+    RateLimitError,
+    TickerNotFoundError,
 )
+from borsapy.fund import Fund, search_funds
+from borsapy.fx import FX
+from borsapy.inflation import Inflation
+from borsapy.market import companies, search_companies
+from borsapy.ticker import Ticker
 
 __version__ = "0.1.0"
 __author__ = "Said Surucu"
@@ -44,6 +62,15 @@ __author__ = "Said Surucu"
 __all__ = [
     # Main classes
     "Ticker",
+    "FX",
+    "Crypto",
+    "Fund",
+    "Inflation",
+    # Market functions
+    "companies",
+    "search_companies",
+    "crypto_pairs",
+    "search_funds",
     # Exceptions
     "BorsapyError",
     "TickerNotFoundError",

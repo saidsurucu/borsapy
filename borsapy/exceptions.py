@@ -27,7 +27,9 @@ class APIError(BorsapyError):
 
     def __init__(self, message: str, status_code: int | None = None):
         self.status_code = status_code
-        super().__init__(f"API Error: {message}" + (f" (status: {status_code})" if status_code else ""))
+        super().__init__(
+            f"API Error: {message}" + (f" (status: {status_code})" if status_code else "")
+        )
 
 
 class AuthenticationError(BorsapyError):
@@ -57,4 +59,6 @@ class InvalidIntervalError(BorsapyError):
     def __init__(self, interval: str):
         self.interval = interval
         valid_intervals = ["1m", "5m", "15m", "30m", "1h", "1d", "1wk", "1mo"]
-        super().__init__(f"Invalid interval: {interval}. Valid intervals: {', '.join(valid_intervals)}")
+        super().__init__(
+            f"Invalid interval: {interval}. Valid intervals: {', '.join(valid_intervals)}"
+        )

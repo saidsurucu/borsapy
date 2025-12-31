@@ -78,7 +78,7 @@ class ParaticProvider(BaseProvider):
             response = self._get(self.BASE_URL, params=params)
             data = response.json()
         except Exception as e:
-            raise APIError(f"Failed to fetch quote for {symbol}: {e}")
+            raise APIError(f"Failed to fetch quote for {symbol}: {e}") from e
 
         if not data:
             raise TickerNotFoundError(symbol)
@@ -172,7 +172,7 @@ class ParaticProvider(BaseProvider):
             response = self._get(self.BASE_URL, params=params)
             data = response.json()
         except Exception as e:
-            raise APIError(f"Failed to fetch data for {symbol}: {e}")
+            raise APIError(f"Failed to fetch data for {symbol}: {e}") from e
 
         if not data:
             raise DataNotAvailableError(f"No data available for {symbol}")
@@ -229,14 +229,16 @@ class ParaticProvider(BaseProvider):
                 if dt < start_dt or dt > end_dt:
                     continue
 
-                records.append({
-                    "Date": dt,
-                    "Open": float(item.get("o", 0)),
-                    "High": float(item.get("h", 0)),
-                    "Low": float(item.get("l", 0)),
-                    "Close": float(item.get("c", 0)),
-                    "Volume": int(item.get("v", 0)),
-                })
+                records.append(
+                    {
+                        "Date": dt,
+                        "Open": float(item.get("o", 0)),
+                        "High": float(item.get("h", 0)),
+                        "Low": float(item.get("l", 0)),
+                        "Close": float(item.get("c", 0)),
+                        "Volume": int(item.get("v", 0)),
+                    }
+                )
             except (TypeError, ValueError):
                 continue
 

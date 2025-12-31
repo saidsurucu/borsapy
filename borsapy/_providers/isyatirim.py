@@ -61,7 +61,7 @@ class IsYatirimProvider(BaseProvider):
             response = self._get(url, params=params)
             data = response.json()
         except Exception as e:
-            raise APIError(f"Failed to fetch quote for {symbol}: {e}")
+            raise APIError(f"Failed to fetch quote for {symbol}: {e}") from e
 
         if not data or "symbol" not in data:
             raise TickerNotFoundError(symbol)
@@ -218,7 +218,7 @@ class IsYatirimProvider(BaseProvider):
             response = self._get(url, params=params)
             data = response.json()
         except Exception as e:
-            raise APIError(f"Failed to fetch financial data for {symbol}: {e}")
+            raise APIError(f"Failed to fetch financial data for {symbol}: {e}") from e
 
         return self._parse_financial_response(data, periods)
 

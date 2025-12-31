@@ -1,6 +1,5 @@
 """Base provider class for all data providers."""
 
-from abc import ABC, abstractmethod
 from typing import Any
 
 import httpx
@@ -8,8 +7,8 @@ import httpx
 from borsapy.cache import Cache, get_cache
 
 
-class BaseProvider(ABC):
-    """Abstract base class for all data providers."""
+class BaseProvider:
+    """Base class for all data providers."""
 
     DEFAULT_HEADERS = {
         "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",

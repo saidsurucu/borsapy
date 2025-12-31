@@ -42,6 +42,7 @@ class Ticker:
         """Lazy load İş Yatırım provider for financial statements."""
         if self._isyatirim is None:
             from borsapy._providers.isyatirim import get_isyatirim_provider
+
             self._isyatirim = get_isyatirim_provider()
         return self._isyatirim
 
