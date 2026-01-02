@@ -54,7 +54,12 @@ import borsapy as bp
 
 hisse = bp.Ticker("THYAO")
 
-# Anlık fiyat bilgileri
+# Hızlı fiyat bilgisi (cache'den, API çağrısı yapmaz)
+print(hisse.fast_info["last_price"])     # Son fiyat
+print(hisse.fast_info["previous_close"]) # Önceki kapanış
+print(hisse.fast_info["volume"])         # Hacim
+
+# Detaylı bilgiler (tüm verileri yükler)
 print(hisse.info["last"])           # Son fiyat
 print(hisse.info["marketCap"])      # Piyasa değeri
 print(hisse.info["trailingPE"])     # F/K oranı
@@ -187,9 +192,6 @@ print(bp.indices())
 # Endeks verisi
 xu100 = bp.Index("XU100")
 print(xu100.history(period="1ay"))
-
-# Endeks bileşenleri
-print(xu100.components)
 ```
 
 ---
@@ -302,10 +304,10 @@ import borsapy as bp
 viop = bp.VIOP()
 
 # Vadeli işlem kontratları
-print(viop.futures())
+print(viop.futures)
 
 # Opsiyon verileri
-print(viop.options("F_XU0300225"))
+print(viop.options)
 ```
 
 ---
