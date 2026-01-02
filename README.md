@@ -356,7 +356,7 @@ print(sonuc)
 
 | Modül | Kaynak | Açıklama |
 |-------|--------|----------|
-| Ticker | İş Yatırım, Paratic, KAP | Hisse verileri, finansallar, bildirimler |
+| Ticker | İş Yatırım, Paratic, KAP, hedeffiyat.com.tr, isinturkiye.com.tr | Hisse verileri, finansallar, bildirimler, analist hedefleri, ISIN |
 | Index | Paratic | BIST endeksleri |
 | FX | doviz.com | Döviz kurları, altın, emtia |
 | Crypto | BtcTurk | Kripto para verileri |
