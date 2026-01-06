@@ -8,6 +8,21 @@ import pandas as pd
 from borsapy._providers.dovizcom import get_dovizcom_provider
 
 
+def banks() -> list[str]:
+    """
+    Get list of supported banks for exchange rates.
+
+    Returns:
+        List of bank codes.
+
+    Examples:
+        >>> import borsapy as bp
+        >>> bp.banks()
+        ['akbank', 'albaraka', 'alternatifbank', 'anadolubank', ...]
+    """
+    return get_dovizcom_provider().get_banks()
+
+
 class FX:
     """
     A yfinance-like interface for forex and commodity data.
@@ -77,6 +92,57 @@ class FX:
     def info(self) -> dict[str, Any]:
         """Alias for current property (yfinance compatibility)."""
         return self.current
+
+    @property
+    def bank_rates(self) -> pd.DataFrame:
+        """
+        Get exchange rates from all banks.
+
+        Returns:
+            DataFrame with columns: bank, bank_name, currency, buy, sell, spread
+
+        Examples:
+            >>> usd = FX("USD")
+            >>> usd.bank_rates
+                      bank        bank_name currency      buy     sell  spread
+            0       akbank           Akbank      USD  41.6610  44.1610    5.99
+            1      garanti     Garanti BBVA      USD  41.7000  44.2000    5.99
+            ...
+        """
+        return self._provider.get_bank_rates(self._asset)
+
+    def bank_rate(self, bank: str) -> dict[str, Any]:
+        """
+        Get exchange rate from a specific bank.
+
+        Args:
+            bank: Bank code (akbank, garanti, isbank, ziraat, etc.)
+
+        Returns:
+            Dictionary with keys: bank, currency, buy, sell, spread
+
+        Examples:
+            >>> usd = FX("USD")
+            >>> usd.bank_rate("akbank")
+            {'bank': 'akbank', 'currency': 'USD', 'buy': 41.6610, 'sell': 44.1610, 'spread': 5.99}
+        """
+        return self._provider.get_bank_rates(self._asset, bank=bank)
+
+    @staticmethod
+    def banks() -> list[str]:
+        """
+        Get list of supported banks.
+
+        Returns:
+            List of bank codes.
+
+        Examples:
+            >>> FX.banks()
+            ['akbank', 'albaraka', 'alternatifbank', 'anadolubank', ...]
+        """
+        from borsapy._providers.dovizcom import get_dovizcom_provider
+
+        return get_dovizcom_provider().get_banks()
 
     def history(
         self,

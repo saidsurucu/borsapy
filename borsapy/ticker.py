@@ -27,7 +27,8 @@ class FastInfo:
         day_high: Day's high
         day_low: Day's low
         previous_close: Previous close price
-        volume: Trading volume
+        volume: Trading volume (lot)
+        amount: Trading volume (TL)
         market_cap: Market capitalization
         shares: Shares outstanding
         pe_ratio: Price/Earnings ratio (F/K)
@@ -48,6 +49,7 @@ class FastInfo:
         "day_low",
         "previous_close",
         "volume",
+        "amount",
         "market_cap",
         "shares",
         "pe_ratio",
@@ -113,6 +115,7 @@ class FastInfo:
             "day_low": info.get("low"),
             "previous_close": info.get("close"),
             "volume": info.get("volume"),
+            "amount": info.get("amount"),
             "market_cap": metrics.get("market_cap"),
             "shares": shares,
             "pe_ratio": metrics.get("pe_ratio"),
@@ -166,7 +169,7 @@ class EnrichedInfo:
     Lazy-loading info dictionary with yfinance-compatible field names.
 
     Provides dict-like access to ticker information with three lazy-loaded groups:
-    - Basic fields (from Paratic quote): last, open, high, low, close, volume
+    - Basic fields (from Paratic quote): last, open, high, low, close, volume, amount
     - Extended fields (from İş Yatırım + calculations): marketCap, trailingPE, etc.
     - Dividend fields (calculated): dividendYield, exDividendDate
 
@@ -211,7 +214,8 @@ class EnrichedInfo:
         "high",
         "low",
         "close",
-        "volume",
+        "volume",  # Lot bazında hacim
+        "amount",  # TL bazında hacim
         "change",
         "change_percent",
         "update_time",

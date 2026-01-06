@@ -98,6 +98,12 @@ class ParaticProvider(BaseProvider):
         change = last - prev_close if prev_close else 0
         change_pct = (change / prev_close * 100) if prev_close else 0
 
+        # TL bazında hacim (amount)
+        amount = float(latest.get("a", 0))
+
+        # Lot bazında hacim: TL hacminden hesapla (Paratic'in v değeri hatalı)
+        volume = int(amount / last) if last > 0 else 0
+
         result = {
             "symbol": symbol,
             "last": last,
@@ -105,7 +111,8 @@ class ParaticProvider(BaseProvider):
             "high": float(latest.get("h", 0)),
             "low": float(latest.get("l", 0)),
             "close": prev_close,
-            "volume": int(latest.get("v", 0)),
+            "volume": volume,  # Lot bazında hacim (hesaplanmış)
+            "amount": amount,  # TL bazında hacim
             "change": round(change, 2),
             "change_percent": round(change_pct, 2),
             "update_time": datetime.fromtimestamp(latest.get("d", 0) / 1000),
