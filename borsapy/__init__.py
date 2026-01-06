@@ -83,7 +83,7 @@ from borsapy.screener import Screener, screen_stocks, screener_criteria, sectors
 from borsapy.ticker import Ticker
 from borsapy.viop import VIOP
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 __author__ = "Said Surucu"
 
 __all__ = [
