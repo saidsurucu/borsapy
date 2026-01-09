@@ -4,7 +4,7 @@
 [![PyPI downloads](https://img.shields.io/pypi/dm/borsapy)](https://pypi.org/project/borsapy/)
 [![Python version](https://img.shields.io/pypi/pyversions/borsapy)](https://pypi.org/project/borsapy/)
 [![License](https://img.shields.io/pypi/l/borsapy)](https://github.com/saidsurucu/borsapy/blob/master/LICENSE)
-[![Documentation](https://img.shields.io/badge/docs-API%20Reference-blue)](https://saidsurucu.github.io/borsa-py/)
+[![Documentation](https://img.shields.io/badge/docs-API%20Reference-blue)](https://saidsurucu.github.io/borsapy/borsapy.html)
 
 Türk finansal piyasaları için Python veri kütüphanesi. BIST hisseleri, döviz, kripto, yatırım fonları ve ekonomik veriler için yfinance benzeri API.
 
