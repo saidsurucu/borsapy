@@ -74,7 +74,7 @@ from borsapy.exceptions import (
     TickerNotFoundError,
 )
 from borsapy.fund import Fund, compare_funds, screen_funds, search_funds
-from borsapy.fx import FX, banks
+from borsapy.fx import FX, banks, metal_institutions
 from borsapy.index import Index, index, indices
 from borsapy.inflation import Inflation
 from borsapy.market import companies, search_companies
@@ -83,7 +83,7 @@ from borsapy.screener import Screener, screen_stocks, screener_criteria, sectors
 from borsapy.ticker import Ticker
 from borsapy.viop import VIOP
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 __author__ = "Said Surucu"
 
 __all__ = [
@@ -103,6 +103,7 @@ __all__ = [
     "companies",
     "search_companies",
     "banks",
+    "metal_institutions",
     "crypto_pairs",
     "search_funds",
     "screen_funds",

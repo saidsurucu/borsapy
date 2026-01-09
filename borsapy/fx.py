@@ -23,6 +23,21 @@ def banks() -> list[str]:
     return get_dovizcom_provider().get_banks()
 
 
+def metal_institutions() -> list[str]:
+    """
+    Get list of supported precious metal assets for institution rates.
+
+    Returns:
+        List of asset codes that support institution_rates.
+
+    Examples:
+        >>> import borsapy as bp
+        >>> bp.metal_institutions()
+        ['gram-altin', 'gram-gumus', 'gram-paladyum', 'gram-platin', 'ons-altin']
+    """
+    return get_dovizcom_provider().get_metal_institutions()
+
+
 class FX:
     """
     A yfinance-like interface for forex and commodity data.
@@ -144,6 +159,61 @@ class FX:
 
         return get_dovizcom_provider().get_banks()
 
+    @property
+    def institution_rates(self) -> pd.DataFrame:
+        """
+        Get precious metal rates from all institutions (kuyumcular, bankalar).
+
+        Only available for precious metals: gram-altin, gram-gumus, ons-altin,
+        gram-platin, gram-paladyum
+
+        Returns:
+            DataFrame with columns: institution, institution_name, asset, buy, sell, spread
+
+        Examples:
+            >>> gold = FX("gram-altin")
+            >>> gold.institution_rates
+                   institution  institution_name       asset      buy     sell  spread
+            0      altinkaynak       Altınkaynak  gram-altin  6315.00  6340.00    0.40
+            1           akbank            Akbank  gram-altin  6310.00  6330.00    0.32
+            ...
+        """
+        return self._provider.get_metal_institution_rates(self._asset)
+
+    def institution_rate(self, institution: str) -> dict[str, Any]:
+        """
+        Get precious metal rate from a specific institution.
+
+        Args:
+            institution: Institution slug (kapalicarsi, altinkaynak, akbank, etc.)
+
+        Returns:
+            Dictionary with keys: institution, institution_name, asset, buy, sell, spread
+
+        Examples:
+            >>> gold = FX("gram-altin")
+            >>> gold.institution_rate("akbank")
+            {'institution': 'akbank', 'institution_name': 'Akbank', 'asset': 'gram-altin',
+             'buy': 6310.00, 'sell': 6330.00, 'spread': 0.32}
+        """
+        return self._provider.get_metal_institution_rates(self._asset, institution=institution)
+
+    @staticmethod
+    def metal_institutions() -> list[str]:
+        """
+        Get list of supported precious metal assets for institution rates.
+
+        Returns:
+            List of asset codes that support institution_rates.
+
+        Examples:
+            >>> FX.metal_institutions()
+            ['gram-altin', 'gram-gumus', 'gram-paladyum', 'gram-platin', 'ons-altin']
+        """
+        from borsapy._providers.dovizcom import get_dovizcom_provider
+
+        return get_dovizcom_provider().get_metal_institutions()
+
     def history(
         self,
         period: str = "1mo",
@@ -174,6 +244,53 @@ class FX:
 
         return self._provider.get_history(
             asset=self._asset,
+            period=period,
+            start=start_dt,
+            end=end_dt,
+        )
+
+    def institution_history(
+        self,
+        institution: str,
+        period: str = "1mo",
+        start: datetime | str | None = None,
+        end: datetime | str | None = None,
+    ) -> pd.DataFrame:
+        """
+        Get historical OHLC data from a specific institution.
+
+        Supports both precious metals and currencies.
+
+        Args:
+            institution: Institution slug (akbank, kapalicarsi, harem, etc.)
+            period: How much data to fetch. Valid periods:
+                    1d, 5d, 1mo, 3mo, 6mo, 1y.
+                    Ignored if start is provided.
+            start: Start date (string or datetime).
+            end: End date (string or datetime). Defaults to today.
+
+        Returns:
+            DataFrame with columns: Open, High, Low, Close.
+            Index is the Date.
+            Note: Banks typically return only Close values (Open/High/Low = 0).
+
+        Examples:
+            >>> # Metal history
+            >>> gold = FX("gram-altin")
+            >>> gold.institution_history("akbank", period="1mo")
+            >>> gold.institution_history("kapalicarsi", start="2024-01-01")
+
+            >>> # Currency history
+            >>> usd = FX("USD")
+            >>> usd.institution_history("akbank", period="1mo")
+            >>> usd.institution_history("garanti-bbva", period="5d")
+        """
+        start_dt = self._parse_date(start) if start else None
+        end_dt = self._parse_date(end) if end else None
+
+        return self._provider.get_institution_history(
+            asset=self._asset,
+            institution=institution,
             period=period,
             start=start_dt,
             end=end_dt,

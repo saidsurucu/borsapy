@@ -4,6 +4,7 @@
 [![PyPI downloads](https://img.shields.io/pypi/dm/borsapy)](https://pypi.org/project/borsapy/)
 [![Python version](https://img.shields.io/pypi/pyversions/borsapy)](https://pypi.org/project/borsapy/)
 [![License](https://img.shields.io/pypi/l/borsapy)](https://github.com/saidsurucu/borsapy/blob/master/LICENSE)
+[![Documentation](https://img.shields.io/badge/docs-API%20Reference-blue)](https://saidsurucu.github.io/borsa-py/)
 
 Türk finansal piyasaları için Python veri kütüphanesi. BIST hisseleri, döviz, kripto, yatırım fonları ve ekonomik veriler için yfinance benzeri API.
 
@@ -264,11 +265,53 @@ yarim = bp.FX("yarim-altin")
 tam = bp.FX("tam-altin")
 cumhuriyet = bp.FX("cumhuriyet-altini")
 
-# Gümüş
-gumus = bp.FX("gumus")
+# Diğer değerli metaller
+gumus = bp.FX("gram-gumus")
+ons_altin = bp.FX("ons-altin")
+platin = bp.FX("gram-platin")
+paladyum = bp.FX("gram-paladyum")
 
 print(gram_altin.current)
 print(gram_altin.history(period="1ay"))
+```
+
+### Kurum Fiyatları (Kuyumcu/Banka)
+
+```python
+# Değerli metal kurum fiyatları
+gold = bp.FX("gram-altin")
+
+# Tüm kurumların fiyatları
+print(gold.institution_rates)
+#       institution institution_name       asset      buy     sell  spread
+# 0     altinkaynak      Altınkaynak  gram-altin  6315.00  6340.00    0.40
+# 1          akbank           Akbank  gram-altin  6310.00  6330.00    0.32
+
+# Tek kurum fiyatı
+print(gold.institution_rate("kapalicarsi"))
+print(gold.institution_rate("akbank"))
+
+# Desteklenen emtialar
+print(bp.metal_institutions())
+# ['gram-altin', 'gram-gumus', 'ons-altin', 'gram-platin', 'gram-paladyum']
+```
+
+### Kurum Bazlı Geçmiş (Metal + Döviz)
+
+```python
+# Metal geçmişi
+gold = bp.FX("gram-altin")
+gold.institution_history("akbank", period="1mo")       # Akbank 1 aylık
+gold.institution_history("kapalicarsi", period="3mo")  # Kapalıçarşı 3 aylık
+
+# Döviz geçmişi
+usd = bp.FX("USD")
+usd.institution_history("akbank", period="1mo")        # Akbank USD 1 aylık
+usd.institution_history("garanti-bbva", period="5d")   # Garanti 5 günlük
+
+# 27 kurum destekleniyor (bankalar + kuyumcular)
+# Kuyumcular (kapalicarsi, harem, altinkaynak) OHLC verir
+# Bankalar (akbank, garanti) sadece Close verir
 ```
 
 ---
@@ -362,6 +405,29 @@ print(result['summary'])            # Özet
 #   avg_return_1y: 53.65
 #   best_return_1y: 100.84
 #   worst_return_1y: 28.15
+```
+
+### Risk Metrikleri
+
+```python
+fon = bp.Fund("YAY")
+
+# Sharpe oranı (10Y tahvil faizi ile)
+print(fon.sharpe_ratio())              # 1Y Sharpe
+print(fon.sharpe_ratio(period="3y"))   # 3Y Sharpe
+
+# Tüm risk metrikleri
+metrics = fon.risk_metrics(period="1y")
+print(metrics['annualized_return'])     # Yıllık getiri (%)
+print(metrics['annualized_volatility']) # Yıllık volatilite (%)
+print(metrics['sharpe_ratio'])          # Sharpe oranı
+print(metrics['sortino_ratio'])         # Sortino oranı (downside risk)
+print(metrics['max_drawdown'])          # Maksimum düşüş (%)
+
+# Uzun dönem desteği
+fon.history(period="3y")   # 3 yıllık veri
+fon.history(period="5y")   # 5 yıllık veri
+fon.history(period="max")  # Tüm veri (5 yıla kadar)
 ```
 
 ---

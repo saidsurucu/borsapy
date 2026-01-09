@@ -95,6 +95,55 @@ class DovizcomProvider(BaseProvider):
         "QAR": "katar-riyali",
     }
 
+    # Precious metal slug mapping for altin.doviz.com institution rates
+    METAL_SLUGS = {
+        "gram-altin": "gram-altin",
+        "gram-gumus": "gumus",
+        "ons-altin": "ons",
+        "gram-platin": "gram-platin",
+        "gram-paladyum": "gram-paladyum",
+    }
+
+    # Asset to API slug mapping (for history/current endpoints)
+    # Some assets use different slugs in API vs user-facing names
+    HISTORY_API_SLUGS = {
+        "gram-gumus": "gumus",
+        "ons-altin": "ons",
+    }
+
+    # Institution ID mapping for history API
+    # Pattern: {institution_id}-{metal_slug} → e.g., "1-gram-altin" for Akbank gram gold
+    # IDs discovered from altin.doviz.com/{institution}/{metal} pages
+    INSTITUTION_IDS = {
+        "akbank": 1,
+        "qnb-finansbank": 2,
+        "halkbank": 3,
+        "isbankasi": 4,
+        "vakifbank": 5,
+        "yapikredi": 6,
+        "ziraat-bankasi": 7,
+        "garanti-bbva": 8,
+        "sekerbank": 9,
+        "denizbank": 10,
+        "hsbc": 12,
+        "turkiye-finans": 13,
+        "ziraat-katilim": 14,
+        "vakif-katilim": 15,
+        "ing-bank": 16,
+        "kuveyt-turk": 17,
+        "albaraka-turk": 18,
+        "enpara": 19,
+        "kapalicarsi": 20,
+        "odaci": 22,
+        "harem": 23,
+        "altinkaynak": 24,
+        "hayat-finans": 29,
+        "emlak-katilim": 30,
+        "fibabanka": 31,
+        "odeabank": 36,
+        "getirfinans": 37,
+    }
+
     SUPPORTED_ASSETS = {
         # Currencies
         "USD",
@@ -107,8 +156,12 @@ class DovizcomProvider(BaseProvider):
         # Precious Metals (TRY)
         "gram-altin",
         "gumus",
+        "gram-gumus",
+        "gram-platin",
+        "gram-paladyum",
         # Precious Metals (USD)
         "ons",
+        "ons-altin",
         "XAG-USD",
         "XPT-USD",
         "XPD-USD",
@@ -268,7 +321,8 @@ class DovizcomProvider(BaseProvider):
             return cached
 
         try:
-            url = f"{self.BASE_URL}/assets/{asset}/archive"
+            api_slug = self.HISTORY_API_SLUGS.get(asset, asset)
+            url = f"{self.BASE_URL}/assets/{api_slug}/archive"
             params = {
                 "start": int(start_dt.timestamp()),
                 "end": int(end_dt.timestamp()),
@@ -305,7 +359,8 @@ class DovizcomProvider(BaseProvider):
 
     def _get_from_daily(self, asset: str) -> dict | None:
         """Get latest data from daily endpoint."""
-        url = f"{self.BASE_URL}/assets/{asset}/daily"
+        api_slug = self.HISTORY_API_SLUGS.get(asset, asset)
+        url = f"{self.BASE_URL}/assets/{api_slug}/daily"
         response = self._client.get(url, headers=self._get_headers(asset), params={"limit": 1})
         response.raise_for_status()
         data = response.json()
@@ -318,7 +373,8 @@ class DovizcomProvider(BaseProvider):
         end_time = int(time.time())
         start_time = end_time - (days * 86400)
 
-        url = f"{self.BASE_URL}/assets/{asset}/archive"
+        api_slug = self.HISTORY_API_SLUGS.get(asset, asset)
+        url = f"{self.BASE_URL}/assets/{api_slug}/archive"
         params = {"start": start_time, "end": end_time}
 
         response = self._client.get(url, headers=self._get_headers(asset), params=params)
@@ -547,6 +603,269 @@ class DovizcomProvider(BaseProvider):
             return float(value)
         except (ValueError, TypeError):
             return None
+
+    # ========== Metal Institution Rates ==========
+
+    def get_metal_institutions(self) -> list[str]:
+        """Get list of supported precious metal assets for institution rates."""
+        return sorted(self.METAL_SLUGS.keys())
+
+    def get_metal_institution_rates(
+        self, asset: str, institution: str | None = None
+    ) -> pd.DataFrame | dict[str, Any]:
+        """
+        Get precious metal rates from institutions (kuyumcular, bankalar).
+
+        Args:
+            asset: Asset code (gram-altin, gram-gumus, ons-altin, gram-platin, gram-paladyum)
+            institution: Optional institution slug. If None, returns all institutions.
+
+        Returns:
+            DataFrame with all institutions or dict for single institution.
+        """
+        if asset not in self.METAL_SLUGS:
+            raise DataNotAvailableError(
+                f"Asset '{asset}' not supported for institution rates. "
+                f"Supported: {', '.join(sorted(self.METAL_SLUGS.keys()))}"
+            )
+
+        if institution:
+            # Single institution - filter from all rates
+            cache_key = f"dovizcom:metal_institution_rate:{asset}:{institution}"
+            cached = self._cache.get(cache_key)
+            if cached:
+                return cached
+
+            all_rates = self._fetch_all_metal_institution_rates(asset)
+            for rate in all_rates:
+                if rate["institution"] == institution:
+                    self._cache.set(cache_key, rate, TTL.FX_RATES)
+                    return rate
+
+            raise DataNotAvailableError(
+                f"Institution '{institution}' not found for asset '{asset}'"
+            )
+
+        # All institutions
+        cache_key = f"dovizcom:metal_institution_rates:{asset}"
+        cached = self._cache.get(cache_key)
+        if cached is not None:
+            return cached
+
+        rates = self._fetch_all_metal_institution_rates(asset)
+        df = pd.DataFrame(rates)
+        if not df.empty:
+            df = df.sort_values("institution").reset_index(drop=True)
+
+        self._cache.set(cache_key, df, TTL.FX_RATES)
+        return df
+
+    def _fetch_all_metal_institution_rates(self, asset: str) -> list[dict[str, Any]]:
+        """Fetch institution rates from altin.doviz.com."""
+        slug = self.METAL_SLUGS.get(asset, asset)
+        url = f"https://altin.doviz.com/{slug}"
+
+        try:
+            response = self._client.get(
+                url,
+                headers={
+                    "User-Agent": self.DEFAULT_HEADERS["User-Agent"],
+                    "Accept": "text/html,application/xhtml+xml",
+                },
+            )
+            response.raise_for_status()
+            return self._parse_metal_institution_rates_html(response.text, asset)
+        except Exception as e:
+            raise APIError(f"Failed to fetch metal institution rates: {e}") from e
+
+    def _parse_metal_institution_rates_html(
+        self, html: str, asset: str
+    ) -> list[dict[str, Any]]:
+        """Parse institution rates table from altin.doviz.com HTML."""
+        soup = BeautifulSoup(html, "html.parser")
+        records = []
+
+        # Find the bank rates table (data-sortable attribute)
+        tables = soup.find_all("table", {"data-sortable": True})
+        if not tables:
+            # Try alternative: look for table with specific class patterns
+            tables = soup.find_all("table", class_=re.compile(r"table|kurlar", re.I))
+
+        for table in tables:
+            tbody = table.find("tbody")
+            if not tbody:
+                continue
+
+            for row in tbody.find_all("tr"):
+                cells = row.find_all("td")
+                if len(cells) < 5:
+                    continue
+
+                # First cell contains the institution link and name
+                link = cells[0].find("a")
+                if not link:
+                    continue
+
+                href = link.get("href", "")
+                institution_name = link.get_text(strip=True)
+
+                # Extract institution slug from URL
+                # URL pattern: https://altin.doviz.com/institution-slug/asset-slug
+                # or: https://altin.doviz.com/institution-slug
+                slug_match = re.search(r"altin\.doviz\.com/([^/]+)", href)
+                if not slug_match:
+                    continue
+
+                institution_slug = slug_match.group(1)
+
+                # Skip if it's an asset page, not an institution
+                if institution_slug in self.METAL_SLUGS.values():
+                    continue
+
+                # Parse numeric values
+                buy = self._parse_turkish_number(cells[1].get_text(strip=True))
+                sell = self._parse_turkish_number(cells[2].get_text(strip=True))
+
+                # Spread is in cell 4 (index 4), remove % sign
+                spread_text = cells[4].get_text(strip=True).replace("%", "").strip()
+                spread = self._parse_turkish_number(spread_text)
+
+                if buy and sell:
+                    records.append(
+                        {
+                            "institution": institution_slug,
+                            "institution_name": institution_name,
+                            "asset": asset,
+                            "buy": buy,
+                            "sell": sell,
+                            "spread": spread if spread else round((sell - buy) / buy * 100, 2),
+                        }
+                    )
+
+        return records
+
+    def get_institution_history(
+        self,
+        asset: str,
+        institution: str,
+        period: str = "1mo",
+        start: datetime | None = None,
+        end: datetime | None = None,
+    ) -> pd.DataFrame:
+        """
+        Get historical data for a specific institution's rates.
+
+        Supports both precious metals and currencies.
+
+        Args:
+            asset: Asset code. Supported:
+                   - Metals: gram-altin, gram-gumus, ons-altin, gram-platin, gram-paladyum
+                   - Currencies: USD, EUR, GBP, CHF, CAD, AUD, JPY, etc.
+            institution: Institution slug (akbank, kapalicarsi, harem, etc.).
+            period: Period (1d, 5d, 1mo, 3mo, 6mo, 1y). Ignored if start is provided.
+            start: Start date.
+            end: End date.
+
+        Returns:
+            DataFrame with OHLC data (Open, High, Low, Close) indexed by Date.
+            Note: Banks typically return only Close values (Open/High/Low = 0).
+
+        Raises:
+            DataNotAvailableError: If asset or institution is not supported.
+            APIError: If API request fails.
+
+        Examples:
+            >>> provider = get_dovizcom_provider()
+            >>> # Metal history
+            >>> provider.get_institution_history("gram-altin", "akbank", period="1mo")
+            >>> # Currency history
+            >>> provider.get_institution_history("USD", "akbank", period="1mo")
+        """
+        # Validate institution
+        if institution not in self.INSTITUTION_IDS:
+            supported = ", ".join(self.INSTITUTION_IDS.keys())
+            raise DataNotAvailableError(
+                f"Unsupported institution: {institution}. Supported: {supported}"
+            )
+
+        # Determine asset type and build API slug
+        asset_upper = asset.upper()
+        if asset in self.METAL_SLUGS:
+            # Metal asset
+            api_asset_slug = self.METAL_SLUGS[asset]
+        elif asset_upper in self.CURRENCY_SLUGS:
+            # Currency asset
+            api_asset_slug = asset_upper
+        else:
+            metal_supported = ", ".join(self.METAL_SLUGS.keys())
+            currency_supported = ", ".join(self.CURRENCY_SLUGS.keys())
+            raise DataNotAvailableError(
+                f"Unsupported asset: {asset}. "
+                f"Supported metals: {metal_supported}. "
+                f"Supported currencies: {currency_supported}"
+            )
+
+        # Calculate date range
+        end_dt = end or datetime.now()
+        if start:
+            start_dt = start
+        else:
+            days = {"1d": 1, "5d": 5, "1mo": 30, "3mo": 90, "6mo": 180, "1y": 365}.get(period, 30)
+            start_dt = end_dt - timedelta(days=days)
+
+        cache_key = f"dovizcom:institution_history:{asset}:{institution}:{start_dt.date()}:{end_dt.date()}"
+        cached = self._cache_get(cache_key)
+        if cached is not None:
+            return cached
+
+        try:
+            # Build API slug: {institution_id}-{asset_slug}
+            institution_id = self.INSTITUTION_IDS[institution]
+            api_slug = f"{institution_id}-{api_asset_slug}"
+
+            url = f"{self.BASE_URL}/assets/{api_slug}/archive"
+            params = {
+                "start": int(start_dt.timestamp()),
+                "end": int(end_dt.timestamp()),
+            }
+
+            response = self._client.get(url, headers=self._get_headers(asset), params=params)
+            response.raise_for_status()
+            data = response.json()
+
+            archive = data.get("data", {}).get("archive", [])
+
+            records = []
+            for item in archive:
+                records.append(
+                    {
+                        "Date": self._parse_timestamp(item.get("update_date")),
+                        "Open": float(item.get("open", 0)),
+                        "High": float(item.get("highest", 0)),
+                        "Low": float(item.get("lowest", 0)),
+                        "Close": float(item.get("close", 0)),
+                    }
+                )
+
+            df = pd.DataFrame(records)
+            if not df.empty:
+                df.set_index("Date", inplace=True)
+                df.sort_index(inplace=True)
+
+            self._cache_set(cache_key, df, TTL.OHLCV_HISTORY)
+            return df
+
+        except Exception as e:
+            raise APIError(f"Failed to fetch institution history for {asset} from {institution}: {e}") from e
+
+    def get_metal_institutions(self) -> list[str]:
+        """
+        Get list of institutions that support metal history data.
+
+        Returns:
+            List of institution slugs.
+        """
+        return list(self.INSTITUTION_IDS.keys())
 
 
 # Singleton

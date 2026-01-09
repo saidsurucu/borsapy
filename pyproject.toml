@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "borsapy"
-version = "0.2.0"
+version = "0.3.0"
 description = "Turkish financial markets data library - yfinance-like API for BIST stocks, forex, crypto, and more"
 readme = "README.md"
 license = { text = "Apache-2.0" }
@@ -71,3 +71,8 @@ ignore = ["E501"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+
+[dependency-groups]
+dev = [
+    "pdoc>=15.0.4",
+]

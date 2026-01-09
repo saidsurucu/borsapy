@@ -208,6 +208,9 @@ class TEFASProvider(BaseProvider):
         except Exception as e:
             raise APIError(f"Failed to fetch fund detail for {fund_code}: {e}") from e
 
+    # WAF limit for TEFAS API - requests longer than ~90 days get blocked
+    MAX_CHUNK_DAYS = 90
+
     def get_history(
         self,
         fund_code: str,
@@ -220,12 +223,16 @@ class TEFASProvider(BaseProvider):
 
         Args:
             fund_code: TEFAS fund code
-            period: Data period (1d, 5d, 1mo, 3mo, 6mo, 1y)
+            period: Data period (1d, 5d, 1mo, 3mo, 6mo, 1y, 3y, 5y, max)
             start: Start date
             end: End date
 
         Returns:
             DataFrame with price history.
+
+        Note:
+            For periods longer than 90 days, data is fetched in chunks
+            to avoid TEFAS WAF blocking.
         """
         fund_code = fund_code.upper()
 
@@ -234,7 +241,17 @@ class TEFASProvider(BaseProvider):
         if start:
             start_dt = start
         else:
-            days = {"1d": 1, "5d": 5, "1mo": 30, "3mo": 90, "6mo": 180, "1y": 365}.get(period, 30)
+            days = {
+                "1d": 1,
+                "5d": 5,
+                "1mo": 30,
+                "3mo": 90,
+                "6mo": 180,
+                "1y": 365,
+                "3y": 365 * 3,
+                "5y": 365 * 5,
+                "max": 365 * 5,  # Limited to 5y due to WAF constraints
+            }.get(period, 30)
             start_dt = end_dt - timedelta(days=days)
 
         cache_key = f"tefas:history:{fund_code}:{start_dt.date()}:{end_dt.date()}"
@@ -242,6 +259,73 @@ class TEFASProvider(BaseProvider):
         if cached is not None:
             return cached
 
+        # Check if we need chunked requests
+        total_days = (end_dt - start_dt).days
+        if total_days > self.MAX_CHUNK_DAYS:
+            df = self._get_history_chunked(fund_code, start_dt, end_dt)
+        else:
+            df = self._fetch_history_chunk(fund_code, start_dt, end_dt)
+
+        self._cache_set(cache_key, df, TTL.OHLCV_HISTORY)
+        return df
+
+    def _get_history_chunked(
+        self,
+        fund_code: str,
+        start_dt: datetime,
+        end_dt: datetime,
+    ) -> pd.DataFrame:
+        """
+        Fetch history in chunks to avoid WAF blocking.
+
+        TEFAS WAF blocks requests longer than ~90-100 days.
+        This method fetches data in chunks and combines them.
+        """
+        import time
+
+        all_records = []
+        chunk_start = start_dt
+        chunk_count = 0
+
+        while chunk_start < end_dt:
+            chunk_end = min(chunk_start + timedelta(days=self.MAX_CHUNK_DAYS), end_dt)
+
+            try:
+                # Add delay between requests to avoid rate limiting
+                if chunk_count > 0:
+                    time.sleep(0.3)
+
+                chunk_df = self._fetch_history_chunk(fund_code, chunk_start, chunk_end)
+                if not chunk_df.empty:
+                    all_records.append(chunk_df)
+                chunk_count += 1
+            except DataNotAvailableError:
+                # No data for this chunk, continue to next
+                pass
+            except APIError:
+                # WAF blocked - stop fetching older data
+                # Return what we have so far
+                break
+
+            # Move to next chunk
+            chunk_start = chunk_end + timedelta(days=1)
+
+        if not all_records:
+            raise DataNotAvailableError(f"No history for fund: {fund_code}")
+
+        # Combine all chunks
+        df = pd.concat(all_records)
+        df = df[~df.index.duplicated(keep="last")]  # Remove duplicate dates
+        df.sort_index(inplace=True)
+        return df
+
+    def _fetch_history_chunk(
+        self,
+        fund_code: str,
+        start_dt: datetime,
+        end_dt: datetime,
+    ) -> pd.DataFrame:
+        """Fetch a single chunk of history data (max ~90 days)."""
         try:
             url = f"{self.BASE_URL}/BindHistoryInfo"
 
@@ -268,6 +352,12 @@ class TEFASProvider(BaseProvider):
 
             response = self._client.post(url, data=data, headers=headers)
             response.raise_for_status()
+
+            # Check if response is JSON (not HTML error page)
+            content_type = response.headers.get("content-type", "")
+            if "text/html" in content_type:
+                raise APIError("TEFAS WAF blocked the request")
+
             result = response.json()
 
             if not result.get("data"):
@@ -292,10 +382,11 @@ class TEFASProvider(BaseProvider):
                 df.set_index("Date", inplace=True)
                 df.sort_index(inplace=True)
 
-            self._cache_set(cache_key, df, TTL.OHLCV_HISTORY)
             return df
 
         except Exception as e:
+            if "WAF" in str(e):
+                raise
             raise APIError(f"Failed to fetch history for {fund_code}: {e}") from e
 
     def get_allocation(
