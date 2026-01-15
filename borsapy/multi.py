@@ -4,7 +4,7 @@ from datetime import datetime
 
 import pandas as pd
 
-from borsapy._providers.paratic import get_paratic_provider
+from borsapy._providers.tradingview import get_tradingview_provider
 from borsapy.ticker import Ticker
 
 
@@ -174,7 +174,7 @@ def download(
     start_dt = _parse_date(start) if start else None
     end_dt = _parse_date(end) if end else None
 
-    provider = get_paratic_provider()
+    provider = get_tradingview_provider()
 
     # Fetch data for each symbol
     data_frames: dict[str, pd.DataFrame] = {}

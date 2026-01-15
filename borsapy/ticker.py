@@ -8,7 +8,7 @@ from typing import Any
 import pandas as pd
 
 from borsapy._providers.kap import get_kap_provider
-from borsapy._providers.paratic import get_paratic_provider
+from borsapy._providers.tradingview import get_tradingview_provider
 from borsapy.technical import TechnicalMixin
 
 
@@ -170,7 +170,7 @@ class EnrichedInfo:
     Lazy-loading info dictionary with yfinance-compatible field names.
 
     Provides dict-like access to ticker information with three lazy-loaded groups:
-    - Basic fields (from Paratic quote): last, open, high, low, close, volume, amount
+    - Basic fields (from TradingView quote): last, open, high, low, close, volume, amount
     - Extended fields (from İş Yatırım + calculations): marketCap, trailingPE, etc.
     - Dividend fields (calculated): dividendYield, exDividendDate
 
@@ -258,9 +258,9 @@ class EnrichedInfo:
         self._dividend_data: dict[str, Any] | None = None
 
     def _load_basic(self) -> dict[str, Any]:
-        """Load basic quote data from Paratic."""
+        """Load basic quote data from TradingView."""
         if self._basic_data is None:
-            self._basic_data = self._ticker._paratic.get_quote(self._ticker._symbol)
+            self._basic_data = self._ticker._tradingview.get_quote(self._ticker._symbol)
         return self._basic_data
 
     def _load_extended(self) -> dict[str, Any]:
@@ -489,7 +489,7 @@ class Ticker(TechnicalMixin):
                     The ".IS" or ".E" suffix is optional and will be removed.
         """
         self._symbol = symbol.upper().replace(".IS", "").replace(".E", "")
-        self._paratic = get_paratic_provider()
+        self._tradingview = get_tradingview_provider()
         self._isyatirim = None  # Lazy load for financial statements
         self._kap = None  # Lazy load for KAP disclosures
         self._isin_provider = None  # Lazy load for ISIN lookup
@@ -644,7 +644,7 @@ class Ticker(TechnicalMixin):
         start_dt = self._parse_date(start) if start else None
         end_dt = self._parse_date(end) if end else None
 
-        df = self._paratic.get_history(
+        df = self._tradingview.get_history(
             symbol=self._symbol,
             period=period,
             interval=interval,

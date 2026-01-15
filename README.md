@@ -1252,8 +1252,8 @@ print(sonuc)
 
 | Modül | Kaynak | Açıklama |
 |-------|--------|----------|
-| Ticker | İş Yatırım, Paratic, KAP, hedeffiyat.com.tr, isinturkiye.com.tr | Hisse verileri, finansallar, bildirimler, analist hedefleri, ISIN |
-| Index | Paratic | BIST endeksleri |
+| Ticker | İş Yatırım, TradingView, KAP, hedeffiyat.com.tr, isinturkiye.com.tr | Hisse verileri, finansallar, bildirimler, analist hedefleri, ISIN |
+| Index | TradingView | BIST endeksleri |
 | FX | canlidoviz.com, doviz.com | 65 döviz, altın, emtia (canlidoviz); banka/kurum kurları (doviz.com) |
 | Crypto | BtcTurk | Kripto para verileri |
 | Fund | TEFAS | Yatırım fonu verileri, varlık dağılımı, tarama/karşılaştırma |
@@ -1303,7 +1303,7 @@ Ek özellik istekleri ve öneriler için [GitHub Discussions](https://github.com
 
 Bu kütüphane aracılığıyla erişilen veriler, ilgili veri kaynaklarına aittir:
 - **İş Yatırım** (isyatirim.com.tr): Finansal tablolar, hisse tarama, VIOP
-- **Paratic** (paratic.com): Hisse OHLCV, endeksler
+- **TradingView** (tradingview.com): Hisse OHLCV, endeksler
 - **KAP** (kap.org.tr): Şirket bildirimleri, ortaklık yapısı
 - **TCMB** (tcmb.gov.tr): Enflasyon verileri, merkez bankası faiz oranları
 - **BtcTurk**: Kripto para verileri

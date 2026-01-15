@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "borsapy"
-version = "0.4.8"
+version = "0.5.0"
 description = "Turkish financial markets data library - yfinance-like API for BIST stocks, forex, crypto, and more"
 readme = "README.md"
 license = { text = "Apache-2.0" }
@@ -42,6 +42,7 @@ dependencies = [
     "pydantic>=2.0.0",
     "openpyxl>=3.1.0",
     "urllib3>=2.0.0",
+    "websocket-client>=1.9.0",
 ]
 
 [project.optional-dependencies]

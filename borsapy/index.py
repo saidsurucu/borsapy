@@ -6,7 +6,7 @@ from typing import Any
 import pandas as pd
 
 from borsapy._providers.bist_index import get_bist_index_provider
-from borsapy._providers.paratic import get_paratic_provider
+from borsapy._providers.tradingview import get_tradingview_provider
 from borsapy.technical import TechnicalMixin
 
 # Known market indices with their names
@@ -79,7 +79,7 @@ class Index(TechnicalMixin):
             symbol: Index symbol (e.g., "XU100", "XU030", "XBANK").
         """
         self._symbol = symbol.upper()
-        self._paratic = get_paratic_provider()
+        self._tradingview = get_tradingview_provider()
         self._bist_index = get_bist_index_provider()
         self._info_cache: dict[str, Any] | None = None
         self._components_cache: list[dict[str, Any]] | None = None
@@ -108,8 +108,8 @@ class Index(TechnicalMixin):
             - update_time: Last update timestamp
         """
         if self._info_cache is None:
-            # Use Paratic API to get quote (same endpoint works for indices)
-            quote = self._paratic.get_quote(self._symbol)
+            # Use TradingView API to get quote (same endpoint works for indices)
+            quote = self._tradingview.get_quote(self._symbol)
             quote["name"] = INDICES.get(self._symbol, self._symbol)
             quote["type"] = "index"
             self._info_cache = quote
@@ -185,8 +185,8 @@ class Index(TechnicalMixin):
         start_dt = self._parse_date(start) if start else None
         end_dt = self._parse_date(end) if end else None
 
-        # Use Paratic provider (same API works for indices)
-        return self._paratic.get_history(
+        # Use TradingView provider (same API works for indices)
+        return self._tradingview.get_history(
             symbol=self._symbol,
             period=period,
             interval=interval,
