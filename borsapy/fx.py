@@ -7,7 +7,37 @@ import pandas as pd
 
 from borsapy._providers.canlidoviz import get_canlidoviz_provider
 from borsapy._providers.dovizcom import get_dovizcom_provider
+from borsapy._providers.tradingview import get_tradingview_provider
 from borsapy.technical import TechnicalMixin
+
+
+# TradingView symbol mapping for currencies (asset -> (exchange, symbol))
+# Note: Only pairs that are verified to work on TradingView free tier
+TV_CURRENCY_MAP = {
+    # Major currencies -> TRY pairs (verified working)
+    "USD": ("FX", "USDTRY"),
+    "EUR": ("FX", "EURTRY"),
+    "GBP": ("PEPPERSTONE", "GBPTRY"),
+    "JPY": ("FX", "TRYJPY"),  # Inverse pair (TRY/JPY)
+    # Note: CHF, CAD, AUD, NZD etc. TRY pairs not available on TradingView
+    # Use daily data from canlidoviz for these currencies
+}
+
+# TradingView symbol mapping for precious metals and commodities
+TV_COMMODITY_MAP = {
+    # Precious metals (USD prices)
+    "ons-altin": ("OANDA", "XAUUSD"),
+    "XAU": ("OANDA", "XAUUSD"),
+    "XAG": ("OANDA", "XAGUSD"),
+    "XAG-USD": ("OANDA", "XAGUSD"),
+    "XPT": ("OANDA", "XPTUSD"),
+    "XPT-USD": ("OANDA", "XPTUSD"),
+    "XPD": ("OANDA", "XPDUSD"),
+    "XPD-USD": ("OANDA", "XPDUSD"),
+    # Energy
+    "BRENT": ("TVC", "UKOIL"),
+    "WTI": ("TVC", "USOIL"),
+}
 
 
 def banks() -> list[str]:
@@ -75,6 +105,7 @@ class FX(TechnicalMixin):
         self._asset = asset
         self._canlidoviz = get_canlidoviz_provider()
         self._dovizcom = get_dovizcom_provider()
+        self._tradingview = get_tradingview_provider()
         self._current_cache: dict[str, Any] | None = None
 
     def _use_canlidoviz(self) -> bool:
@@ -93,6 +124,26 @@ class FX(TechnicalMixin):
         if asset_upper in self._canlidoviz.COMMODITY_IDS:
             return True
         return False
+
+    def _get_tradingview_symbol(self) -> tuple[str, str] | None:
+        """Get TradingView exchange and symbol for this asset.
+
+        Returns:
+            Tuple of (exchange, symbol) or None if not supported.
+        """
+        asset_upper = self._asset.upper()
+
+        # Check currency map first
+        if asset_upper in TV_CURRENCY_MAP:
+            return TV_CURRENCY_MAP[asset_upper]
+
+        # Check commodity map
+        if self._asset in TV_COMMODITY_MAP:
+            return TV_COMMODITY_MAP[self._asset]
+        if asset_upper in TV_COMMODITY_MAP:
+            return TV_COMMODITY_MAP[asset_upper]
+
+        return None
 
     @property
     def asset(self) -> str:
@@ -265,6 +316,7 @@ class FX(TechnicalMixin):
     def history(
         self,
         period: str = "1mo",
+        interval: str = "1d",
         start: datetime | str | None = None,
         end: datetime | str | None = None,
     ) -> pd.DataFrame:
@@ -273,23 +325,50 @@ class FX(TechnicalMixin):
 
         Args:
             period: How much data to fetch. Valid periods:
-                    1d, 5d, 1mo, 3mo, 6mo, 1y.
+                    1d, 5d, 1mo, 3mo, 6mo, 1y, 2y, 5y, max.
                     Ignored if start is provided.
+            interval: Data interval. Valid intervals:
+                    1m, 5m, 15m, 30m, 1h, 4h, 1d, 1wk, 1mo.
+                    Note: Intraday intervals (1m-4h) use TradingView.
+                    Daily and above use canlidoviz/dovizcom.
             start: Start date (string or datetime).
             end: End date (string or datetime). Defaults to today.
 
         Returns:
-            DataFrame with columns: Open, High, Low, Close.
+            DataFrame with columns: Open, High, Low, Close, Volume.
             Index is the Date.
 
         Examples:
             >>> fx = FX("USD")
-            >>> fx.history(period="1mo")  # Last month
+            >>> fx.history(period="1mo")  # Last month daily
+            >>> fx.history(period="1d", interval="1m")  # Today's minute data
+            >>> fx.history(period="5d", interval="1h")  # 5 days hourly
             >>> fx.history(start="2024-01-01", end="2024-06-30")  # Date range
         """
         start_dt = self._parse_date(start) if start else None
         end_dt = self._parse_date(end) if end else None
 
+        # Use TradingView for intraday intervals
+        intraday_intervals = ("1m", "5m", "15m", "30m", "1h", "4h")
+        if interval in intraday_intervals:
+            tv_info = self._get_tradingview_symbol()
+            if tv_info is None:
+                raise ValueError(
+                    f"Intraday data not available for {self._asset}. "
+                    f"Supported currencies: {list(TV_CURRENCY_MAP.keys())}"
+                )
+
+            exchange, symbol = tv_info
+            return self._tradingview.get_history(
+                symbol=symbol,
+                period=period,
+                interval=interval,
+                start=start_dt,
+                end=end_dt,
+                exchange=exchange,
+            )
+
+        # Use canlidoviz/dovizcom for daily and above
         if self._use_canlidoviz():
             return self._canlidoviz.get_history(
                 asset=self._asset,
