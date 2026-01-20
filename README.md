@@ -281,7 +281,7 @@ import borsapy as bp
 
 usd = bp.FX("USD")
 print(usd.current)                  # Güncel kur
-print(usd.history(period="1ay"))    # Geçmiş veriler
+print(usd.history(period="1ay"))    # Geçmiş veriler (günlük)
 
 # Majör dövizler
 eur = bp.FX("EUR")
@@ -299,6 +299,52 @@ aed = bp.FX("AED")    # BAE Dirhemi
 inr = bp.FX("INR")    # Hindistan Rupisi
 # ... ve daha fazlası
 ```
+
+### Dakikalık/Saatlik Veri (TradingView)
+
+Bazı döviz çiftleri için intraday (dakikalık/saatlik) veri TradingView üzerinden sağlanır.
+
+```python
+import borsapy as bp
+
+usd = bp.FX("USD")
+
+# Dakikalık veri
+df = usd.history(period="1g", interval="1m")    # Son 1 gün, 1 dakikalık
+df = usd.history(period="1g", interval="5m")    # 5 dakikalık
+df = usd.history(period="1g", interval="15m")   # 15 dakikalık
+df = usd.history(period="1g", interval="30m")   # 30 dakikalık
+
+# Saatlik veri
+df = usd.history(period="5g", interval="1h")    # Son 5 gün, saatlik
+df = usd.history(period="1ay", interval="4h")   # Son 1 ay, 4 saatlik
+
+# Günlük ve üstü (varsayılan, canlidoviz kullanır)
+df = usd.history(period="1ay", interval="1d")   # Günlük
+df = usd.history(period="1ay")                  # Günlük (varsayılan)
+```
+
+**İntraday Destekleyen Dövizler (TradingView):**
+
+| Döviz | Symbol | Not |
+|-------|--------|-----|
+| USD/TRY | `USD` | FX:USDTRY |
+| EUR/TRY | `EUR` | FX:EURTRY |
+| GBP/TRY | `GBP` | PEPPERSTONE:GBPTRY |
+| TRY/JPY | `JPY` | FX:TRYJPY (ters çift) |
+
+**İntraday Destekleyen Emtialar (TradingView):**
+
+| Emtia | Symbol | Not |
+|-------|--------|-----|
+| Altın (Ons/USD) | `ons-altin` veya `XAU` | OANDA:XAUUSD |
+| Gümüş (Ons/USD) | `XAG` | OANDA:XAGUSD |
+| Platin (USD) | `XPT` | OANDA:XPTUSD |
+| Paladyum (USD) | `XPD` | OANDA:XPDUSD |
+| Brent Petrol | `BRENT` | TVC:UKOIL |
+| WTI Petrol | `WTI` | TVC:USOIL |
+
+> **Not**: Diğer dövizler (CHF, CAD, AUD, vb.) için TradingView'da TRY çifti bulunmadığından sadece günlük veri mevcuttur (canlidoviz.com). İntraday desteklenmeyen bir döviz için interval belirtilirse hata verir.
 
 ### Desteklenen Dövizler
 
