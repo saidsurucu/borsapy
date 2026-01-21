@@ -100,6 +100,13 @@ from borsapy.technical import (
 from borsapy.ticker import Ticker
 from borsapy.viop import VIOP
 
+# TradingView authentication for real-time data
+from borsapy._providers.tradingview import (
+    clear_tradingview_auth,
+    get_tradingview_auth,
+    set_tradingview_auth,
+)
+
 __version__ = "0.5.3"
 __author__ = "Said Surucu"
 
@@ -168,4 +175,8 @@ __all__ = [
     "RateLimitError",
     "InvalidPeriodError",
     "InvalidIntervalError",
+    # TradingView authentication (premium)
+    "set_tradingview_auth",
+    "get_tradingview_auth",
+    "clear_tradingview_auth",
 ]
