@@ -79,14 +79,21 @@ class IsYatirimProvider(BaseProvider):
         if cached is not None:
             return cached
 
-        url = f"{self.BASE_URL}/ChartData.aspx/OneEndeks"
+        url = f"{self.BASE_URL}/Data.aspx/OneEndeks"
         params = {"endeks": symbol}
+        
+        headers = {
+            "Referer": "https://www.isyatirim.com.tr/tr-tr/analiz/Sayfalar/default.aspx"
+        }
 
         try:
-            response = self._get(url, params=params)
+            response = self._get(url, params=params, headers=headers)
             data = response.json()
         except Exception as e:
             raise APIError(f"Failed to fetch quote for {symbol}: {e}") from e
+
+        if isinstance(data, list) and len(data) > 0:
+            data = data[0]
 
         if not data or "symbol" not in data:
             raise TickerNotFoundError(symbol)
@@ -123,8 +130,8 @@ class IsYatirimProvider(BaseProvider):
 
             start = end - timedelta(days=365)
 
-        start_str = start.strftime("%d-%m-%Y")
-        end_str = end.strftime("%d-%m-%Y")
+        start_str = start.strftime("%Y%m%d%H%M%S")
+        end_str = end.strftime("%Y%m%d%H%M%S")
 
         cache_key = f"isyatirim:index_history:{index_code}:{start_str}:{end_str}"
         cached = self._cache_get(cache_key)
@@ -132,14 +139,20 @@ class IsYatirimProvider(BaseProvider):
             return cached
 
         url = f"{self.BASE_URL}/ChartData.aspx/IndexHistoricalAll"
+        
         params = {
             "endeks": index_code,
-            "startdate": start_str,
-            "enddate": end_str,
+            "period": "1440",
+            "from": start_str,
+            "to": end_str,
+        }
+        
+        headers = {
+            "Referer": "https://www.isyatirim.com.tr/tr-tr/analiz/Sayfalar/default.aspx"
         }
 
         try:
-            response = self._get(url, params=params)
+            response = self._get(url, params=params, headers=headers)
             data = response.json()
         except Exception as e:
             raise APIError(f"Failed to fetch index history for {index_code}: {e}") from e
@@ -152,12 +165,38 @@ class IsYatirimProvider(BaseProvider):
 
         return df
 
-    def _parse_index_history(self, data: list[dict[str, Any]]) -> pd.DataFrame:
+    def _parse_index_history(self, data: dict[str, Any] | list) -> pd.DataFrame:
         """Parse index history response into DataFrame."""
         records = []
-        for item in data:
+        
+        history_data = data
+        if isinstance(data, dict):
+             history_data = data.get("data", [])
+             
+        if not history_data or not isinstance(history_data, list):
+             return pd.DataFrame()
+
+        for item in history_data:
             try:
-                # Parse timestamp from JavaScript date format
+                if isinstance(item, list) and len(item) >= 2:
+                    timestamp = float(item[0])
+                    value = float(item[1])
+                    
+                    if not timestamp:
+                        continue
+                        
+                    dt = datetime.fromtimestamp(timestamp / 1000)
+                    
+                    records.append({
+                        "Date": dt,
+                        "Open": value,
+                        "High": value,
+                        "Low": value,
+                        "Close": value,
+                        "Volume": 0
+                    })
+                    continue
+
                 date_str = item.get("date", "")
                 if date_str:
                     dt = datetime.strptime(date_str[:10], "%Y-%m-%d")
