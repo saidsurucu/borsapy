@@ -544,6 +544,16 @@ class TechnicalAnalyzer:
         """Calculate Average Directional Index."""
         return calculate_adx(self._df, period)
 
+    def heikin_ashi(self) -> pd.DataFrame:
+        """Calculate Heikin Ashi candlestick values.
+
+        Returns:
+            DataFrame with HA_Open, HA_High, HA_Low, HA_Close, Volume columns
+        """
+        from borsapy.charts import calculate_heikin_ashi
+
+        return calculate_heikin_ashi(self._df)
+
     def all(self, **kwargs: Any) -> pd.DataFrame:
         """Get DataFrame with all applicable indicators added."""
         return add_indicators(self._df, **kwargs)
@@ -830,3 +840,155 @@ class TechnicalMixin:
             return np.nan
         adx_series = calculate_adx(df, adx_period)
         return round(float(adx_series.iloc[-1]), 2)
+
+    def heikin_ashi(self, period: str = "1mo") -> pd.DataFrame:
+        """Get Heikin Ashi candlestick data.
+
+        Heikin Ashi candles smooth price data and help identify trends.
+
+        Args:
+            period: History period to fetch (default "1mo")
+
+        Returns:
+            DataFrame with columns:
+            - HA_Open: Heikin Ashi open price
+            - HA_High: Heikin Ashi high price
+            - HA_Low: Heikin Ashi low price
+            - HA_Close: Heikin Ashi close price
+            - Volume: Original volume (if available)
+
+        Examples:
+            >>> stock = bp.Ticker("THYAO")
+            >>> ha = stock.heikin_ashi(period="1y")
+            >>> print(ha.columns.tolist())
+            ['HA_Open', 'HA_High', 'HA_Low', 'HA_Close', 'Volume']
+        """
+        from borsapy.charts import calculate_heikin_ashi
+
+        df = self.history(period=period)
+        if df.empty:
+            return pd.DataFrame(columns=["HA_Open", "HA_High", "HA_Low", "HA_Close", "Volume"])
+        return calculate_heikin_ashi(df)
+
+    def _get_ta_symbol_info(self) -> tuple[str, str]:
+        """Get TradingView symbol and screener for TA signals.
+
+        Must be implemented by subclasses.
+
+        Returns:
+            Tuple of (tv_symbol, screener) where:
+            - tv_symbol: Full TradingView symbol (e.g., "BIST:THYAO", "FX:USDTRY")
+            - screener: Market screener (turkey, forex, crypto, america)
+
+        Raises:
+            NotImplementedError: If TA signals are not supported for this asset
+        """
+        raise NotImplementedError(
+            f"TA signals not supported for {self.__class__.__name__}. "
+            "Subclass must implement _get_ta_symbol_info() method."
+        )
+
+    def ta_signals(self, interval: str = "1d") -> dict[str, Any]:
+        """Get TradingView technical analysis signals.
+
+        Fetches buy/sell/neutral signals from TradingView Scanner API.
+        This provides 11 oscillator indicators and up to 15 moving averages
+        with their computed signals.
+
+        Args:
+            interval: Timeframe for analysis. Valid intervals:
+                     1m, 5m, 15m, 30m, 1h, 2h, 4h, 1d, 1W, 1M
+
+        Returns:
+            Dictionary with structure:
+            {
+                "symbol": str,
+                "exchange": str,
+                "interval": str,
+                "summary": {
+                    "recommendation": str,  # STRONG_BUY, BUY, NEUTRAL, SELL, STRONG_SELL
+                    "buy": int,
+                    "sell": int,
+                    "neutral": int
+                },
+                "oscillators": {
+                    "recommendation": str,
+                    "buy": int,
+                    "sell": int,
+                    "neutral": int,
+                    "compute": {"RSI": "NEUTRAL", "MACD": "BUY", ...},
+                    "values": {"RSI": 48.95, "MACD.macd": 3.78, ...}
+                },
+                "moving_averages": {
+                    "recommendation": str,
+                    "buy": int,
+                    "sell": int,
+                    "neutral": int,
+                    "compute": {"EMA20": "BUY", "SMA50": "SELL", ...},
+                    "values": {"EMA20": 285.5, "SMA50": 278.2, ...}
+                }
+            }
+
+        Examples:
+            >>> stock = bp.Ticker("THYAO")
+            >>> signals = stock.ta_signals()
+            >>> signals['summary']['recommendation']
+            'BUY'
+            >>> signals['oscillators']['compute']['RSI']
+            'NEUTRAL'
+            >>> signals['oscillators']['values']['RSI']
+            48.95
+
+            >>> # Get hourly signals
+            >>> signals_1h = stock.ta_signals(interval="1h")
+
+        Raises:
+            NotImplementedError: If TA signals not supported for this asset
+            APIError: If TradingView API request fails
+        """
+        from borsapy._providers.tradingview_scanner import get_scanner_provider
+
+        tv_symbol, screener = self._get_ta_symbol_info()
+        return get_scanner_provider().get_ta_signals(tv_symbol, screener, interval)
+
+    def ta_signals_all_timeframes(self) -> dict[str, dict[str, Any]]:
+        """Get TradingView TA signals for all available timeframes.
+
+        Fetches signals for 9 different timeframes in a single call.
+        Useful for multi-timeframe analysis.
+
+        Returns:
+            Dictionary keyed by interval with ta_signals() result for each:
+            {
+                "1m": {...},
+                "5m": {...},
+                "15m": {...},
+                "30m": {...},
+                "1h": {...},
+                "4h": {...},
+                "1d": {...},
+                "1W": {...},
+                "1M": {...}
+            }
+
+        Examples:
+            >>> stock = bp.Ticker("THYAO")
+            >>> all_tf = stock.ta_signals_all_timeframes()
+            >>> all_tf['1d']['summary']['recommendation']
+            'BUY'
+            >>> all_tf['1h']['summary']['recommendation']
+            'STRONG_BUY'
+
+        Raises:
+            NotImplementedError: If TA signals not supported for this asset
+            APIError: If TradingView API request fails
+        """
+        intervals = ["1m", "5m", "15m", "30m", "1h", "4h", "1d", "1W", "1M"]
+        result = {}
+        for interval in intervals:
+            try:
+                result[interval] = self.ta_signals(interval)
+            except Exception as e:
+                # Include error info for failed intervals
+                result[interval] = {"error": str(e)}
+        return result
