@@ -129,6 +129,19 @@ class Crypto(TechnicalMixin):
                 continue
         raise ValueError(f"Could not parse date: {date}")
 
+    def _get_ta_symbol_info(self) -> tuple[str, str]:
+        """Get TradingView symbol and screener for TA signals.
+
+        Maps BtcTurk pairs to Binance USDT pairs for better TradingView coverage.
+
+        Returns:
+            Tuple of (tv_symbol, screener) for TradingView Scanner API.
+        """
+        # Extract base currency from pair (e.g., "BTCTRY" -> "BTC")
+        base = self._pair.replace("TRY", "").replace("USDT", "")
+        # Use Binance USDT pair for better TradingView coverage
+        return (f"BINANCE:{base}USDT", "crypto")
+
     def __repr__(self) -> str:
         return f"Crypto('{self._pair}')"
 

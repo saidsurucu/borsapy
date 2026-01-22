@@ -464,5 +464,24 @@ class FX(TechnicalMixin):
                 continue
         raise ValueError(f"Could not parse date: {date}")
 
+    def _get_ta_symbol_info(self) -> tuple[str, str]:
+        """Get TradingView symbol and screener for TA signals.
+
+        Returns:
+            Tuple of (tv_symbol, screener) for TradingView Scanner API.
+
+        Raises:
+            NotImplementedError: If TA signals not available for this asset.
+        """
+        tv_info = self._get_tradingview_symbol()
+        if tv_info is None:
+            raise NotImplementedError(
+                f"TA signals not available for {self._asset}. "
+                f"Supported currencies: {list(TV_CURRENCY_MAP.keys())}. "
+                f"Supported commodities: {list(TV_COMMODITY_MAP.keys())}."
+            )
+        exchange, symbol = tv_info
+        return (f"{exchange}:{symbol}", "forex")
+
     def __repr__(self) -> str:
         return f"FX('{self._asset}')"

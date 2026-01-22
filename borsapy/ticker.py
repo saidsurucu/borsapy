@@ -1243,5 +1243,13 @@ class Ticker(TechnicalMixin):
                 continue
         raise ValueError(f"Could not parse date: {date}")
 
+    def _get_ta_symbol_info(self) -> tuple[str, str]:
+        """Get TradingView symbol and screener for TA signals.
+
+        Returns:
+            Tuple of (tv_symbol, screener) for TradingView Scanner API.
+        """
+        return (f"BIST:{self._symbol}", "turkey")
+
     def __repr__(self) -> str:
         return f"Ticker('{self._symbol}')"
