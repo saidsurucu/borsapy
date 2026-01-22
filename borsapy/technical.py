@@ -544,6 +544,16 @@ class TechnicalAnalyzer:
         """Calculate Average Directional Index."""
         return calculate_adx(self._df, period)
 
+    def heikin_ashi(self) -> pd.DataFrame:
+        """Calculate Heikin Ashi candlestick values.
+
+        Returns:
+            DataFrame with HA_Open, HA_High, HA_Low, HA_Close, Volume columns
+        """
+        from borsapy.charts import calculate_heikin_ashi
+
+        return calculate_heikin_ashi(self._df)
+
     def all(self, **kwargs: Any) -> pd.DataFrame:
         """Get DataFrame with all applicable indicators added."""
         return add_indicators(self._df, **kwargs)
@@ -830,6 +840,35 @@ class TechnicalMixin:
             return np.nan
         adx_series = calculate_adx(df, adx_period)
         return round(float(adx_series.iloc[-1]), 2)
+
+    def heikin_ashi(self, period: str = "1mo") -> pd.DataFrame:
+        """Get Heikin Ashi candlestick data.
+
+        Heikin Ashi candles smooth price data and help identify trends.
+
+        Args:
+            period: History period to fetch (default "1mo")
+
+        Returns:
+            DataFrame with columns:
+            - HA_Open: Heikin Ashi open price
+            - HA_High: Heikin Ashi high price
+            - HA_Low: Heikin Ashi low price
+            - HA_Close: Heikin Ashi close price
+            - Volume: Original volume (if available)
+
+        Examples:
+            >>> stock = bp.Ticker("THYAO")
+            >>> ha = stock.heikin_ashi(period="1y")
+            >>> print(ha.columns.tolist())
+            ['HA_Open', 'HA_High', 'HA_Low', 'HA_Close', 'Volume']
+        """
+        from borsapy.charts import calculate_heikin_ashi
+
+        df = self.history(period=period)
+        if df.empty:
+            return pd.DataFrame(columns=["HA_Open", "HA_High", "HA_Low", "HA_Close", "Volume"])
+        return calculate_heikin_ashi(df)
 
     def _get_ta_symbol_info(self) -> tuple[str, str]:
         """Get TradingView symbol and screener for TA signals.

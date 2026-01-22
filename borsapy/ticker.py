@@ -494,6 +494,7 @@ class Ticker(TechnicalMixin):
         self._kap = None  # Lazy load for KAP disclosures
         self._isin_provider = None  # Lazy load for ISIN lookup
         self._hedeffiyat = None  # Lazy load for analyst price targets
+        self._etf_provider = None  # Lazy load for ETF holders
 
     def _get_isyatirim(self):
         """Lazy load İş Yatırım provider for financial statements."""
@@ -526,6 +527,14 @@ class Ticker(TechnicalMixin):
 
             self._hedeffiyat = get_hedeffiyat_provider()
         return self._hedeffiyat
+
+    def _get_etf_provider(self):
+        """Lazy load TradingView ETF provider for ETF holders."""
+        if self._etf_provider is None:
+            from borsapy._providers.tradingview_etf import get_tradingview_etf_provider
+
+            self._etf_provider = get_tradingview_etf_provider()
+        return self._etf_provider
 
     @property
     def symbol(self) -> str:
@@ -1164,6 +1173,42 @@ class Ticker(TechnicalMixin):
              'median': 465.0, 'numberOfAnalysts': 19}
         """
         return self._get_hedeffiyat().get_price_targets(self._symbol)
+
+    @property
+    def etf_holders(self) -> pd.DataFrame:
+        """
+        Get international ETFs that hold this stock.
+
+        Returns data from TradingView showing which ETFs hold this stock,
+        including position value, weight, and ETF characteristics.
+
+        Returns:
+            DataFrame with ETF holder information:
+            - symbol: ETF ticker symbol
+            - exchange: Exchange (AMEX, NASDAQ, LSE, etc.)
+            - name: ETF full name
+            - market_cap_usd: Position value in USD
+            - holding_weight_pct: Weight percentage (0.09 = 0.09%)
+            - issuer: ETF issuer (BlackRock, Vanguard, etc.)
+            - management: Management style (Passive/Active)
+            - focus: Investment focus (Total Market, Emerging Markets, etc.)
+            - expense_ratio: Expense ratio (0.09 = 0.09%)
+            - aum_usd: Total assets under management (USD)
+            - price: Current ETF price
+            - change_pct: Change percentage
+
+        Examples:
+            >>> stock = Ticker("ASELS")
+            >>> holders = stock.etf_holders
+            >>> holders[['symbol', 'name', 'holding_weight_pct']].head()
+               symbol                                      name  holding_weight_pct
+            0    IEMG  iShares Core MSCI Emerging Markets ETF            0.090686
+            1     VWO     Vanguard FTSE Emerging Markets ETF            0.060000
+
+            >>> print(f"Total ETFs: {len(holders)}")
+            Total ETFs: 118
+        """
+        return self._get_etf_provider().get_etf_holders(self._symbol)
 
     @cached_property
     def earnings_dates(self) -> pd.DataFrame:
