@@ -142,7 +142,7 @@ from borsapy.multi import Tickers, download
 from borsapy.portfolio import Portfolio
 from borsapy.replay import ReplaySession, create_replay
 from borsapy.screener import Screener, screen_stocks, screener_criteria, sectors, stock_indices
-from borsapy.search import search, search_bist, search_crypto, search_forex, search_index
+from borsapy.search import search, search_bist, search_crypto, search_forex, search_index, search_viop, viop_contracts
 from borsapy.tcmb import TCMB, policy_rate
 from borsapy.technical import (
     TechnicalAnalyzer,
@@ -200,6 +200,8 @@ __all__ = [
     "search_crypto",
     "search_forex",
     "search_index",
+    "search_viop",
+    "viop_contracts",
     "banks",
     "metal_institutions",
     "crypto_pairs",

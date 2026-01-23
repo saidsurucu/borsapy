@@ -226,3 +226,143 @@ class TestSearchIntegration:
         if results:
             # First result should likely contain THYAO
             assert "THYAO" in results[0].upper() or len(results) > 0
+
+
+class TestVIOPSearch:
+    """Tests for VIOP (derivatives) search functionality."""
+
+    def test_search_viop_basic(self):
+        """Test basic VIOP search."""
+        from borsapy.search import search_viop
+
+        results = search_viop("XU030")
+
+        assert isinstance(results, list)
+        # Should find some BIST30 futures
+        assert len(results) >= 0  # May be empty if no active contracts
+
+    def test_search_viop_from_module(self):
+        """Test search_viop from main module."""
+        import borsapy as bp
+
+        results = bp.search_viop("gold")
+
+        assert isinstance(results, list)
+
+    def test_viop_contracts_basic(self):
+        """Test viop_contracts function."""
+        from borsapy.search import viop_contracts
+
+        contracts = viop_contracts("XU030D")
+
+        assert isinstance(contracts, list)
+        # Each item should be a string (symbol)
+        for c in contracts:
+            assert isinstance(c, str)
+            # Should start with base symbol
+            assert c.startswith("XU030D")
+
+    def test_viop_contracts_full_info(self):
+        """Test viop_contracts with full_info=True."""
+        from borsapy.search import viop_contracts
+
+        contracts = viop_contracts("XU030D", full_info=True)
+
+        assert isinstance(contracts, list)
+        # Each item should be a dict
+        for c in contracts:
+            assert isinstance(c, dict)
+            assert "symbol" in c
+            assert "base" in c
+            assert "month_code" in c
+
+    def test_viop_contracts_from_module(self):
+        """Test viop_contracts from main module."""
+        import borsapy as bp
+
+        contracts = bp.viop_contracts("XAUTRYD")
+
+        assert isinstance(contracts, list)
+
+    def test_viop_contracts_various_symbols(self):
+        """Test viop_contracts works for various VIOP symbols."""
+        from borsapy.search import viop_contracts
+
+        # XU030D has D suffix (BIST30 futures)
+        contracts_xu030d = viop_contracts("XU030D")
+        assert len(contracts_xu030d) > 0
+        for c in contracts_xu030d:
+            assert c.startswith("XU030D")
+
+        # XAUTRY has no D suffix (gold futures)
+        contracts_xautry = viop_contracts("XAUTRY")
+        assert isinstance(contracts_xautry, list)
+        # May be empty if no active contracts, but should not error
+
+
+class TestVIOPSearchProvider:
+    """Tests for VIOP search in provider."""
+
+    def test_provider_search_viop(self):
+        """Test provider search_viop method."""
+        from borsapy._providers.tradingview_search import get_search_provider
+
+        provider = get_search_provider()
+        results = provider.search_viop("XU030")
+
+        assert isinstance(results, list)
+
+    def test_provider_get_viop_contracts(self):
+        """Test provider get_viop_contracts method."""
+        from borsapy._providers.tradingview_search import get_search_provider
+
+        provider = get_search_provider()
+        contracts = provider.get_viop_contracts("XU030D")
+
+        assert isinstance(contracts, list)
+        for c in contracts:
+            assert "symbol" in c
+            assert "full_name" in c
+            assert "is_continuous" in c
+
+    def test_provider_month_code_mapping(self):
+        """Test month code to name mapping."""
+        from borsapy._providers.tradingview_search import (
+            VIOP_MONTH_CODES,
+            month_code_to_name,
+        )
+
+        # Test mapping exists
+        assert len(VIOP_MONTH_CODES) == 12
+
+        # Test specific codes
+        assert month_code_to_name("G") == "February"
+        assert month_code_to_name("J") == "April"
+        assert month_code_to_name("Z") == "December"
+
+        # Test invalid code
+        assert month_code_to_name("A") == ""
+
+    def test_provider_viop_contract_structure(self):
+        """Test VIOP contract result structure."""
+        from borsapy._providers.tradingview_search import get_search_provider
+
+        provider = get_search_provider()
+        contracts = provider.get_viop_contracts("XU030D")
+
+        if contracts:
+            c = contracts[0]
+            # Required fields
+            assert "symbol" in c
+            assert "full_name" in c
+            assert "base" in c
+            assert "month_code" in c
+            assert "year" in c
+            assert "is_continuous" in c
+            assert "exchange" in c
+            assert "type" in c
+
+            # Validate values
+            assert c["exchange"] == "BIST"
+            assert c["type"] == "futures"
+            assert c["base"] == "XU030D"

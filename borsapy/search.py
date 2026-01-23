@@ -244,3 +244,84 @@ def search_index(query: str, limit: int = 50) -> list[str]:
         ['XU100', 'XU030', 'XU050', ...]
     """
     return search(query, type="index", limit=limit)
+
+
+def search_viop(query: str, limit: int = 50) -> list[str]:
+    """Search VIOP (Turkish derivatives) symbols.
+
+    Searches for futures and options contracts on BIST.
+
+    Args:
+        query: Search query (e.g., "XU030", "AKBNK", "gold")
+        limit: Maximum results
+
+    Returns:
+        List of VIOP contract symbol strings
+
+    Examples:
+        >>> bp.search_viop("XU030")
+        ['XU030D', 'XU030DG2026', 'XU030DJ2026', ...]
+
+        >>> bp.search_viop("gold")
+        ['XAUTRYD', 'XAUTRYG2026', ...]
+    """
+    return search(query, type="futures", exchange="BIST", limit=limit)
+
+
+def viop_contracts(
+    base_symbol: str,
+    full_info: bool = False,
+) -> list[str] | list[dict]:
+    """Get available VIOP contracts for a base symbol.
+
+    Queries TradingView to find all active contracts (expiry months)
+    for a given futures base symbol.
+
+    Args:
+        base_symbol: Base futures symbol (e.g., "XU030D", "XAUTRYD", "USDTRYD")
+                    Can be with or without 'D' suffix.
+        full_info: If True, return full contract info dicts
+
+    Returns:
+        If full_info=False (default):
+            List of contract symbol strings: ['XU030DG2026', 'XU030DJ2026']
+
+        If full_info=True:
+            List of contract dicts with month/year info
+
+    Note:
+        Contract month codes:
+        F=Jan, G=Feb, H=Mar, J=Apr, K=May, M=Jun,
+        N=Jul, Q=Aug, U=Sep, V=Oct, X=Nov, Z=Dec
+
+    Examples:
+        >>> import borsapy as bp
+
+        >>> # Get BIST30 futures contracts
+        >>> bp.viop_contracts("XU030D")
+        ['XU030DG2026', 'XU030DJ2026']
+
+        >>> # Get gold TRY futures
+        >>> bp.viop_contracts("XAUTRYD")
+        ['XAUTRYG2026', 'XAUTRYJ2026']
+
+        >>> # Get full contract info
+        >>> bp.viop_contracts("XU030D", full_info=True)
+        [
+            {'symbol': 'XU030DG2026', 'month_code': 'G', 'year': '2026', ...},
+            {'symbol': 'XU030DJ2026', 'month_code': 'J', 'year': '2026', ...},
+        ]
+
+    See Also:
+        search_viop: Search for VIOP symbols by keyword
+    """
+    from borsapy._providers.tradingview_search import get_search_provider
+
+    provider = get_search_provider()
+    contracts = provider.get_viop_contracts(base_symbol)
+
+    if full_info:
+        return contracts
+    else:
+        # Filter out continuous contracts (they don't work with streaming)
+        return [c["symbol"] for c in contracts if not c.get("is_continuous", False)]
