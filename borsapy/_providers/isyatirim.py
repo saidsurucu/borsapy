@@ -1,5 +1,6 @@
 """İş Yatırım provider for real-time prices and financial statements."""
 
+import warnings
 from datetime import datetime
 from typing import Any
 
@@ -54,6 +55,10 @@ class IsYatirimProvider(BaseProvider):
         """
         Get real-time quote for a symbol using OneEndeks API.
 
+        .. deprecated::
+            This method is deprecated since v0.5.1. Use TradingView provider
+            via ``bp.Ticker(symbol).info`` or ``bp.TradingViewStream()`` instead.
+
         Args:
             symbol: Stock symbol (e.g., "THYAO", "GARAN").
 
@@ -72,6 +77,12 @@ class IsYatirimProvider(BaseProvider):
             - change_percent: Price change percentage
             - update_time: Last update time
         """
+        warnings.warn(
+            "get_realtime_quote is deprecated since v0.5.1. "
+            "Use TradingView provider via bp.Ticker(symbol).info or bp.TradingViewStream() instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         symbol = symbol.upper().replace(".IS", "").replace(".E", "")
 
         cache_key = f"isyatirim:quote:{symbol}"
@@ -112,6 +123,10 @@ class IsYatirimProvider(BaseProvider):
         """
         Get historical data for an index.
 
+        .. deprecated::
+            This method is deprecated since v0.5.1. Use TradingView provider
+            via ``bp.Index(index_code).history()`` instead.
+
         Args:
             index_code: Index code (e.g., "XU100", "XU030", "XBANK").
             start: Start date.
@@ -119,7 +134,17 @@ class IsYatirimProvider(BaseProvider):
 
         Returns:
             DataFrame with columns: Open, High, Low, Close, Volume.
+
+        Note:
+            This endpoint returns only a single price value per timestamp,
+            so Open, High, Low, and Close are all the same value.
         """
+        warnings.warn(
+            "get_index_history is deprecated since v0.5.1. "
+            "Use TradingView provider via bp.Index(index_code).history() instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         index_code = index_code.upper()
 
         # Default date range
@@ -227,12 +252,22 @@ class IsYatirimProvider(BaseProvider):
         """
         Get current information for an index.
 
+        .. deprecated::
+            This method is deprecated since v0.5.1. Use TradingView provider
+            via ``bp.Index(index_code).info`` instead.
+
         Args:
             index_code: Index code (e.g., "XU100").
 
         Returns:
             Dictionary with index information.
         """
+        warnings.warn(
+            "get_index_info is deprecated since v0.5.1. "
+            "Use TradingView provider via bp.Index(index_code).info instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         index_code = index_code.upper()
 
         if index_code not in self.INDICES:
