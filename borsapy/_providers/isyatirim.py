@@ -1,5 +1,6 @@
 """İş Yatırım provider for real-time prices and financial statements."""
 
+import warnings
 from datetime import datetime
 from typing import Any
 
@@ -54,6 +55,10 @@ class IsYatirimProvider(BaseProvider):
         """
         Get real-time quote for a symbol using OneEndeks API.
 
+        .. deprecated::
+            This method is deprecated since v0.5.1. Use TradingView provider
+            via ``bp.Ticker(symbol).info`` or ``bp.TradingViewStream()`` instead.
+
         Args:
             symbol: Stock symbol (e.g., "THYAO", "GARAN").
 
@@ -72,6 +77,12 @@ class IsYatirimProvider(BaseProvider):
             - change_percent: Price change percentage
             - update_time: Last update time
         """
+        warnings.warn(
+            "get_realtime_quote is deprecated since v0.5.1. "
+            "Use TradingView provider via bp.Ticker(symbol).info or bp.TradingViewStream() instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         symbol = symbol.upper().replace(".IS", "").replace(".E", "")
 
         cache_key = f"isyatirim:quote:{symbol}"
@@ -79,14 +90,21 @@ class IsYatirimProvider(BaseProvider):
         if cached is not None:
             return cached
 
-        url = f"{self.BASE_URL}/ChartData.aspx/OneEndeks"
+        url = f"{self.BASE_URL}/Data.aspx/OneEndeks"
         params = {"endeks": symbol}
+        
+        headers = {
+            "Referer": "https://www.isyatirim.com.tr/tr-tr/analiz/Sayfalar/default.aspx"
+        }
 
         try:
-            response = self._get(url, params=params)
+            response = self._get(url, params=params, headers=headers)
             data = response.json()
         except Exception as e:
             raise APIError(f"Failed to fetch quote for {symbol}: {e}") from e
+
+        if isinstance(data, list) and len(data) > 0:
+            data = data[0]
 
         if not data or "symbol" not in data:
             raise TickerNotFoundError(symbol)
@@ -105,6 +123,10 @@ class IsYatirimProvider(BaseProvider):
         """
         Get historical data for an index.
 
+        .. deprecated::
+            This method is deprecated since v0.5.1. Use TradingView provider
+            via ``bp.Index(index_code).history()`` instead.
+
         Args:
             index_code: Index code (e.g., "XU100", "XU030", "XBANK").
             start: Start date.
@@ -112,7 +134,17 @@ class IsYatirimProvider(BaseProvider):
 
         Returns:
             DataFrame with columns: Open, High, Low, Close, Volume.
+
+        Note:
+            This endpoint returns only a single price value per timestamp,
+            so Open, High, Low, and Close are all the same value.
         """
+        warnings.warn(
+            "get_index_history is deprecated since v0.5.1. "
+            "Use TradingView provider via bp.Index(index_code).history() instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         index_code = index_code.upper()
 
         # Default date range
@@ -123,8 +155,8 @@ class IsYatirimProvider(BaseProvider):
 
             start = end - timedelta(days=365)
 
-        start_str = start.strftime("%d-%m-%Y")
-        end_str = end.strftime("%d-%m-%Y")
+        start_str = start.strftime("%Y%m%d%H%M%S")
+        end_str = end.strftime("%Y%m%d%H%M%S")
 
         cache_key = f"isyatirim:index_history:{index_code}:{start_str}:{end_str}"
         cached = self._cache_get(cache_key)
@@ -132,14 +164,20 @@ class IsYatirimProvider(BaseProvider):
             return cached
 
         url = f"{self.BASE_URL}/ChartData.aspx/IndexHistoricalAll"
+        
         params = {
             "endeks": index_code,
-            "startdate": start_str,
-            "enddate": end_str,
+            "period": "1440",
+            "from": start_str,
+            "to": end_str,
+        }
+        
+        headers = {
+            "Referer": "https://www.isyatirim.com.tr/tr-tr/analiz/Sayfalar/default.aspx"
         }
 
         try:
-            response = self._get(url, params=params)
+            response = self._get(url, params=params, headers=headers)
             data = response.json()
         except Exception as e:
             raise APIError(f"Failed to fetch index history for {index_code}: {e}") from e
@@ -152,12 +190,38 @@ class IsYatirimProvider(BaseProvider):
 
         return df
 
-    def _parse_index_history(self, data: list[dict[str, Any]]) -> pd.DataFrame:
+    def _parse_index_history(self, data: dict[str, Any] | list) -> pd.DataFrame:
         """Parse index history response into DataFrame."""
         records = []
-        for item in data:
+        
+        history_data = data
+        if isinstance(data, dict):
+             history_data = data.get("data", [])
+             
+        if not history_data or not isinstance(history_data, list):
+             return pd.DataFrame()
+
+        for item in history_data:
             try:
-                # Parse timestamp from JavaScript date format
+                if isinstance(item, list) and len(item) >= 2:
+                    timestamp = float(item[0])
+                    value = float(item[1])
+                    
+                    if not timestamp:
+                        continue
+                        
+                    dt = datetime.fromtimestamp(timestamp / 1000)
+                    
+                    records.append({
+                        "Date": dt,
+                        "Open": value,
+                        "High": value,
+                        "Low": value,
+                        "Close": value,
+                        "Volume": 0
+                    })
+                    continue
+
                 date_str = item.get("date", "")
                 if date_str:
                     dt = datetime.strptime(date_str[:10], "%Y-%m-%d")
@@ -188,12 +252,22 @@ class IsYatirimProvider(BaseProvider):
         """
         Get current information for an index.
 
+        .. deprecated::
+            This method is deprecated since v0.5.1. Use TradingView provider
+            via ``bp.Index(index_code).info`` instead.
+
         Args:
             index_code: Index code (e.g., "XU100").
 
         Returns:
             Dictionary with index information.
         """
+        warnings.warn(
+            "get_index_info is deprecated since v0.5.1. "
+            "Use TradingView provider via bp.Index(index_code).info instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         index_code = index_code.upper()
 
         if index_code not in self.INDICES:
