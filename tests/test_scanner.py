@@ -1,14 +1,12 @@
-"""Tests for technical scanner."""
+"""Tests for technical scanner using TradingView-native API."""
 
 from datetime import datetime
 from unittest.mock import MagicMock, patch
 
-import numpy as np
 import pandas as pd
 import pytest
 
 from borsapy.scanner import TechnicalScanner, ScanResult, scan
-from borsapy.condition import ParseError
 
 
 # =============================================================================
@@ -17,72 +15,24 @@ from borsapy.condition import ParseError
 
 
 @pytest.fixture
-def mock_quote():
-    """Mock quote data."""
-    return {
-        "symbol": "THYAO",
-        "last": 285.0,
-        "open": 280.0,
-        "high": 290.0,
-        "low": 278.0,
-        "volume": 15000000,
-        "change_percent": 1.8,
-        "market_cap": 50000000000,
-        "bid": 284.9,
-        "ask": 285.1,
-    }
-
-
-@pytest.fixture
-def mock_history():
-    """Mock OHLCV history DataFrame."""
-    np.random.seed(42)
-    n = 60
-    close = 280 + np.cumsum(np.random.randn(n) * 2)
-    high = close + np.abs(np.random.randn(n) * 1)
-    low = close - np.abs(np.random.randn(n) * 1)
-    open_ = close + np.random.randn(n) * 0.5
-    volume = np.random.randint(10000000, 20000000, n)
-
+def mock_scan_result():
+    """Mock scan result DataFrame."""
     return pd.DataFrame(
         {
-            "Open": open_,
-            "High": high,
-            "Low": low,
-            "Close": close,
-            "Volume": volume,
-        },
-        index=pd.date_range("2024-01-01", periods=n, freq="D"),
+            "symbol": ["THYAO", "GARAN"],
+            "close": [285.0, 52.0],
+            "volume": [15000000, 20000000],
+            "change": [1.8, 2.1],
+            "market_cap": [50000000000, 30000000000],
+            "rsi": [28.5, 25.0],
+        }
     )
 
 
 @pytest.fixture
-def oversold_quote():
-    """Quote data for oversold stock."""
-    return {
-        "symbol": "TEST",
-        "last": 100.0,
-        "volume": 5000000,
-        "change_percent": -5.0,
-    }
-
-
-@pytest.fixture
-def oversold_history():
-    """History that produces low RSI."""
-    n = 30
-    # Declining prices produce low RSI
-    close = np.linspace(120, 90, n)
-    return pd.DataFrame(
-        {
-            "Close": close,
-            "High": close + 1,
-            "Low": close - 1,
-            "Open": close,
-            "Volume": [1000000] * n,
-        },
-        index=pd.date_range("2024-01-01", periods=n, freq="D"),
-    )
+def empty_result():
+    """Empty scan result DataFrame."""
+    return pd.DataFrame()
 
 
 # =============================================================================
@@ -124,8 +74,7 @@ class TestTechnicalScannerBasics:
         """Test scanner initialization."""
         scanner = TechnicalScanner()
         assert scanner._symbols == []
-        assert scanner._conditions == {}
-        assert scanner._data_period == "3mo"
+        assert scanner._conditions == []
         assert scanner._interval == "1d"
 
     def test_set_universe_list(self):
@@ -166,26 +115,36 @@ class TestTechnicalScannerBasics:
         """Test adding condition."""
         scanner = TechnicalScanner()
         scanner.add_condition("rsi < 30", name="oversold")
-        assert "oversold" in scanner._conditions
+        assert "rsi < 30" in scanner._conditions
+        assert scanner._condition_names["rsi < 30"] == "oversold"
 
     def test_add_condition_auto_name(self):
         """Test adding condition with auto name."""
         scanner = TechnicalScanner()
         scanner.add_condition("rsi < 30")
         assert "rsi < 30" in scanner._conditions
+        assert scanner._condition_names["rsi < 30"] == "rsi < 30"
 
-    def test_add_invalid_condition(self):
-        """Test adding invalid condition raises error."""
+    def test_add_compound_condition(self):
+        """Test adding compound condition."""
         scanner = TechnicalScanner()
-        with pytest.raises(ParseError):
-            scanner.add_condition("")
+        scanner.add_condition("rsi < 30 and volume > 1M")
+        assert "rsi < 30" in scanner._conditions
+        assert "volume > 1m" in scanner._conditions
 
     def test_remove_condition(self):
         """Test removing condition."""
         scanner = TechnicalScanner()
         scanner.add_condition("rsi < 30", name="oversold")
         scanner.remove_condition("oversold")
-        assert "oversold" not in scanner._conditions
+        assert "rsi < 30" not in scanner._conditions
+
+    def test_remove_condition_by_string(self):
+        """Test removing condition by condition string."""
+        scanner = TechnicalScanner()
+        scanner.add_condition("rsi < 30")
+        scanner.remove_condition("rsi < 30")
+        assert "rsi < 30" not in scanner._conditions
 
     def test_clear_conditions(self):
         """Test clearing all conditions."""
@@ -195,17 +154,17 @@ class TestTechnicalScannerBasics:
         scanner.clear_conditions()
         assert len(scanner._conditions) == 0
 
-    def test_set_data_period(self):
-        """Test setting data period."""
-        scanner = TechnicalScanner()
-        scanner.set_data_period("1y")
-        assert scanner._data_period == "1y"
-
     def test_set_interval(self):
         """Test setting interval."""
         scanner = TechnicalScanner()
         scanner.set_interval("1h")
         assert scanner._interval == "1h"
+
+    def test_add_column(self):
+        """Test adding extra column."""
+        scanner = TechnicalScanner()
+        scanner.add_column("ema_200")
+        assert "ema_200" in scanner._extra_columns
 
     def test_method_chaining(self):
         """Test fluent API method chaining."""
@@ -213,8 +172,8 @@ class TestTechnicalScannerBasics:
         result = (
             scanner.set_universe(["THYAO", "GARAN"])
             .add_condition("rsi < 30")
-            .set_data_period("1y")
             .set_interval("1d")
+            .add_column("macd")
         )
         assert result is scanner
 
@@ -226,41 +185,23 @@ class TestTechnicalScannerBasics:
         repr_str = repr(scanner)
         assert "symbols=2" in repr_str
         assert "conditions=1" in repr_str
+        assert "interval='1d'" in repr_str
 
+    def test_symbols_property(self):
+        """Test symbols property returns copy."""
+        scanner = TechnicalScanner()
+        scanner.set_universe(["THYAO", "GARAN"])
+        symbols = scanner.symbols
+        symbols.append("ASELS")
+        assert len(scanner._symbols) == 2
 
-# =============================================================================
-# Indicator Collection Tests
-# =============================================================================
-
-
-class TestIndicatorCollection:
-    """Tests for collecting required indicators."""
-
-    def test_collect_rsi(self):
-        """Test collecting RSI indicator."""
+    def test_conditions_property(self):
+        """Test conditions property returns copy."""
         scanner = TechnicalScanner()
         scanner.add_condition("rsi < 30")
-        indicators = scanner._collect_required_indicators()
-        assert "rsi" in indicators
-        assert 14 in indicators["rsi"]
-
-    def test_collect_multiple_sma(self):
-        """Test collecting multiple SMA periods."""
-        scanner = TechnicalScanner()
-        scanner.add_condition("sma_20 > sma_50")
-        indicators = scanner._collect_required_indicators()
-        assert "sma" in indicators
-        assert 20 in indicators["sma"]
-        assert 50 in indicators["sma"]
-
-    def test_collect_from_multiple_conditions(self):
-        """Test collecting from multiple conditions."""
-        scanner = TechnicalScanner()
-        scanner.add_condition("rsi < 30")
-        scanner.add_condition("macd > signal")
-        indicators = scanner._collect_required_indicators()
-        assert "rsi" in indicators
-        assert "macd" in indicators
+        conditions = scanner.conditions
+        conditions.append("volume > 1M")
+        assert len(scanner._conditions) == 1
 
 
 # =============================================================================
@@ -269,135 +210,107 @@ class TestIndicatorCollection:
 
 
 class TestScanExecution:
-    """Tests for scan execution with mocked data."""
+    """Tests for scan execution with mocked provider."""
 
-    @patch("borsapy._providers.tradingview.get_tradingview_provider")
-    @patch("borsapy.ticker.Ticker")
-    def test_scan_single_symbol(
-        self, mock_ticker_class, mock_tv_provider, mock_quote, mock_history
-    ):
-        """Test scanning single symbol."""
-        # Setup mocks
+    @patch("borsapy.scanner.get_tv_screener_provider")
+    def test_run_returns_dataframe(self, mock_get_provider, mock_scan_result):
+        """Test that run() returns a DataFrame."""
         mock_provider = MagicMock()
-        mock_provider.get_quote.return_value = mock_quote
-        mock_tv_provider.return_value = mock_provider
+        mock_provider.scan.return_value = mock_scan_result
+        mock_get_provider.return_value = mock_provider
 
-        mock_ticker = MagicMock()
-        mock_ticker.history.return_value = mock_history
-        mock_ticker_class.return_value = mock_ticker
+        scanner = TechnicalScanner()
+        scanner.set_universe(["THYAO", "GARAN"])
+        scanner.add_condition("rsi < 30")
+        result = scanner.run()
 
-        # Run scan
+        assert isinstance(result, pd.DataFrame)
+        assert len(result) == 2
+
+    @patch("borsapy.scanner.get_tv_screener_provider")
+    def test_run_adds_conditions_met(self, mock_get_provider, mock_scan_result):
+        """Test that run() adds conditions_met column."""
+        mock_provider = MagicMock()
+        mock_provider.scan.return_value = mock_scan_result
+        mock_get_provider.return_value = mock_provider
+
         scanner = TechnicalScanner()
         scanner.set_universe(["THYAO"])
-        scanner.add_condition("volume > 1M")  # Should match with 15M volume
-        results = scanner.run()
+        scanner.add_condition("rsi < 30", name="oversold")
+        result = scanner.run()
 
-        assert len(results) >= 0  # May or may not match based on mock data
+        assert "conditions_met" in result.columns
+        assert result["conditions_met"].iloc[0] == ["oversold"]
 
-    def test_scan_empty_universe(self):
-        """Test scanning empty universe."""
+    @patch("borsapy.scanner.get_tv_screener_provider")
+    def test_run_empty_symbols(self, mock_get_provider):
+        """Test run with empty symbols returns empty DataFrame."""
         scanner = TechnicalScanner()
         scanner.add_condition("rsi < 30")
-        results = scanner.run()
-        assert len(results) == 0
+        result = scanner.run()
 
-    @patch("borsapy._providers.tradingview.get_tradingview_provider")
-    @patch("borsapy.ticker.Ticker")
-    def test_scan_no_conditions(
-        self, mock_ticker_class, mock_tv_provider, mock_quote, mock_history
-    ):
-        """Test scanning without conditions."""
+        assert isinstance(result, pd.DataFrame)
+        assert len(result) == 0
+        mock_get_provider.return_value.scan.assert_not_called()
+
+    @patch("borsapy.scanner.get_tv_screener_provider")
+    def test_run_empty_conditions(self, mock_get_provider):
+        """Test run with empty conditions returns empty DataFrame."""
+        scanner = TechnicalScanner()
+        scanner.set_universe(["THYAO"])
+        result = scanner.run()
+
+        assert isinstance(result, pd.DataFrame)
+        assert len(result) == 0
+        mock_get_provider.return_value.scan.assert_not_called()
+
+    @patch("borsapy.scanner.get_tv_screener_provider")
+    def test_run_with_limit(self, mock_get_provider, mock_scan_result):
+        """Test run with custom limit."""
         mock_provider = MagicMock()
-        mock_provider.get_quote.return_value = mock_quote
-        mock_tv_provider.return_value = mock_provider
+        mock_provider.scan.return_value = mock_scan_result
+        mock_get_provider.return_value = mock_provider
 
         scanner = TechnicalScanner()
         scanner.set_universe(["THYAO"])
-        # No conditions - should return empty
-        results = scanner.run()
-        assert len(results) == 0
+        scanner.add_condition("rsi < 30")
+        scanner.run(limit=50)
 
-    @patch("borsapy._providers.tradingview.get_tradingview_provider")
-    @patch("borsapy.ticker.Ticker")
-    def test_scan_with_oversold_condition(
-        self, mock_ticker_class, mock_tv_provider, oversold_quote, oversold_history
-    ):
-        """Test scanning with oversold RSI condition."""
+        mock_provider.scan.assert_called_once()
+        call_kwargs = mock_provider.scan.call_args[1]
+        assert call_kwargs["limit"] == 50
+
+    @patch("borsapy.scanner.get_tv_screener_provider")
+    def test_run_passes_interval(self, mock_get_provider, mock_scan_result):
+        """Test run passes interval to provider."""
         mock_provider = MagicMock()
-        mock_provider.get_quote.return_value = oversold_quote
-        mock_tv_provider.return_value = mock_provider
-
-        mock_ticker = MagicMock()
-        mock_ticker.history.return_value = oversold_history
-        mock_ticker_class.return_value = mock_ticker
+        mock_provider.scan.return_value = mock_scan_result
+        mock_get_provider.return_value = mock_provider
 
         scanner = TechnicalScanner()
-        scanner.set_universe(["TEST"])
-        scanner.add_condition("rsi < 40")  # Declining prices should have low RSI
-        results = scanner.run()
+        scanner.set_universe(["THYAO"])
+        scanner.add_condition("rsi < 30")
+        scanner.set_interval("1h")
+        scanner.run()
 
-        # Should match due to declining price history
-        assert len(results) >= 0  # Result depends on actual RSI calculation
+        call_kwargs = mock_provider.scan.call_args[1]
+        assert call_kwargs["interval"] == "1h"
 
+    @patch("borsapy.scanner.get_tv_screener_provider")
+    def test_run_passes_extra_columns(self, mock_get_provider, mock_scan_result):
+        """Test run passes extra columns to provider."""
+        mock_provider = MagicMock()
+        mock_provider.scan.return_value = mock_scan_result
+        mock_get_provider.return_value = mock_provider
 
-# =============================================================================
-# Callback Tests
-# =============================================================================
-
-
-class TestCallbacks:
-    """Tests for callback functionality."""
-
-    def test_on_match_callback(self):
-        """Test on_match callback registration."""
         scanner = TechnicalScanner()
-        callback = MagicMock()
-        scanner.on_match(callback)
-        assert scanner._on_match_callback is callback
+        scanner.set_universe(["THYAO"])
+        scanner.add_condition("rsi < 30")
+        scanner.add_column("ema_200")
+        scanner.run()
 
-    def test_on_scan_complete_callback(self):
-        """Test on_scan_complete callback registration."""
-        scanner = TechnicalScanner()
-        callback = MagicMock()
-        scanner.on_scan_complete(callback)
-        assert scanner._on_complete_callback is callback
-
-
-# =============================================================================
-# DataFrame Output Tests
-# =============================================================================
-
-
-class TestDataFrameOutput:
-    """Tests for DataFrame output."""
-
-    def test_to_dataframe_empty(self):
-        """Test DataFrame output with no results."""
-        scanner = TechnicalScanner()
-        df = scanner.to_dataframe()
-        assert isinstance(df, pd.DataFrame)
-        assert len(df) == 0
-
-    def test_to_dataframe_with_results(self):
-        """Test DataFrame output with results."""
-        scanner = TechnicalScanner()
-        scanner._results = [
-            ScanResult(
-                symbol="THYAO",
-                data={"price": 285.0, "rsi": 28.5, "volume": 15000000},
-                conditions_met=["oversold"],
-            ),
-            ScanResult(
-                symbol="GARAN",
-                data={"price": 52.0, "rsi": 25.0, "volume": 20000000},
-                conditions_met=["oversold", "high_volume"],
-            ),
-        ]
-        df = scanner.to_dataframe()
-
-        assert len(df) == 2
-        assert "symbol" in df.columns or "price" in df.columns
-        assert "conditions_met" in df.columns
+        call_kwargs = mock_provider.scan.call_args[1]
+        assert "ema_200" in call_kwargs["columns"]
 
 
 # =============================================================================
@@ -416,14 +329,6 @@ class TestScanFunction:
         result = scan(["THYAO", "GARAN"], "rsi < 30")
 
         assert isinstance(result, pd.DataFrame)
-
-    @patch("borsapy.scanner.TechnicalScanner.run")
-    def test_scan_with_period(self, mock_run):
-        """Test scan with custom period."""
-        mock_run.return_value = pd.DataFrame()
-
-        result = scan("THYAO", "rsi < 30", period="1y")
-
         mock_run.assert_called_once()
 
     @patch("borsapy.scanner.TechnicalScanner.run")
@@ -435,6 +340,15 @@ class TestScanFunction:
 
         mock_run.assert_called_once()
 
+    @patch("borsapy.scanner.TechnicalScanner.run")
+    def test_scan_with_limit(self, mock_run):
+        """Test scan with custom limit."""
+        mock_run.return_value = pd.DataFrame()
+
+        result = scan("THYAO", "rsi < 30", limit=50)
+
+        mock_run.assert_called_once_with(limit=50)
+
 
 # =============================================================================
 # Index Integration Tests
@@ -442,22 +356,18 @@ class TestScanFunction:
 
 
 class TestIndexIntegration:
-    """Tests for Index.scan() integration."""
+    """Tests for Index integration."""
 
-    @patch("borsapy.scanner.TechnicalScanner")
     @patch("borsapy.index.get_bist_index_provider")
     @patch("borsapy.index.get_tradingview_provider")
-    def test_index_scan_method(
-        self, mock_tv_provider, mock_bist_provider, mock_scanner_class
-    ):
-        """Test Index.scan() method."""
-        from borsapy.index import Index
-
+    def test_set_universe_index(self, mock_tv_provider, mock_bist_provider):
+        """Test setting universe with index symbol."""
         # Mock index components
         mock_bist = MagicMock()
         mock_bist.get_components.return_value = [
             {"symbol": "AKBNK", "name": "AKBANK"},
             {"symbol": "GARAN", "name": "GARANTİ BANK"},
+            {"symbol": "THYAO", "name": "TÜRK HAVA YOLLARI"},
         ]
         mock_bist_provider.return_value = mock_bist
 
@@ -466,125 +376,180 @@ class TestIndexIntegration:
         mock_tv.get_quote.return_value = {"symbol": "XU030", "last": 9500}
         mock_tv_provider.return_value = mock_tv
 
-        # Create index
-        idx = Index("XU030")
-
-        # Verify components are accessible
-        assert len(idx.component_symbols) == 2
-
-
-# =============================================================================
-# Error Handling Tests
-# =============================================================================
-
-
-class TestErrorHandling:
-    """Tests for error handling."""
-
-    @patch("borsapy._providers.tradingview.get_tradingview_provider")
-    @patch("borsapy.ticker.Ticker")
-    def test_handles_quote_error(self, mock_ticker_class, mock_tv_provider):
-        """Test handling quote fetch errors."""
-        mock_provider = MagicMock()
-        mock_provider.get_quote.side_effect = Exception("API Error")
-        mock_tv_provider.return_value = mock_provider
-
         scanner = TechnicalScanner()
-        scanner.set_universe(["BADTICKER"])
-        scanner.add_condition("rsi < 30")
+        scanner.set_universe("XU030")
 
-        # Should not raise, just skip the symbol
-        results = scanner.run()
-        assert len(results) == 0
+        assert len(scanner._symbols) == 3
+        assert "AKBNK" in scanner._symbols
+        assert "GARAN" in scanner._symbols
+        assert "THYAO" in scanner._symbols
 
-    @patch("borsapy._providers.tradingview.get_tradingview_provider")
-    @patch("borsapy.ticker.Ticker")
-    def test_handles_history_error(
-        self, mock_ticker_class, mock_tv_provider, mock_quote
-    ):
-        """Test handling history fetch errors."""
+
+# =============================================================================
+# Backward Compatibility Tests
+# =============================================================================
+
+
+class TestBackwardCompatibility:
+    """Tests for backward compatibility methods."""
+
+    def test_set_data_period_deprecated(self):
+        """Test set_data_period shows deprecation warning."""
+        scanner = TechnicalScanner()
+        with pytest.warns(DeprecationWarning):
+            scanner.set_data_period("1y")
+
+    def test_results_property_empty(self):
+        """Test results property returns empty list."""
+        scanner = TechnicalScanner()
+        assert scanner.results == []
+
+    @patch("borsapy.scanner.get_tv_screener_provider")
+    def test_to_dataframe(self, mock_get_provider, mock_scan_result):
+        """Test to_dataframe calls run."""
         mock_provider = MagicMock()
-        mock_provider.get_quote.return_value = mock_quote
-        mock_tv_provider.return_value = mock_provider
-
-        mock_ticker = MagicMock()
-        mock_ticker.history.side_effect = Exception("History Error")
-        mock_ticker_class.return_value = mock_ticker
+        mock_provider.scan.return_value = mock_scan_result
+        mock_get_provider.return_value = mock_provider
 
         scanner = TechnicalScanner()
         scanner.set_universe(["THYAO"])
-        scanner.add_condition("volume > 1M")
+        scanner.add_condition("rsi < 30")
+        result = scanner.to_dataframe()
 
-        # Should still work with quote-only conditions
-        results = scanner.run()
-        # May or may not have results depending on condition evaluation
+        assert isinstance(result, pd.DataFrame)
+
+    def test_on_match_deprecated(self):
+        """Test on_match shows deprecation warning."""
+        scanner = TechnicalScanner()
+        with pytest.warns(DeprecationWarning):
+            scanner.on_match(lambda s, d: None)
+
+    def test_on_scan_complete_deprecated(self):
+        """Test on_scan_complete shows deprecation warning."""
+        scanner = TechnicalScanner()
+        with pytest.warns(DeprecationWarning):
+            scanner.on_scan_complete(lambda r: None)
 
 
 # =============================================================================
-# Indicator Calculation Tests
+# Provider Tests
 # =============================================================================
 
 
-class TestIndicatorCalculation:
-    """Tests for indicator calculation in scanner."""
+class TestTVScreenerProvider:
+    """Tests for TVScreenerProvider."""
 
-    def test_add_indicators_to_history(self, mock_history):
-        """Test adding indicators to history DataFrame."""
-        scanner = TechnicalScanner()
-        indicators = {"rsi": [14], "sma": [20, 50]}
-        result = scanner._add_indicators_to_history(mock_history, indicators)
+    def test_provider_field_map(self):
+        """Test that FIELD_MAP contains expected fields."""
+        from borsapy._providers.tradingview_screener_native import TVScreenerProvider
 
-        assert "RSI_14" in result.columns
-        assert "SMA_20" in result.columns
-        assert "SMA_50" in result.columns
+        provider = TVScreenerProvider()
 
-    def test_add_macd_indicators(self, mock_history):
-        """Test adding MACD indicators."""
-        scanner = TechnicalScanner()
-        indicators = {"macd": []}
-        result = scanner._add_indicators_to_history(mock_history, indicators)
+        # Check key fields exist
+        assert "rsi" in provider.FIELD_MAP
+        assert "close" in provider.FIELD_MAP
+        assert "macd" in provider.FIELD_MAP
+        assert "sma_50" in provider.FIELD_MAP
 
-        assert "MACD" in result.columns
-        assert "Signal" in result.columns
-        assert "Histogram" in result.columns
+    def test_provider_interval_map(self):
+        """Test that INTERVAL_MAP contains expected intervals."""
+        from borsapy._providers.tradingview_screener_native import TVScreenerProvider
 
-    def test_add_bollinger_bands(self, mock_history):
-        """Test adding Bollinger Bands."""
-        scanner = TechnicalScanner()
-        indicators = {"bb": [20]}
-        result = scanner._add_indicators_to_history(mock_history, indicators)
+        provider = TVScreenerProvider()
 
-        assert "BB_Upper" in result.columns
-        assert "BB_Middle" in result.columns
-        assert "BB_Lower" in result.columns
+        assert "1d" in provider.INTERVAL_MAP
+        assert "1h" in provider.INTERVAL_MAP
+        assert "5m" in provider.INTERVAL_MAP
 
-    def test_add_stochastic(self, mock_history):
-        """Test adding Stochastic oscillator."""
-        scanner = TechnicalScanner()
-        indicators = {"stoch": [14]}
-        result = scanner._add_indicators_to_history(mock_history, indicators)
+    def test_parse_number_simple(self):
+        """Test parsing simple numbers."""
+        from borsapy._providers.tradingview_screener_native import TVScreenerProvider
 
-        assert "Stoch_K" in result.columns
-        assert "Stoch_D" in result.columns
+        provider = TVScreenerProvider()
 
-    def test_add_latest_indicators(self, mock_history):
-        """Test adding latest indicator values to data dict."""
-        from borsapy.technical import calculate_rsi, calculate_sma
+        assert provider._parse_number("100") == 100.0
+        assert provider._parse_number("1.5") == 1.5
+        assert provider._parse_number("-50") == -50.0
 
-        scanner = TechnicalScanner()
-        indicators = {"rsi": [14], "sma": [20]}
+    def test_parse_number_suffixes(self):
+        """Test parsing numbers with K/M/B suffixes."""
+        from borsapy._providers.tradingview_screener_native import TVScreenerProvider
 
-        # Add indicator columns to history
-        history = mock_history.copy()
-        history["RSI_14"] = calculate_rsi(history, 14)
-        history["SMA_20"] = calculate_sma(history, 20)
+        provider = TVScreenerProvider()
 
-        data = {}
-        scanner._add_latest_indicators(data, history, indicators)
+        assert provider._parse_number("1K") == 1000.0
+        assert provider._parse_number("1.5M") == 1500000.0
+        assert provider._parse_number("2B") == 2000000000.0
 
-        assert "rsi_14" in data
-        assert "rsi" in data  # Default period alias
-        assert "sma_20" in data
+    def test_get_tv_column_mapped(self):
+        """Test getting TV column for mapped fields."""
+        from borsapy._providers.tradingview_screener_native import TVScreenerProvider
+
+        provider = TVScreenerProvider()
+
+        assert provider._get_tv_column("rsi") == "RSI"
+        assert provider._get_tv_column("close") == "close"
+        assert provider._get_tv_column("macd") == "MACD.macd"
+
+    def test_get_tv_column_dynamic_sma(self):
+        """Test getting TV column for dynamic SMA."""
+        from borsapy._providers.tradingview_screener_native import TVScreenerProvider
+
+        provider = TVScreenerProvider()
+
+        assert provider._get_tv_column("sma_100") == "SMA100"
+        assert provider._get_tv_column("sma_150") == "SMA150"
+
+    def test_get_tv_column_dynamic_ema(self):
+        """Test getting TV column for dynamic EMA."""
+        from borsapy._providers.tradingview_screener_native import TVScreenerProvider
+
+        provider = TVScreenerProvider()
+
+        assert provider._get_tv_column("ema_100") == "EMA100"
+        assert provider._get_tv_column("ema_150") == "EMA150"
+
+    def test_get_tv_column_with_interval(self):
+        """Test getting TV column with non-daily interval."""
+        from borsapy._providers.tradingview_screener_native import TVScreenerProvider
+
+        provider = TVScreenerProvider()
+
+        assert provider._get_tv_column("rsi", "1h") == "RSI|60"
+        assert provider._get_tv_column("close", "5m") == "close|5"
+
+    def test_extract_fields_from_condition(self):
+        """Test extracting fields from condition."""
+        from borsapy._providers.tradingview_screener_native import TVScreenerProvider
+
+        provider = TVScreenerProvider()
+
+        fields = provider._extract_fields_from_condition("rsi < 30")
+        assert "rsi" in fields
+
+        fields = provider._extract_fields_from_condition("close > sma_50")
+        assert "close" in fields
+        assert "sma_50" in fields
+
+    def test_scan_empty_symbols(self):
+        """Test scan with empty symbols."""
+        from borsapy._providers.tradingview_screener_native import TVScreenerProvider
+
+        provider = TVScreenerProvider()
+        result = provider.scan([], ["rsi < 30"])
+
+        assert isinstance(result, pd.DataFrame)
+        assert len(result) == 0
+
+    def test_scan_empty_conditions(self):
+        """Test scan with empty conditions."""
+        from borsapy._providers.tradingview_screener_native import TVScreenerProvider
+
+        provider = TVScreenerProvider()
+        result = provider.scan(["THYAO"], [])
+
+        assert isinstance(result, pd.DataFrame)
+        assert len(result) == 0
 
 
 # =============================================================================
@@ -595,34 +560,61 @@ class TestIndicatorCalculation:
 class TestComplexConditions:
     """Tests for complex condition handling."""
 
-    def test_compound_condition_parsing(self):
-        """Test compound condition in scanner."""
+    def test_compound_condition_parsed(self):
+        """Test compound condition is split."""
         scanner = TechnicalScanner()
         scanner.add_condition("rsi < 30 and volume > 1M")
-        indicators = scanner._collect_required_indicators()
-        assert "rsi" in indicators
 
-    def test_nested_condition_parsing(self):
-        """Test nested condition in scanner."""
-        scanner = TechnicalScanner()
-        scanner.add_condition("(rsi < 30 or rsi > 70) and volume > 1M")
-        indicators = scanner._collect_required_indicators()
-        assert "rsi" in indicators
+        assert "rsi < 30" in scanner._conditions
+        assert "volume > 1m" in scanner._conditions
 
-    def test_crossover_condition_parsing(self):
-        """Test crossover condition in scanner."""
+    def test_crossover_condition_parsed(self):
+        """Test crossover condition."""
         scanner = TechnicalScanner()
         scanner.add_condition("sma_20 crosses_above sma_50")
-        indicators = scanner._collect_required_indicators()
-        assert "sma" in indicators
-        assert 20 in indicators["sma"]
-        assert 50 in indicators["sma"]
 
-    def test_multiple_indicator_types(self):
-        """Test multiple indicator types in one condition."""
+        assert "sma_20 crosses_above sma_50" in scanner._conditions
+
+    def test_multiple_conditions(self):
+        """Test adding multiple conditions."""
         scanner = TechnicalScanner()
-        scanner.add_condition("rsi < 30 and macd > 0 and sma_20 > sma_50")
-        indicators = scanner._collect_required_indicators()
-        assert "rsi" in indicators
-        assert "macd" in indicators
-        assert "sma" in indicators
+        scanner.add_condition("rsi < 30", name="oversold")
+        scanner.add_condition("macd > signal", name="macd_bullish")
+
+        assert len(scanner._conditions) == 2
+        assert "rsi < 30" in scanner._conditions
+        assert "macd > signal" in scanner._conditions
+
+
+# =============================================================================
+# Integration Tests (requires network)
+# =============================================================================
+
+
+@pytest.mark.skip(reason="Integration test requires network access")
+class TestIntegration:
+    """Integration tests with real TradingView API."""
+
+    def test_scan_xu030_rsi(self):
+        """Test scanning XU030 for RSI oversold."""
+        result = scan("XU030", "rsi < 40")
+        assert isinstance(result, pd.DataFrame)
+        print(f"Found {len(result)} stocks with RSI < 40")
+
+    def test_scan_compound_condition(self):
+        """Test scanning with compound condition."""
+        result = scan("XU030", "rsi < 40 and close > sma_50")
+        assert isinstance(result, pd.DataFrame)
+        print(f"Found {len(result)} stocks matching compound condition")
+
+    def test_scan_crossover(self):
+        """Test scanning for crossover."""
+        result = scan("XU030", "sma_20 crosses_above sma_50")
+        assert isinstance(result, pd.DataFrame)
+        print(f"Found {len(result)} stocks with golden cross")
+
+    def test_scan_hourly_timeframe(self):
+        """Test scanning with hourly timeframe."""
+        result = scan("XU030", "rsi < 40", interval="1h")
+        assert isinstance(result, pd.DataFrame)
+        print(f"Found {len(result)} stocks with 1h RSI < 40")

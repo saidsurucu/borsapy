@@ -2005,8 +2005,26 @@ print(results[['symbol', 'rsi', 'volume', 'conditions_met']])
 | Kategori | Koşullar | Örnek |
 |----------|----------|-------|
 | **Quote** | `price`, `volume`, `change_percent`, `bid`, `ask` | `price > 100` |
-| **Göstergeler** | `rsi`, `sma_N`, `ema_N`, `macd`, `signal`, `bb_upper/lower`, `adx` | `rsi < 30` |
+| **Göstergeler** | `rsi`, `sma_N`, `ema_N`, `macd`, `signal`, `bb_upper/lower`, `adx`, `atr`, `cci`, `stoch_k/d` | `rsi < 30` |
 | **Crossover** | `crosses`, `crosses_above`, `crosses_below` | `sma_20 crosses_above sma_50` |
+| **Yüzde** | `above_pct`, `below_pct` | `close above_pct sma_50 1.05` |
+
+### Timeframe Desteği
+
+```python
+import borsapy as bp
+
+# Günlük (varsayılan)
+df = bp.scan("XU030", "rsi < 30")
+
+# Saatlik
+df = bp.scan("XU030", "rsi < 30", interval="1h")
+
+# 15 dakikalık
+df = bp.scan("XU030", "macd > signal", interval="15m")
+
+# Desteklenen: 1m, 5m, 15m, 30m, 1h, 2h, 4h, 1d, 1W, 1M
+```
 
 ### Örnek Stratejiler
 
@@ -2019,11 +2037,26 @@ oversold = bp.scan("XU100", "rsi < 30")
 # Golden Cross
 golden = bp.scan("XU030", "sma_20 crosses_above sma_50")
 
+# Death Cross
+death = bp.scan("XU030", "sma_20 crosses_below sma_50")
+
+# MACD sıfır çizgisini geçiyor
+macd_cross = bp.scan("XU100", "macd crosses signal")
+
 # Yüksek hacimli momentum
 momentum = bp.scan("XU030", "rsi > 50 and volume > 5000000 and change_percent > 2")
 
+# Fiyat SMA50'nin %5 üzerinde
+breakout = bp.scan("XU030", "close above_pct sma_50 1.05")
+
+# Fiyat SMA200'ün %10 altında (potansiyel dip)
+dip = bp.scan("XU100", "close below_pct sma_200 0.90")
+
 # Bollinger alt bandına yakın
-bb_low = bp.scan("XU100", "price < bb_lower * 1.02")
+bb_low = bp.scan("XU030", "close < bb_lower")
+
+# Saatlik RSI oversold
+hourly_oversold = bp.scan("XU030", "rsi < 30", interval="1h")
 ```
 
 ---

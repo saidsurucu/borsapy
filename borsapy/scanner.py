@@ -1,7 +1,13 @@
-"""Technical scanner for screening stocks based on technical conditions.
+"""Technical scanner using TradingView-native filtering.
 
 This module provides a TechnicalScanner class for screening multiple symbols
-based on technical indicators and price conditions.
+based on technical indicators using TradingView's Scanner API.
+
+The scanner supports conditions like:
+- Simple comparisons: "rsi < 30", "price > 300"
+- Field comparisons: "close > sma_50", "macd > signal"
+- Compound conditions: "rsi < 30 and volume > 1M"
+- Crossover detection: "sma_20 crosses_above sma_50"
 
 Examples:
     >>> import borsapy as bp
@@ -11,7 +17,13 @@ Examples:
     >>> bp.scan("XU100", "price > sma_50")
 
     # Compound conditions
-    >>> bp.scan("XU030", "rsi < 30 and volume > 1000000")
+    >>> bp.scan("XU030", "rsi < 30 and volume > 1M")
+
+    # Crossover
+    >>> bp.scan("XU030", "sma_20 crosses_above sma_50")
+
+    # Different timeframe
+    >>> bp.scan("XU030", "rsi < 30", interval="1h")
 
     # Using TechnicalScanner class
     >>> scanner = bp.TechnicalScanner()
@@ -24,27 +36,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Callable
+from typing import Any
 
-import numpy as np
 import pandas as pd
 
-from borsapy.condition import ConditionParser, ParseError
-from borsapy.technical import (
-    calculate_adx,
-    calculate_atr,
-    calculate_bollinger_bands,
-    calculate_ema,
-    calculate_macd,
-    calculate_obv,
-    calculate_rsi,
-    calculate_sma,
-    calculate_stochastic,
-    calculate_vwap,
-)
-
-if TYPE_CHECKING:
-    pass
+from borsapy._providers.tradingview_screener_native import get_tv_screener_provider
 
 __all__ = ["TechnicalScanner", "ScanResult", "scan"]
 
@@ -66,60 +62,134 @@ class ScanResult:
     timestamp: datetime = field(default_factory=datetime.now)
 
 
-class TechnicalScanner:
-    """Scanner for technical analysis conditions across multiple symbols.
+def scan(
+    universe: str | list[str],
+    condition: str,
+    interval: str = "1d",
+    limit: int = 100,
+) -> pd.DataFrame:
+    """Convenience function for quick technical scanning using TradingView API.
 
-    Supports batch scanning with conditions based on quote data (price, volume)
-    and technical indicators (RSI, SMA, EMA, MACD, Bollinger Bands, etc.).
+    This function provides a simple interface to scan stocks based on technical
+    conditions. All filtering is done server-side by TradingView for fast results.
+
+    Args:
+        universe: Index symbol (e.g., "XU030", "XU100", "XBANK") or list of stock symbols
+        condition: Condition string supporting:
+            - Simple comparisons: "rsi < 30", "volume > 1M"
+            - Field comparisons: "close > sma_50", "macd > signal"
+            - Compound conditions: "rsi < 30 and close > sma_50"
+            - Crossover: "sma_20 crosses_above sma_50", "macd crosses signal"
+            - Percentage: "close above_pct sma_50 1.05", "close below_pct sma_50 0.95"
+        interval: Timeframe for indicators ("1m", "5m", "15m", "30m", "1h", "4h", "1d", "1W", "1M")
+        limit: Maximum number of results (default: 100)
+
+    Returns:
+        DataFrame with matching symbols and their indicator values
+
+    Examples:
+        >>> import borsapy as bp
+
+        # RSI oversold
+        >>> bp.scan("XU030", "rsi < 30")
+
+        # Price above SMA50
+        >>> bp.scan("XU100", "close > sma_50")
+
+        # Compound condition
+        >>> bp.scan("XU030", "rsi < 30 and volume > 1M")
+
+        # MACD bullish
+        >>> bp.scan("XU100", "macd > signal")
+
+        # Golden cross
+        >>> bp.scan("XU030", "sma_20 crosses_above sma_50")
+
+        # MACD crosses signal line
+        >>> bp.scan("XU030", "macd crosses signal")
+
+        # Close 5% above SMA50
+        >>> bp.scan("XU030", "close above_pct sma_50 1.05")
+
+        # Hourly timeframe
+        >>> bp.scan("XU030", "rsi < 30", interval="1h")
+
+    Supported Fields:
+        Price: price, close, open, high, low, volume, change_percent, market_cap
+        RSI: rsi, rsi_7, rsi_14
+        SMA: sma_5, sma_10, sma_20, sma_30, sma_50, sma_100, sma_200
+        EMA: ema_5, ema_10, ema_12, ema_20, ema_26, ema_50, ema_100, ema_200
+        MACD: macd, signal, histogram
+        Stochastic: stoch_k, stoch_d
+        ADX: adx
+        Bollinger: bb_upper, bb_middle, bb_lower
+        ATR: atr
+        CCI: cci
+        Williams %R: wr
+    """
+    scanner = TechnicalScanner()
+    scanner.set_universe(universe)
+    scanner.add_condition(condition)
+    scanner.set_interval(interval)
+    return scanner.run(limit=limit)
+
+
+class TechnicalScanner:
+    """Scanner for technical analysis conditions using TradingView API.
+
+    Provides a fluent API for building and executing stock scans based on
+    technical indicators. All filtering is done server-side by TradingView
+    for optimal performance.
 
     Examples:
         >>> scanner = TechnicalScanner()
         >>> scanner.set_universe("XU030")
         >>> scanner.add_condition("rsi < 30", name="oversold")
-        >>> scanner.add_condition("volume > 1000000", name="high_vol")
+        >>> scanner.add_condition("volume > 1M", name="high_vol")
         >>> results = scanner.run()
         >>> print(results)
+
+    Supported Timeframes:
+        "1m", "5m", "15m", "30m", "1h", "2h", "4h", "1d", "1W", "1M"
     """
 
-    def __init__(self, realtime: bool = False) -> None:
-        """Initialize scanner.
-
-        Args:
-            realtime: If True, use streaming for real-time scanning (not yet implemented)
-        """
-        self._realtime = realtime
+    def __init__(self) -> None:
+        """Initialize scanner."""
+        self._provider = get_tv_screener_provider()
         self._symbols: list[str] = []
-        self._conditions: dict[str, ConditionParser] = {}
-        self._data_period = "3mo"
-        self._interval = "1d"
-        self._results: list[ScanResult] = []
-        self._on_match_callback: Callable[[str, dict[str, Any]], None] | None = None
-        self._on_complete_callback: Callable[[list[ScanResult]], None] | None = None
+        self._conditions: list[str] = []
+        self._condition_names: dict[str, str] = {}  # condition -> name
+        self._interval: str = "1d"
+        self._extra_columns: list[str] = []
 
-    def set_universe(self, symbols: str | list[str]) -> "TechnicalScanner":
+    def set_universe(self, universe: str | list[str]) -> "TechnicalScanner":
         """Set the universe of symbols to scan.
 
         Args:
-            symbols: Index symbol (e.g., "XU030") or list of stock symbols
+            universe: Index symbol (e.g., "XU030", "XU100", "XBANK") or list of stock symbols
 
         Returns:
             Self for method chaining
+
+        Examples:
+            >>> scanner.set_universe("XU030")  # BIST 30 components
+            >>> scanner.set_universe(["THYAO", "GARAN", "ASELS"])  # Specific symbols
         """
-        if isinstance(symbols, str):
+        if isinstance(universe, str):
             # Check if it's an index
-            if symbols.upper().startswith("X"):
+            if universe.upper().startswith("X"):
                 from borsapy.index import Index
 
                 try:
-                    idx = Index(symbols.upper())
+                    idx = Index(universe.upper())
                     self._symbols = idx.component_symbols
                 except Exception:
                     # Not a valid index, treat as single symbol
-                    self._symbols = [symbols.upper()]
+                    self._symbols = [universe.upper()]
             else:
-                self._symbols = [symbols.upper()]
+                self._symbols = [universe.upper()]
         else:
-            self._symbols = [s.upper() for s in symbols]
+            self._symbols = [s.upper() for s in universe]
         return self
 
     def add_symbol(self, symbol: str) -> "TechnicalScanner":
@@ -155,32 +225,52 @@ class TechnicalScanner:
     ) -> "TechnicalScanner":
         """Add a scanning condition.
 
+        Conditions are combined with AND logic. For OR logic, use the full
+        condition string: "(rsi < 30 or rsi > 70)".
+
         Args:
-            condition: Condition string (e.g., "rsi < 30")
-            name: Optional name for the condition
+            condition: Condition string (e.g., "rsi < 30", "close > sma_50")
+            name: Optional name for the condition (for reporting)
 
         Returns:
             Self for method chaining
 
-        Raises:
-            ParseError: If condition syntax is invalid
+        Supported Syntax:
+            - Simple: "rsi < 30", "volume > 1M"
+            - Field comparison: "close > sma_50", "macd > signal"
+            - Compound (AND): "rsi < 30 and volume > 1M"
+            - Crossover: "sma_20 crosses_above sma_50"
+
+        Examples:
+            >>> scanner.add_condition("rsi < 30", name="oversold")
+            >>> scanner.add_condition("volume > 1M", name="high_volume")
         """
-        parser = ConditionParser(condition)
-        cond_name = name or condition
-        self._conditions[cond_name] = parser
+        # Split by "and" for multiple conditions
+        parts = [c.strip() for c in condition.lower().split(" and ")]
+
+        for part in parts:
+            if part and part not in self._conditions:
+                self._conditions.append(part)
+                cond_name = name if name and len(parts) == 1 else part
+                self._condition_names[part] = cond_name
+
         return self
 
-    def remove_condition(self, name: str) -> "TechnicalScanner":
-        """Remove a condition by name.
+    def remove_condition(self, name_or_condition: str) -> "TechnicalScanner":
+        """Remove a condition by name or condition string.
 
         Args:
-            name: Condition name to remove
+            name_or_condition: Condition name or string to remove
 
         Returns:
             Self for method chaining
         """
-        if name in self._conditions:
-            del self._conditions[name]
+        # Try to find by name
+        for cond, cname in list(self._condition_names.items()):
+            if cname == name_or_condition or cond == name_or_condition.lower():
+                self._conditions.remove(cond)
+                del self._condition_names[cond]
+                break
         return self
 
     def clear_conditions(self) -> "TechnicalScanner":
@@ -190,25 +280,19 @@ class TechnicalScanner:
             Self for method chaining
         """
         self._conditions.clear()
+        self._condition_names.clear()
         return self
 
-    def set_data_period(self, period: str = "3mo") -> "TechnicalScanner":
-        """Set the historical data period for indicator calculation.
+    def set_interval(self, interval: str) -> "TechnicalScanner":
+        """Set the data interval/timeframe for indicators.
 
         Args:
-            period: Period for history data (e.g., "1mo", "3mo", "1y")
-
-        Returns:
-            Self for method chaining
-        """
-        self._data_period = period
-        return self
-
-    def set_interval(self, interval: str = "1d") -> "TechnicalScanner":
-        """Set the data interval.
-
-        Args:
-            interval: Interval for data (e.g., "1d", "1h")
+            interval: Timeframe for indicators:
+                - "1m", "5m", "15m", "30m" (intraday minutes)
+                - "1h", "2h", "4h" (intraday hours)
+                - "1d" (daily, default)
+                - "1W", "1wk" (weekly)
+                - "1M", "1mo" (monthly)
 
         Returns:
             Self for method chaining
@@ -216,310 +300,107 @@ class TechnicalScanner:
         self._interval = interval
         return self
 
-    def on_match(self, callback: Callable[[str, dict[str, Any]], None]) -> None:
-        """Set callback for when a symbol matches conditions (real-time mode).
+    def add_column(self, column: str) -> "TechnicalScanner":
+        """Add extra column to retrieve in results.
 
         Args:
-            callback: Function taking (symbol, data) arguments
-        """
-        self._on_match_callback = callback
-
-    def on_scan_complete(self, callback: Callable[[list[ScanResult]], None]) -> None:
-        """Set callback for when scan completes.
-
-        Args:
-            callback: Function taking list of ScanResults
-        """
-        self._on_complete_callback = callback
-
-    def run(self) -> pd.DataFrame:
-        """Execute the scan and return results as DataFrame.
+            column: Column name (e.g., "ema_200", "adx")
 
         Returns:
-            DataFrame with columns: symbol, plus indicator columns,
-            plus conditions_met column
-
-        Examples:
-            >>> scanner = TechnicalScanner()
-            >>> scanner.set_universe("XU030")
-            >>> scanner.add_condition("rsi < 30")
-            >>> df = scanner.run()
-            >>> print(df[['symbol', 'rsi', 'price', 'conditions_met']])
+            Self for method chaining
         """
-        from borsapy.ticker import Ticker
-        from borsapy._providers.tradingview import get_tradingview_provider
+        if column not in self._extra_columns:
+            self._extra_columns.append(column)
+        return self
 
-        self._results = []
-        tv_provider = get_tradingview_provider()
+    def run(self, limit: int = 100) -> pd.DataFrame:
+        """Execute the scan and return results.
 
-        # Collect all required indicators
-        all_indicators = self._collect_required_indicators()
+        Args:
+            limit: Maximum number of results
 
-        for symbol in self._symbols:
-            try:
-                result = self._scan_symbol(symbol, all_indicators, tv_provider)
-                if result is not None:
-                    self._results.append(result)
-            except Exception as e:
-                # Log error but continue with other symbols
-                import warnings
+        Returns:
+            DataFrame with matching symbols and their data.
+            Columns include: symbol, close, volume, change, market_cap,
+            plus any indicator columns used in conditions.
 
-                warnings.warn(f"Error scanning {symbol}: {e}")
-                continue
+        Raises:
+            ValueError: If no symbols or conditions are set
+        """
+        if not self._symbols:
+            return pd.DataFrame()
 
-        # Invoke callback if set
-        if self._on_complete_callback:
-            self._on_complete_callback(self._results)
+        if not self._conditions:
+            return pd.DataFrame()
 
-        return self.to_dataframe()
-
-    def _collect_required_indicators(self) -> dict[str, list[int]]:
-        """Collect all required indicators from all conditions."""
-        all_indicators: dict[str, list[int]] = {}
-        for parser in self._conditions.values():
-            for ind, periods in parser.required_indicators().items():
-                if ind not in all_indicators:
-                    all_indicators[ind] = []
-                for p in periods:
-                    if p not in all_indicators[ind]:
-                        all_indicators[ind].append(p)
-        return all_indicators
-
-    def _scan_symbol(
-        self,
-        symbol: str,
-        indicators: dict[str, list[int]],
-        tv_provider: Any,
-    ) -> ScanResult | None:
-        """Scan a single symbol."""
-        from borsapy.ticker import Ticker
-
-        # Get quote data
-        try:
-            quote = tv_provider.get_quote(symbol)
-        except Exception:
-            return None
-
-        # Get historical data for indicators
-        try:
-            ticker = Ticker(symbol)
-            history = ticker.history(period=self._data_period, interval=self._interval)
-        except Exception:
-            history = pd.DataFrame()
-
-        # Build data dict with quote fields
-        data: dict[str, Any] = {
-            "symbol": symbol,
-            "price": quote.get("last"),
-            "last": quote.get("last"),
-            "open": quote.get("open"),
-            "high": quote.get("high"),
-            "low": quote.get("low"),
-            "volume": quote.get("volume"),
-            "change_percent": quote.get("change_percent"),
-            "market_cap": quote.get("market_cap"),
-            "bid": quote.get("bid"),
-            "ask": quote.get("ask"),
-        }
-
-        # Calculate indicators and add to history
-        if not history.empty:
-            history = self._add_indicators_to_history(history, indicators)
-            # Add latest indicator values to data
-            self._add_latest_indicators(data, history, indicators)
-
-        # Evaluate conditions
-        conditions_met = []
-        for name, parser in self._conditions.items():
-            try:
-                if parser.evaluate(data, history):
-                    conditions_met.append(name)
-            except Exception:
-                continue
-
-        # Only include if at least one condition met
-        if not conditions_met:
-            return None
-
-        # Invoke match callback
-        if self._on_match_callback:
-            self._on_match_callback(symbol, data)
-
-        return ScanResult(
-            symbol=symbol,
-            data=data,
-            conditions_met=conditions_met,
-            timestamp=datetime.now(),
+        # Execute scan via provider
+        df = self._provider.scan(
+            symbols=self._symbols,
+            conditions=self._conditions,
+            columns=self._extra_columns,
+            interval=self._interval,
+            limit=limit,
         )
 
-    def _add_indicators_to_history(
-        self, df: pd.DataFrame, indicators: dict[str, list[int]]
-    ) -> pd.DataFrame:
-        """Add indicator columns to history DataFrame."""
-        result = df.copy()
+        # Add conditions_met column for compatibility
+        if not df.empty:
+            df["conditions_met"] = [list(self._condition_names.values())] * len(df)
 
-        for ind, periods in indicators.items():
-            if ind == "rsi":
-                for period in periods:
-                    result[f"RSI_{period}"] = calculate_rsi(df, period)
-            elif ind == "sma":
-                for period in periods:
-                    result[f"SMA_{period}"] = calculate_sma(df, period)
-            elif ind == "ema":
-                for period in periods:
-                    result[f"EMA_{period}"] = calculate_ema(df, period)
-            elif ind == "macd" or ind == "macd_signal" or ind == "macd_histogram":
-                macd_df = calculate_macd(df)
-                result["MACD"] = macd_df["MACD"]
-                result["Signal"] = macd_df["Signal"]
-                result["Histogram"] = macd_df["Histogram"]
-            elif ind == "bb":
-                for period in periods:
-                    bb_df = calculate_bollinger_bands(df, period)
-                    result["BB_Upper"] = bb_df["BB_Upper"]
-                    result["BB_Middle"] = bb_df["BB_Middle"]
-                    result["BB_Lower"] = bb_df["BB_Lower"]
-            elif ind == "adx":
-                for period in periods:
-                    result[f"ADX_{period}"] = calculate_adx(df, period)
-            elif ind == "atr":
-                for period in periods:
-                    result[f"ATR_{period}"] = calculate_atr(df, period)
-            elif ind == "stoch":
-                stoch_df = calculate_stochastic(df)
-                result["Stoch_K"] = stoch_df["Stoch_K"]
-                result["Stoch_D"] = stoch_df["Stoch_D"]
-            elif ind == "obv":
-                result["OBV"] = calculate_obv(df)
-            elif ind == "vwap":
-                result["VWAP"] = calculate_vwap(df)
+        return df
 
-        return result
+    @property
+    def symbols(self) -> list[str]:
+        """Get current symbol universe."""
+        return self._symbols.copy()
 
-    def _add_latest_indicators(
-        self,
-        data: dict[str, Any],
-        history: pd.DataFrame,
-        indicators: dict[str, list[int]],
-    ) -> None:
-        """Add latest indicator values to data dict."""
-        if history.empty:
-            return
+    @property
+    def conditions(self) -> list[str]:
+        """Get current conditions."""
+        return self._conditions.copy()
 
-        for ind, periods in indicators.items():
-            if ind == "rsi":
-                for period in periods:
-                    col = f"RSI_{period}"
-                    if col in history.columns:
-                        data[f"rsi_{period}"] = float(history[col].iloc[-1])
-                        if period == 14:
-                            data["rsi"] = data[f"rsi_{period}"]
-            elif ind == "sma":
-                for period in periods:
-                    col = f"SMA_{period}"
-                    if col in history.columns:
-                        data[f"sma_{period}"] = float(history[col].iloc[-1])
-            elif ind == "ema":
-                for period in periods:
-                    col = f"EMA_{period}"
-                    if col in history.columns:
-                        data[f"ema_{period}"] = float(history[col].iloc[-1])
-            elif ind in ("macd", "macd_signal", "macd_histogram"):
-                if "MACD" in history.columns:
-                    data["macd"] = float(history["MACD"].iloc[-1])
-                if "Signal" in history.columns:
-                    data["signal"] = float(history["Signal"].iloc[-1])
-                if "Histogram" in history.columns:
-                    data["histogram"] = float(history["Histogram"].iloc[-1])
-            elif ind == "bb":
-                if "BB_Upper" in history.columns:
-                    data["bb_upper"] = float(history["BB_Upper"].iloc[-1])
-                if "BB_Middle" in history.columns:
-                    data["bb_middle"] = float(history["BB_Middle"].iloc[-1])
-                if "BB_Lower" in history.columns:
-                    data["bb_lower"] = float(history["BB_Lower"].iloc[-1])
-            elif ind == "adx":
-                for period in periods:
-                    col = f"ADX_{period}"
-                    if col in history.columns:
-                        data[f"adx_{period}"] = float(history[col].iloc[-1])
-                        if period == 14:
-                            data["adx"] = data[f"adx_{period}"]
-            elif ind == "atr":
-                for period in periods:
-                    col = f"ATR_{period}"
-                    if col in history.columns:
-                        data[f"atr_{period}"] = float(history[col].iloc[-1])
-                        if period == 14:
-                            data["atr"] = data[f"atr_{period}"]
-            elif ind == "stoch":
-                if "Stoch_K" in history.columns:
-                    data["stoch_k"] = float(history["Stoch_K"].iloc[-1])
-                if "Stoch_D" in history.columns:
-                    data["stoch_d"] = float(history["Stoch_D"].iloc[-1])
-            elif ind == "obv":
-                if "OBV" in history.columns:
-                    data["obv"] = float(history["OBV"].iloc[-1])
-            elif ind == "vwap":
-                if "VWAP" in history.columns:
-                    data["vwap"] = float(history["VWAP"].iloc[-1])
+    # Backward compatibility aliases
+    def set_data_period(self, period: str = "3mo") -> "TechnicalScanner":
+        """Deprecated: Period is not used with TradingView API."""
+        import warnings
+
+        warnings.warn(
+            "set_data_period() is deprecated. TradingView API uses real-time data.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self
 
     @property
     def results(self) -> list[ScanResult]:
-        """Get list of scan results."""
-        return self._results
+        """Deprecated: Use run() which returns DataFrame directly."""
+        return []
 
     def to_dataframe(self) -> pd.DataFrame:
-        """Convert results to DataFrame.
+        """Deprecated: Use run() which returns DataFrame directly."""
+        return self.run()
 
-        Returns:
-            DataFrame with scan results
-        """
-        if not self._results:
-            return pd.DataFrame()
+    def on_match(self, callback) -> None:
+        """Deprecated: Callbacks not supported with batch API."""
+        import warnings
 
-        rows = []
-        for result in self._results:
-            row = result.data.copy()
-            row["conditions_met"] = result.conditions_met
-            row["timestamp"] = result.timestamp
-            rows.append(row)
+        warnings.warn(
+            "on_match() is deprecated. Use run() and iterate results.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
 
-        return pd.DataFrame(rows)
+    def on_scan_complete(self, callback) -> None:
+        """Deprecated: Callbacks not supported with batch API."""
+        import warnings
+
+        warnings.warn(
+            "on_scan_complete() is deprecated. Use run() directly.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
 
     def __repr__(self) -> str:
         return (
             f"TechnicalScanner(symbols={len(self._symbols)}, "
-            f"conditions={len(self._conditions)})"
+            f"conditions={len(self._conditions)}, interval='{self._interval}')"
         )
-
-
-def scan(
-    symbols: str | list[str],
-    condition: str,
-    period: str = "3mo",
-    interval: str = "1d",
-) -> pd.DataFrame:
-    """Convenience function for quick technical scanning.
-
-    Args:
-        symbols: Index symbol (e.g., "XU030") or list of stock symbols
-        condition: Condition string (e.g., "rsi < 30")
-        period: Historical data period for indicators
-        interval: Data interval
-
-    Returns:
-        DataFrame with matching symbols and their data
-
-    Examples:
-        >>> import borsapy as bp
-        >>> bp.scan("XU030", "rsi < 30")
-        >>> bp.scan(["THYAO", "GARAN"], "price > sma_50")
-        >>> bp.scan("XU100", "rsi < 30 and volume > 1000000")
-    """
-    scanner = TechnicalScanner()
-    scanner.set_universe(symbols)
-    scanner.add_condition(condition)
-    scanner.set_data_period(period)
-    scanner.set_interval(interval)
-    return scanner.run()
