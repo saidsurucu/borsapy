@@ -6,10 +6,8 @@ from borsapy._providers.tradingview_scanner import (
     INTERVAL_MAP,
     MOVING_AVERAGE_COLUMNS,
     OSCILLATOR_COLUMNS,
-    TradingViewScannerProvider,
     get_scanner_provider,
 )
-
 
 # =============================================================================
 # Unit Tests - TradingViewScannerProvider

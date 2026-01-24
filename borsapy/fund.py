@@ -354,6 +354,61 @@ class Fund(TechnicalMixin):
             "trading_days": trading_days,
         }
 
+    def get_holdings(
+        self,
+        api_key: str,
+        period: str | None = None,
+    ) -> pd.DataFrame:
+        """
+        Get detailed portfolio holdings (individual securities).
+
+        Returns the specific stocks, ETFs, and funds held by this fund,
+        with their weights and ISIN codes. Data is sourced from KAP
+        "Portföy Dağılım Raporu" (Portfolio Distribution Report) disclosures.
+
+        Uses OpenRouter LLM for PDF parsing.
+
+        Args:
+            api_key: OpenRouter API key for LLM parsing.
+                    Get your free API key at: https://openrouter.ai/
+            period: Optional period in format "YYYY-MM" (e.g., "2025-12").
+                   If None, returns the most recent holdings.
+
+        Returns:
+            DataFrame with columns:
+            - symbol: Security symbol (e.g., "GOOGL", "THYAO")
+            - isin: ISIN code
+            - name: Full security name
+            - weight: Portfolio weight (%)
+            - type: Holding type ('stock', 'etf', 'fund', 'viop', etc.)
+            - country: Country ('TR', 'US', or None)
+            - value: Market value in TRY
+
+        Raises:
+            DataNotAvailableError: If holdings data not available.
+            APIError: If LLM parsing fails.
+            ImportError: If required packages are not installed.
+
+        Examples:
+            >>> fund = bp.Fund("YAY")
+            >>> fund.get_holdings(api_key="sk-or-v1-...")
+               symbol              isin                              name  weight   type country         value
+            0   GOOGL  US02079K3059             ALPHABET INC CL A    6.76  stock      US  82478088.0
+            1    AVGO  US11135F1012             BROADCOM INC          5.11  stock      US  62345678.0
+            ...
+
+            >>> # Get holdings for specific period
+            >>> fund.get_holdings(api_key="sk-or-v1-...", period="2025-12")
+
+            >>> # Filter by type
+            >>> holdings = fund.get_holdings(api_key="sk-or-v1-...")
+            >>> holdings[holdings['type'] == 'stock']
+        """
+        from borsapy._providers.kap_holdings import get_kap_holdings_provider
+
+        provider = get_kap_holdings_provider()
+        return provider.get_holdings_df(self._fund_code, api_key, period=period)
+
     def __repr__(self) -> str:
         return f"Fund('{self._fund_code}')"
 

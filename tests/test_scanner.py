@@ -6,8 +6,7 @@ from unittest.mock import MagicMock, patch
 import pandas as pd
 import pytest
 
-from borsapy.scanner import TechnicalScanner, ScanResult, scan
-
+from borsapy.scanner import ScanResult, TechnicalScanner, scan
 
 # =============================================================================
 # Test Fixtures
@@ -336,7 +335,7 @@ class TestScanFunction:
         """Test scan with custom interval."""
         mock_run.return_value = pd.DataFrame()
 
-        result = scan("THYAO", "rsi < 30", interval="1h")
+        scan("THYAO", "rsi < 30", interval="1h")
 
         mock_run.assert_called_once()
 
@@ -345,7 +344,7 @@ class TestScanFunction:
         """Test scan with custom limit."""
         mock_run.return_value = pd.DataFrame()
 
-        result = scan("THYAO", "rsi < 30", limit=50)
+        scan("THYAO", "rsi < 30", limit=50)
 
         mock_run.assert_called_once_with(limit=50)
 

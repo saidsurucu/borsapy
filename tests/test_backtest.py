@@ -10,7 +10,7 @@ import pandas as pd
 import pytest
 
 from borsapy.backtest import Backtest, BacktestResult, Trade, backtest
-
+from borsapy.exceptions import APIError
 
 # ============================================================================
 # Trade Tests
@@ -440,8 +440,8 @@ class TestBacktest:
             strategy=my_strategy,
             period="1y",
         )
-        # Should raise error on run
-        with pytest.raises(Exception):
+        # Should raise error on run (ValueError for no data, APIError for invalid symbol)
+        with pytest.raises((ValueError, APIError)):
             bt.run()
 
 

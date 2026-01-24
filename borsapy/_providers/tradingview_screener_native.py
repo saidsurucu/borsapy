@@ -21,7 +21,7 @@ try:
 except ImportError:
     raise ImportError(
         "tradingview-screener package is required. Install with: pip install tradingview-screener"
-    )
+    ) from None
 
 __all__ = ["TVScreenerProvider", "get_tv_screener_provider"]
 
@@ -222,14 +222,14 @@ class TVScreenerProvider:
                 # Skip invalid conditions but log warning
                 import warnings
 
-                warnings.warn(f"Failed to parse condition '{cond}': {e}")
+                warnings.warn(f"Failed to parse condition '{cond}': {e}", stacklevel=2)
                 continue
 
         # If no valid filters were parsed, return empty DataFrame
         if not filters:
             import warnings
 
-            warnings.warn("No valid conditions were parsed. Returning empty DataFrame.")
+            warnings.warn("No valid conditions were parsed. Returning empty DataFrame.", stacklevel=2)
             return pd.DataFrame()
 
         # Apply all filters in single where() call
@@ -249,7 +249,7 @@ class TVScreenerProvider:
         except Exception as e:
             import warnings
 
-            warnings.warn(f"TradingView Scanner API error: {e}")
+            warnings.warn(f"TradingView Scanner API error: {e}", stacklevel=2)
             return pd.DataFrame()
 
         if df.empty:

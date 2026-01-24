@@ -1,6 +1,5 @@
 """Tests for TradingView streaming functionality."""
 
-import json
 import threading
 import time
 from unittest.mock import MagicMock, patch
@@ -15,7 +14,6 @@ from borsapy.stream import (
     TradingViewStream,
     create_stream,
 )
-
 
 # =============================================================================
 # Test Fixtures
@@ -428,7 +426,7 @@ class TestContextManager:
             with patch.object(TradingViewStream, "disconnect") as mock_disconnect:
                 mock_connect.return_value = True
 
-                with TradingViewStream() as stream:
+                with TradingViewStream():
                     pass
 
                 mock_connect.assert_called_once()

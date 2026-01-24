@@ -145,7 +145,7 @@ def calculate_heikin_ashi_vectorized(df: pd.DataFrame) -> pd.DataFrame:
     # This can be expressed as an exponentially weighted sum
     # Using the fact that HA_Open[i] = sum(HA_Close[j] * 0.5^(i-j)) * 0.5 + initial * 0.5^i
     n = len(df)
-    weights = 0.5 ** np.arange(n)
+    0.5 ** np.arange(n)
 
     # Initial value
     initial = (df["Open"].iloc[0] + df["Close"].iloc[0]) / 2

@@ -243,7 +243,7 @@ class TradingViewScannerProvider(BaseProvider):
 
         # RSI (14)
         rsi = raw_values.get(f"RSI{suffix}")
-        rsi_prev = raw_values.get(f"RSI[1]{suffix}")
+        raw_values.get(f"RSI[1]{suffix}")
         if rsi is not None:
             osc_values["RSI"] = round(rsi, 2) if rsi else None
             if rsi is not None:
@@ -257,8 +257,8 @@ class TradingViewScannerProvider(BaseProvider):
         # Stochastic %K
         stoch_k = raw_values.get(f"Stoch.K{suffix}")
         stoch_d = raw_values.get(f"Stoch.D{suffix}")
-        stoch_k_prev = raw_values.get(f"Stoch.K[1]{suffix}")
-        stoch_d_prev = raw_values.get(f"Stoch.D[1]{suffix}")
+        raw_values.get(f"Stoch.K[1]{suffix}")
+        raw_values.get(f"Stoch.D[1]{suffix}")
         if stoch_k is not None:
             osc_values["Stoch.K"] = round(stoch_k, 2) if stoch_k else None
             osc_values["Stoch.D"] = round(stoch_d, 2) if stoch_d else None
@@ -272,7 +272,7 @@ class TradingViewScannerProvider(BaseProvider):
 
         # CCI (20)
         cci = raw_values.get(f"CCI20{suffix}")
-        cci_prev = raw_values.get(f"CCI20[1]{suffix}")
+        raw_values.get(f"CCI20[1]{suffix}")
         if cci is not None:
             osc_values["CCI20"] = round(cci, 2) if cci else None
             if cci is not None:
@@ -287,8 +287,8 @@ class TradingViewScannerProvider(BaseProvider):
         adx = raw_values.get(f"ADX{suffix}")
         adx_plus = raw_values.get(f"ADX+DI{suffix}")
         adx_minus = raw_values.get(f"ADX-DI{suffix}")
-        adx_plus_prev = raw_values.get(f"ADX+DI[1]{suffix}")
-        adx_minus_prev = raw_values.get(f"ADX-DI[1]{suffix}")
+        raw_values.get(f"ADX+DI[1]{suffix}")
+        raw_values.get(f"ADX-DI[1]{suffix}")
         if adx is not None:
             osc_values["ADX"] = round(adx, 2) if adx else None
             osc_values["ADX+DI"] = round(adx_plus, 2) if adx_plus else None
@@ -306,7 +306,7 @@ class TradingViewScannerProvider(BaseProvider):
         # Awesome Oscillator
         ao = raw_values.get(f"AO{suffix}")
         ao_prev = raw_values.get(f"AO[1]{suffix}")
-        ao_prev2 = raw_values.get(f"AO[2]{suffix}")
+        raw_values.get(f"AO[2]{suffix}")
         if ao is not None:
             osc_values["AO"] = round(ao, 4) if ao else None
             if ao is not None and ao_prev is not None:

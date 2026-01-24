@@ -92,7 +92,7 @@ class IsYatirimProvider(BaseProvider):
 
         url = f"{self.BASE_URL}/Data.aspx/OneEndeks"
         params = {"endeks": symbol}
-        
+
         headers = {
             "Referer": "https://www.isyatirim.com.tr/tr-tr/analiz/Sayfalar/default.aspx"
         }
@@ -164,14 +164,14 @@ class IsYatirimProvider(BaseProvider):
             return cached
 
         url = f"{self.BASE_URL}/ChartData.aspx/IndexHistoricalAll"
-        
+
         params = {
             "endeks": index_code,
             "period": "1440",
             "from": start_str,
             "to": end_str,
         }
-        
+
         headers = {
             "Referer": "https://www.isyatirim.com.tr/tr-tr/analiz/Sayfalar/default.aspx"
         }
@@ -193,11 +193,11 @@ class IsYatirimProvider(BaseProvider):
     def _parse_index_history(self, data: dict[str, Any] | list) -> pd.DataFrame:
         """Parse index history response into DataFrame."""
         records = []
-        
+
         history_data = data
         if isinstance(data, dict):
              history_data = data.get("data", [])
-             
+
         if not history_data or not isinstance(history_data, list):
              return pd.DataFrame()
 
@@ -206,12 +206,12 @@ class IsYatirimProvider(BaseProvider):
                 if isinstance(item, list) and len(item) >= 2:
                     timestamp = float(item[0])
                     value = float(item[1])
-                    
+
                     if not timestamp:
                         continue
-                        
+
                     dt = datetime.fromtimestamp(timestamp / 1000)
-                    
+
                     records.append({
                         "Date": dt,
                         "Open": value,

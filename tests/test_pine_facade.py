@@ -10,6 +10,7 @@ from borsapy._providers.pine_facade import (
     INDICATOR_OUTPUTS,
     STANDARD_INDICATORS,
     PineFacadeProvider,
+    clear_indicator_cache,
     get_pine_facade_provider,
 )
 from borsapy.exceptions import AuthenticationError, DataNotAvailableError
@@ -394,7 +395,7 @@ class TestFetchIndicatorErrors:
         provider._client.get = MagicMock(return_value=mock_response)
 
         # Clear cache first
-        provider._fetch_indicator.cache_clear()
+        clear_indicator_cache()
 
         with pytest.raises(DataNotAvailableError) as exc_info:
             provider._fetch_indicator("STD;NotFound", "last", "", "")
@@ -409,7 +410,7 @@ class TestFetchIndicatorErrors:
         mock_response.raise_for_status.side_effect = Exception("401 Unauthorized")
         provider._client.get = MagicMock(return_value=mock_response)
 
-        provider._fetch_indicator.cache_clear()
+        clear_indicator_cache()
 
         with pytest.raises(AuthenticationError) as exc_info:
             provider._fetch_indicator("PUB;protected", "last", "", "")
@@ -424,7 +425,7 @@ class TestFetchIndicatorErrors:
         mock_response.raise_for_status.side_effect = Exception("403 Forbidden")
         provider._client.get = MagicMock(return_value=mock_response)
 
-        provider._fetch_indicator.cache_clear()
+        clear_indicator_cache()
 
         with pytest.raises(AuthenticationError) as exc_info:
             provider._fetch_indicator("USER;private", "last", "", "")
@@ -437,7 +438,7 @@ class TestFetchIndicatorErrors:
 
         provider._client.get = MagicMock(side_effect=Exception("Connection timeout"))
 
-        provider._fetch_indicator.cache_clear()
+        clear_indicator_cache()
 
         with pytest.raises(DataNotAvailableError) as exc_info:
             provider._fetch_indicator("STD;RSI", "last", "", "")
@@ -471,25 +472,39 @@ class TestSingleton:
         assert isinstance(provider, PineFacadeProvider)
 
 
-class TestLRUCache:
-    """Test LRU caching behavior."""
+class TestModuleCache:
+    """Test module-level caching behavior."""
 
-    def test_cache_is_cleared_on_init(self):
-        """Cache should be cleared when provider is initialized."""
-        # Create provider, which clears cache
+    def test_cache_can_be_cleared(self):
+        """clear_indicator_cache should clear the cache."""
+        import borsapy._providers.pine_facade as pf_module
+
+        # Add something to cache
+        pf_module._indicator_cache[("test", "last", "", "")] = {"test": True}
+
+        # Clear cache
+        clear_indicator_cache()
+
+        # Check cache is empty
+        assert len(pf_module._indicator_cache) == 0
+
+    def test_cache_stores_results(self):
+        """Cache should store fetched results."""
+        import borsapy._providers.pine_facade as pf_module
+
         provider = PineFacadeProvider()
+        clear_indicator_cache()
 
-        # Check cache info - should be empty
-        cache_info = provider._fetch_indicator.cache_info()
-        assert cache_info.hits == 0
-        assert cache_info.misses == 0
+        # Mock the client
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"inputs": [], "plots": []}
+        provider._client.get = MagicMock(return_value=mock_response)
 
-    def test_cache_max_size(self):
-        """Cache should have max size of 100."""
-        provider = PineFacadeProvider()
+        # Fetch indicator
+        provider._fetch_indicator("STD;RSI", "last", "", "")
 
-        cache_info = provider._fetch_indicator.cache_info()
-        assert cache_info.maxsize == 100
+        # Check cache has entry
+        assert len(pf_module._indicator_cache) == 1
 
 
 class TestURLEncoding:
@@ -503,7 +518,7 @@ class TestURLEncoding:
         mock_response = MagicMock()
         mock_response.json.return_value = {"inputs": [], "plots": []}
         provider._client.get = MagicMock(return_value=mock_response)
-        provider._fetch_indicator.cache_clear()
+        clear_indicator_cache()
 
         provider._fetch_indicator("STD;RSI", "last", "", "")
 
@@ -519,7 +534,7 @@ class TestURLEncoding:
         mock_response = MagicMock()
         mock_response.json.return_value = {"inputs": [], "plots": []}
         provider._client.get = MagicMock(return_value=mock_response)
-        provider._fetch_indicator.cache_clear()
+        clear_indicator_cache()
 
         provider._fetch_indicator("STD;Williams%25R", "last", "", "")
 
@@ -539,7 +554,7 @@ class TestAuthHeaders:
         mock_response = MagicMock()
         mock_response.json.return_value = {"inputs": [], "plots": []}
         provider._client.get = MagicMock(return_value=mock_response)
-        provider._fetch_indicator.cache_clear()
+        clear_indicator_cache()
 
         provider._fetch_indicator("STD;RSI", "last", "my_session", "")
 
@@ -555,7 +570,7 @@ class TestAuthHeaders:
         mock_response = MagicMock()
         mock_response.json.return_value = {"inputs": [], "plots": []}
         provider._client.get = MagicMock(return_value=mock_response)
-        provider._fetch_indicator.cache_clear()
+        clear_indicator_cache()
 
         provider._fetch_indicator("STD;RSI", "last", "my_session", "my_sign")
 
@@ -571,7 +586,7 @@ class TestAuthHeaders:
         mock_response = MagicMock()
         mock_response.json.return_value = {"inputs": [], "plots": []}
         provider._client.get = MagicMock(return_value=mock_response)
-        provider._fetch_indicator.cache_clear()
+        clear_indicator_cache()
 
         provider._fetch_indicator("STD;RSI", "last", "", "")
 
@@ -586,7 +601,7 @@ class TestAuthHeaders:
         mock_response = MagicMock()
         mock_response.json.return_value = {"inputs": [], "plots": []}
         provider._client.get = MagicMock(return_value=mock_response)
-        provider._fetch_indicator.cache_clear()
+        clear_indicator_cache()
 
         provider._fetch_indicator("STD;RSI", "last", "", "")
 

@@ -5,15 +5,14 @@ import pandas as pd
 import pytest
 
 from borsapy.portfolio import (
-    Portfolio,
-    Holding,
-    _detect_asset_type,
-    _get_asset,
+    FX_COMMODITIES,
     FX_CURRENCIES,
     FX_METALS,
-    FX_COMMODITIES,
+    Holding,
+    Portfolio,
+    _detect_asset_type,
+    _get_asset,
 )
-
 
 # =============================================================================
 # Test Fixtures

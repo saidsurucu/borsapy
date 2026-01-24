@@ -117,6 +117,12 @@ Examples:
     >>> print(rsi['value'])
 """
 
+# TradingView authentication for real-time data
+from borsapy._providers.tradingview import (
+    clear_tradingview_auth,
+    get_tradingview_auth,
+    set_tradingview_auth,
+)
 from borsapy.backtest import Backtest, BacktestResult, Trade, backtest
 from borsapy.bond import Bond, bonds, risk_free_rate
 from borsapy.calendar import EconomicCalendar, economic_calendar
@@ -141,10 +147,20 @@ from borsapy.market import companies, search_companies
 from borsapy.multi import Tickers, download
 from borsapy.portfolio import Portfolio
 from borsapy.replay import ReplaySession, create_replay
-from borsapy.condition import ConditionParser, ParseError
-from borsapy.scanner import TechnicalScanner, ScanResult, scan
+from borsapy.scanner import ScanResult, TechnicalScanner, scan
 from borsapy.screener import Screener, screen_stocks, screener_criteria, sectors, stock_indices
-from borsapy.search import search, search_bist, search_crypto, search_forex, search_index, search_viop, viop_contracts
+from borsapy.search import (
+    search,
+    search_bist,
+    search_crypto,
+    search_forex,
+    search_index,
+    search_viop,
+    viop_contracts,
+)
+
+# TradingView streaming for real-time updates
+from borsapy.stream import TradingViewStream, create_stream
 from borsapy.tcmb import TCMB, policy_rate
 from borsapy.technical import (
     TechnicalAnalyzer,
@@ -163,17 +179,7 @@ from borsapy.technical import (
 from borsapy.ticker import Ticker
 from borsapy.viop import VIOP
 
-# TradingView authentication for real-time data
-from borsapy._providers.tradingview import (
-    clear_tradingview_auth,
-    get_tradingview_auth,
-    set_tradingview_auth,
-)
-
-# TradingView streaming for real-time updates
-from borsapy.stream import TradingViewStream, create_stream
-
-__version__ = "0.6.0"
+__version__ = "0.6.1"
 __author__ = "Said Surucu"
 
 __all__ = [
@@ -232,8 +238,6 @@ __all__ = [
     "TechnicalScanner",
     "ScanResult",
     "scan",
-    "ConditionParser",
-    "ParseError",
     # Technical analysis
     "TechnicalAnalyzer",
     "add_indicators",

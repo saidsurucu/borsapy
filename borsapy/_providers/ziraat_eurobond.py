@@ -4,7 +4,7 @@ Fetches Turkish sovereign Eurobond data from Ziraat Bank's API.
 Includes USD and EUR denominated bonds with bid/ask prices and yields.
 """
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from bs4 import BeautifulSoup
 
@@ -50,6 +50,80 @@ class ZiraatEurobondProvider(BaseProvider):
         except ValueError:
             return None
 
+    def _fetch_bonds_for_date(self, date_str: str) -> list[dict]:
+        """Fetch bonds for a specific date.
+
+        Args:
+            date_str: Date in YYYY-MM-DD format
+
+        Returns:
+            List of bond dicts
+        """
+        headers = {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "Origin": "https://www.ziraatbank.com.tr",
+            "Referer": "https://www.ziraatbank.com.tr/tr/bireysel/yatirim/eurobond",
+        }
+
+        payload = {
+            "kiymetTipi": "EURO",
+            "date": date_str,
+            "hideIfStartWith": "",
+        }
+
+        response = self._post(ZIRAAT_URL, json=payload, headers=headers)
+        data = response.json()
+
+        # Extract HTML from response
+        html = data.get("d", {}).get("Data", "")
+        if not html:
+            return []
+
+        # Parse HTML table
+        soup = BeautifulSoup(html, "lxml")
+        table = soup.find("table")
+        if not table:
+            return []
+
+        bonds = []
+        rows = table.find_all("tr")
+
+        for row in rows[1:]:  # Skip header row
+            cols = row.find_all("td")
+            if len(cols) < 8:
+                continue
+
+            bond = {
+                "isin": cols[0].text.strip(),
+                "maturity": self._parse_date(cols[1].text),
+                "days_to_maturity": int(cols[2].text.strip()) if cols[2].text.strip().isdigit() else 0,
+                "currency": cols[3].text.strip(),
+                "bid_price": self._parse_turkish_number(cols[4].text),
+                "bid_yield": self._parse_turkish_number(cols[5].text),
+                "ask_price": self._parse_turkish_number(cols[6].text),
+                "ask_yield": self._parse_turkish_number(cols[7].text),
+            }
+            bonds.append(bond)
+
+        return bonds
+
+    def _has_valid_yields(self, bonds: list[dict]) -> bool:
+        """Check if bonds have valid (non-zero) yield data.
+
+        Args:
+            bonds: List of bond dicts
+
+        Returns:
+            True if at least one bond has non-zero yield
+        """
+        for bond in bonds:
+            if bond.get("bid_yield") and bond["bid_yield"] > 0:
+                return True
+            if bond.get("ask_yield") and bond["ask_yield"] > 0:
+                return True
+        return False
+
     def get_eurobonds(self, currency: str | None = None) -> list[dict]:
         """Get all Turkish Eurobonds.
 
@@ -79,53 +153,16 @@ class ZiraatEurobondProvider(BaseProvider):
         cached = self._cache_get(cache_key)
 
         if cached is None:
-            # Fetch from API
-            headers = {
-                "Content-Type": "application/json",
-                "Accept": "application/json",
-                "Origin": "https://www.ziraatbank.com.tr",
-                "Referer": "https://www.ziraatbank.com.tr/tr/bireysel/yatirim/eurobond",
-            }
-
-            payload = {
-                "kiymetTipi": "EURO",
-                "date": datetime.now().strftime("%Y-%m-%d"),
-                "hideIfStartWith": "",
-            }
-
-            response = self._post(ZIRAAT_URL, json=payload, headers=headers)
-            data = response.json()
-
-            # Extract HTML from response
-            html = data.get("d", {}).get("Data", "")
-            if not html:
-                return []
-
-            # Parse HTML table
-            soup = BeautifulSoup(html, "lxml")
-            table = soup.find("table")
-            if not table:
-                return []
-
+            # Try today first, then go back up to 7 days to find valid data
+            # This handles cases where the system date is ahead of API data
             bonds = []
-            rows = table.find_all("tr")
+            for days_back in range(8):
+                try_date = datetime.now() - timedelta(days=days_back)
+                date_str = try_date.strftime("%Y-%m-%d")
+                bonds = self._fetch_bonds_for_date(date_str)
 
-            for row in rows[1:]:  # Skip header row
-                cols = row.find_all("td")
-                if len(cols) < 8:
-                    continue
-
-                bond = {
-                    "isin": cols[0].text.strip(),
-                    "maturity": self._parse_date(cols[1].text),
-                    "days_to_maturity": int(cols[2].text.strip()) if cols[2].text.strip().isdigit() else 0,
-                    "currency": cols[3].text.strip(),
-                    "bid_price": self._parse_turkish_number(cols[4].text),
-                    "bid_yield": self._parse_turkish_number(cols[5].text),
-                    "ask_price": self._parse_turkish_number(cols[6].text),
-                    "ask_yield": self._parse_turkish_number(cols[7].text),
-                }
-                bonds.append(bond)
+                if bonds and self._has_valid_yields(bonds):
+                    break
 
             # Cache for 5 minutes
             self._cache_set(cache_key, bonds, TTL.FX_RATES)

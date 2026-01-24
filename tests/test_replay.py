@@ -6,7 +6,6 @@ from datetime import datetime
 import pandas as pd
 import pytest
 
-
 # =============================================================================
 # Test Fixtures
 # =============================================================================
@@ -186,7 +185,7 @@ class TestReplay:
 
         # Should be able to iterate without loading all into memory
         count = 0
-        for candle in session.replay():
+        for _candle in session.replay():
             count += 1
             if count >= 100:  # Only process first 100
                 break

@@ -10,7 +10,6 @@ from borsapy._providers.dovizcom import get_dovizcom_provider
 from borsapy._providers.tradingview import get_tradingview_provider
 from borsapy.technical import TechnicalMixin
 
-
 # TradingView symbol mapping for currencies (asset -> (exchange, symbol))
 # Note: Only pairs that are verified to work on TradingView free tier
 TV_CURRENCY_MAP = {

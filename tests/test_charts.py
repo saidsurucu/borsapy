@@ -228,7 +228,7 @@ class TestHeikinAshiIntegration:
         ha = calculate_heikin_ashi(df)
 
         # HA should have smaller average body size (smoother)
-        original_body = abs(df["Close"] - df["Open"]).mean()
+        abs(df["Close"] - df["Open"]).mean()
         ha_body = abs(ha["HA_Close"] - ha["HA_Open"]).mean()
 
         # HA bodies are typically smoother (smaller or similar)

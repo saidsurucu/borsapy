@@ -162,7 +162,7 @@ class TechnicalScanner:
         self._interval: str = "1d"
         self._extra_columns: list[str] = []
 
-    def set_universe(self, universe: str | list[str]) -> "TechnicalScanner":
+    def set_universe(self, universe: str | list[str]) -> TechnicalScanner:
         """Set the universe of symbols to scan.
 
         Args:
@@ -192,7 +192,7 @@ class TechnicalScanner:
             self._symbols = [s.upper() for s in universe]
         return self
 
-    def add_symbol(self, symbol: str) -> "TechnicalScanner":
+    def add_symbol(self, symbol: str) -> TechnicalScanner:
         """Add a single symbol to the universe.
 
         Args:
@@ -206,7 +206,7 @@ class TechnicalScanner:
             self._symbols.append(symbol)
         return self
 
-    def remove_symbol(self, symbol: str) -> "TechnicalScanner":
+    def remove_symbol(self, symbol: str) -> TechnicalScanner:
         """Remove a symbol from the universe.
 
         Args:
@@ -222,7 +222,7 @@ class TechnicalScanner:
 
     def add_condition(
         self, condition: str, name: str | None = None
-    ) -> "TechnicalScanner":
+    ) -> TechnicalScanner:
         """Add a scanning condition.
 
         Conditions are combined with AND logic. For OR logic, use the full
@@ -256,7 +256,7 @@ class TechnicalScanner:
 
         return self
 
-    def remove_condition(self, name_or_condition: str) -> "TechnicalScanner":
+    def remove_condition(self, name_or_condition: str) -> TechnicalScanner:
         """Remove a condition by name or condition string.
 
         Args:
@@ -273,7 +273,7 @@ class TechnicalScanner:
                 break
         return self
 
-    def clear_conditions(self) -> "TechnicalScanner":
+    def clear_conditions(self) -> TechnicalScanner:
         """Clear all conditions.
 
         Returns:
@@ -283,7 +283,7 @@ class TechnicalScanner:
         self._condition_names.clear()
         return self
 
-    def set_interval(self, interval: str) -> "TechnicalScanner":
+    def set_interval(self, interval: str) -> TechnicalScanner:
         """Set the data interval/timeframe for indicators.
 
         Args:
@@ -300,7 +300,7 @@ class TechnicalScanner:
         self._interval = interval
         return self
 
-    def add_column(self, column: str) -> "TechnicalScanner":
+    def add_column(self, column: str) -> TechnicalScanner:
         """Add extra column to retrieve in results.
 
         Args:
@@ -359,7 +359,7 @@ class TechnicalScanner:
         return self._conditions.copy()
 
     # Backward compatibility aliases
-    def set_data_period(self, period: str = "3mo") -> "TechnicalScanner":
+    def set_data_period(self, period: str = "3mo") -> TechnicalScanner:
         """Deprecated: Period is not used with TradingView API."""
         import warnings
 

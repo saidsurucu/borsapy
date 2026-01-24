@@ -201,7 +201,7 @@ class StudySession:
         48.5
     """
 
-    def __init__(self, stream: "TradingViewStream"):
+    def __init__(self, stream: TradingViewStream):
         """
         Initialize StudySession.
 
@@ -615,7 +615,7 @@ class StudySession:
 
         # Convert to TradingView format
         i = 0
-        for key, value in merged.items():
+        for _key, value in merged.items():
             # Determine type
             if isinstance(value, bool):
                 tv_type = "boolean"
@@ -905,7 +905,6 @@ class TradingViewStream:
         # Pattern: ~m~{length}~m~{content} or ~h~{number}
         pattern = r"~m~(\d+)~m~|~h~(\d+)"
 
-        pos = 0
         for match in re.finditer(pattern, raw):
             if match.group(2):  # Heartbeat
                 packets.append(f"~h~{match.group(2)}")
@@ -1917,7 +1916,7 @@ class TradingViewStream:
 
     # Context manager
 
-    def __enter__(self) -> "TradingViewStream":
+    def __enter__(self) -> TradingViewStream:
         """Context manager entry."""
         self.connect()
         return self

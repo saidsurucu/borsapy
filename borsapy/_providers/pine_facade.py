@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from functools import lru_cache
 from typing import Any
 
 from borsapy._providers.base import BaseProvider
@@ -52,6 +51,9 @@ INDICATOR_OUTPUTS = {
     "STD;CMF": {"plot_0": "value"},
 }
 
+# Module-level cache for indicator metadata
+_indicator_cache: dict[tuple[str, str, str, str], dict[str, Any]] = {}
+
 
 class PineFacadeProvider(BaseProvider):
     """
@@ -68,8 +70,6 @@ class PineFacadeProvider(BaseProvider):
 
     def __init__(self):
         super().__init__(timeout=15.0)
-        # Clear cache on init
-        self._fetch_indicator.cache_clear()
 
     def get_indicator(
         self,
@@ -202,7 +202,6 @@ class PineFacadeProvider(BaseProvider):
         """
         return indicator_id.startswith(("USER;", "PUB;"))
 
-    @lru_cache(maxsize=100)
     def _fetch_indicator(
         self,
         indicator_id: str,
@@ -222,6 +221,11 @@ class PineFacadeProvider(BaseProvider):
         Returns:
             Indicator metadata dict
         """
+        # Check module-level cache
+        cache_key = (indicator_id, version, session, signature)
+        if cache_key in _indicator_cache:
+            return _indicator_cache[cache_key]
+
         # Build URL - URL encode the indicator ID
         import urllib.parse
         encoded_id = urllib.parse.quote(indicator_id, safe="")
@@ -261,7 +265,16 @@ class PineFacadeProvider(BaseProvider):
         data = response.json()
 
         # Parse and normalize the response
-        return self._parse_indicator_response(indicator_id, data)
+        result = self._parse_indicator_response(indicator_id, data)
+
+        # Store in module-level cache (limit size to 100)
+        if len(_indicator_cache) >= 100:
+            # Remove oldest entry (first key)
+            oldest_key = next(iter(_indicator_cache))
+            del _indicator_cache[oldest_key]
+        _indicator_cache[cache_key] = result
+
+        return result
 
     def _parse_indicator_response(
         self,
@@ -334,6 +347,11 @@ class PineFacadeProvider(BaseProvider):
         """
         normalized = self._normalize_indicator_id(indicator_id)
         return INDICATOR_OUTPUTS.get(normalized, {})
+
+
+def clear_indicator_cache() -> None:
+    """Clear the module-level indicator cache."""
+    _indicator_cache.clear()
 
 
 # Singleton instance
