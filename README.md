@@ -1952,6 +1952,82 @@ print(df.columns)
 
 ---
 
+## Teknik Tarama (Technical Scanner)
+
+Teknik göstergelere dayalı hisse tarama. `scan()` fonksiyonu veya `TechnicalScanner` class ile kullanılabilir.
+
+### Basit Kullanım
+
+```python
+import borsapy as bp
+
+# Basit tarama (DataFrame döndürür)
+df = bp.scan("XU030", "rsi < 30")                # RSI oversold
+df = bp.scan("XU100", "price > sma_50")          # SMA50 üzerinde
+df = bp.scan("XBANK", "change_percent > 3")      # %3+ yükselenler
+
+# Compound koşullar
+df = bp.scan("XU030", "rsi < 30 and volume > 1000000")
+df = bp.scan("XU030", "sma_20 crosses_above sma_50")  # Golden cross
+
+# Sonuçları incele
+print(f"Bulunan: {len(df)} hisse")
+print(df[['symbol', 'price', 'rsi', 'volume']])
+```
+
+### Index.scan() Metodu
+
+```python
+import borsapy as bp
+
+# Index nesnesi üzerinden tarama
+xu030 = bp.Index("XU030")
+df = xu030.scan("rsi < 30")
+df = xu030.scan("price > sma_50 and rsi > 50")
+```
+
+### TechnicalScanner Class
+
+```python
+import borsapy as bp
+
+scanner = bp.TechnicalScanner()
+scanner.set_universe("XU030")
+scanner.add_condition("rsi < 30", name="oversold")
+scanner.add_condition("volume > 1000000", name="high_vol")
+results = scanner.run()
+
+print(results[['symbol', 'rsi', 'volume', 'conditions_met']])
+```
+
+### Desteklenen Koşullar
+
+| Kategori | Koşullar | Örnek |
+|----------|----------|-------|
+| **Quote** | `price`, `volume`, `change_percent`, `bid`, `ask` | `price > 100` |
+| **Göstergeler** | `rsi`, `sma_N`, `ema_N`, `macd`, `signal`, `bb_upper/lower`, `adx` | `rsi < 30` |
+| **Crossover** | `crosses`, `crosses_above`, `crosses_below` | `sma_20 crosses_above sma_50` |
+
+### Örnek Stratejiler
+
+```python
+import borsapy as bp
+
+# Oversold tarama
+oversold = bp.scan("XU100", "rsi < 30")
+
+# Golden Cross
+golden = bp.scan("XU030", "sma_20 crosses_above sma_50")
+
+# Yüksek hacimli momentum
+momentum = bp.scan("XU030", "rsi > 50 and volume > 5000000 and change_percent > 2")
+
+# Bollinger alt bandına yakın
+bb_low = bp.scan("XU100", "price < bb_lower * 1.02")
+```
+
+---
+
 ## Şirket Listesi
 
 BIST şirketlerini listeleme ve arama.
