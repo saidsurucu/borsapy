@@ -68,6 +68,7 @@ class BaseProvider:
         data: dict[str, Any] | None = None,
         json: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
+        cookies: dict[str, str] | None = None,
     ) -> httpx.Response:
         """
         Make a POST request.
@@ -77,11 +78,14 @@ class BaseProvider:
             data: Form data.
             json: JSON data.
             headers: Request headers.
+            cookies: Request cookies.
 
         Returns:
             HTTP response.
         """
-        response = self._client.post(url, data=data, json=json, headers=headers)
+        response = self._client.post(
+            url, data=data, json=json, headers=headers, cookies=cookies
+        )
         response.raise_for_status()
         return response
 

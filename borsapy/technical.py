@@ -112,9 +112,10 @@ def calculate_rsi(
     gain = delta.where(delta > 0, 0.0)
     loss = (-delta).where(delta < 0, 0.0)
 
-    # Use exponential moving average for smoothing
-    avg_gain = gain.ewm(span=period, adjust=False).mean()
-    avg_loss = loss.ewm(span=period, adjust=False).mean()
+    # Use Wilder's smoothing (same as TradingView)
+    # Wilder's uses alpha=1/period, NOT span=period
+    avg_gain = gain.ewm(alpha=1 / period, adjust=False).mean()
+    avg_loss = loss.ewm(alpha=1 / period, adjust=False).mean()
 
     rs = avg_gain / avg_loss
     rsi = 100.0 - (100.0 / (1.0 + rs))
@@ -235,8 +236,8 @@ def calculate_atr(df: pd.DataFrame, period: int = 14) -> pd.Series:
     # True Range is the maximum of the three
     tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
 
-    # ATR is the smoothed average of TR
-    atr = tr.ewm(span=period, adjust=False).mean()
+    # ATR uses Wilder's smoothing (same as TradingView)
+    atr = tr.ewm(alpha=1 / period, adjust=False).mean()
 
     return atr.rename(f"ATR_{period}")
 
@@ -372,16 +373,16 @@ def calculate_adx(df: pd.DataFrame, period: int = 14) -> pd.Series:
     tr3 = abs(low - close.shift(1))
     tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
 
-    # Smoothed values
-    atr = tr.ewm(span=period, adjust=False).mean()
-    plus_di = 100 * (plus_dm.ewm(span=period, adjust=False).mean() / atr)
-    minus_di = 100 * (minus_dm.ewm(span=period, adjust=False).mean() / atr)
+    # Smoothed values using Wilder's smoothing (same as TradingView)
+    atr = tr.ewm(alpha=1 / period, adjust=False).mean()
+    plus_di = 100 * (plus_dm.ewm(alpha=1 / period, adjust=False).mean() / atr)
+    minus_di = 100 * (minus_dm.ewm(alpha=1 / period, adjust=False).mean() / atr)
 
     # DX and ADX
     dx = 100 * abs(plus_di - minus_di) / (plus_di + minus_di)
     dx = dx.replace([np.inf, -np.inf], np.nan).fillna(0)
 
-    adx = dx.ewm(span=period, adjust=False).mean()
+    adx = dx.ewm(alpha=1 / period, adjust=False).mean()
 
     return adx.rename(f"ADX_{period}")
 
@@ -662,138 +663,196 @@ class TechnicalMixin:
         df = self.history(period=period)
         return add_indicators(df, indicators, **kwargs)
 
-    def rsi(self, period: str = "3mo", rsi_period: int = 14) -> float:
-        """Get latest RSI value.
+    def rsi(self, interval: str = "1d", **kwargs: Any) -> float:
+        """Get latest RSI value from TradingView.
 
         Args:
-            period: History period to fetch
-            rsi_period: RSI calculation period
+            interval: Timeframe (1m, 5m, 15m, 30m, 1h, 4h, 1d, 1W, 1M)
+            **kwargs: Ignored (for backwards compatibility)
 
         Returns:
             Latest RSI value (0-100)
         """
-        df = self.history(period=period)
-        if df.empty:
-            return np.nan
-        rsi_series = calculate_rsi(df, rsi_period)
-        return round(float(rsi_series.iloc[-1]), 2)
+        try:
+            signals = self.ta_signals(interval=interval)
+            rsi = signals.get("oscillators", {}).get("values", {}).get("RSI")
+            return round(float(rsi), 2) if rsi is not None else np.nan
+        except (NotImplementedError, Exception):
+            # Fallback to local calculation
+            df = self.history(period="3mo")
+            if df.empty:
+                return np.nan
+            rsi_series = calculate_rsi(df, 14)
+            return round(float(rsi_series.iloc[-1]), 2)
 
-    def sma(self, period: str = "3mo", sma_period: int = 20) -> float:
-        """Get latest SMA value.
+    def sma(self, interval: str = "1d", sma_period: int = 20, **kwargs: Any) -> float:
+        """Get latest SMA value from TradingView.
 
         Args:
-            period: History period to fetch
-            sma_period: SMA calculation period
+            interval: Timeframe (1m, 5m, 15m, 30m, 1h, 4h, 1d, 1W, 1M)
+            sma_period: SMA period (5, 10, 20, 30, 50, 100, 200)
+            **kwargs: Ignored (for backwards compatibility)
 
         Returns:
             Latest SMA value
         """
-        df = self.history(period=period)
-        if df.empty:
-            return np.nan
-        sma_series = calculate_sma(df, sma_period)
-        return round(float(sma_series.iloc[-1]), 2)
+        try:
+            signals = self.ta_signals(interval=interval)
+            sma = signals.get("moving_averages", {}).get("values", {}).get(f"SMA{sma_period}")
+            return round(float(sma), 2) if sma is not None else np.nan
+        except (NotImplementedError, Exception):
+            # Fallback to local calculation
+            df = self.history(period="3mo")
+            if df.empty:
+                return np.nan
+            sma_series = calculate_sma(df, sma_period)
+            return round(float(sma_series.iloc[-1]), 2)
 
-    def ema(self, period: str = "3mo", ema_period: int = 20) -> float:
-        """Get latest EMA value.
+    def ema(self, interval: str = "1d", ema_period: int = 20, **kwargs: Any) -> float:
+        """Get latest EMA value from TradingView.
 
         Args:
-            period: History period to fetch
-            ema_period: EMA calculation period
+            interval: Timeframe (1m, 5m, 15m, 30m, 1h, 4h, 1d, 1W, 1M)
+            ema_period: EMA period (5, 10, 20, 30, 50, 100, 200)
+            **kwargs: Ignored (for backwards compatibility)
 
         Returns:
             Latest EMA value
         """
-        df = self.history(period=period)
-        if df.empty:
-            return np.nan
-        ema_series = calculate_ema(df, ema_period)
-        return round(float(ema_series.iloc[-1]), 2)
+        try:
+            signals = self.ta_signals(interval=interval)
+            ema = signals.get("moving_averages", {}).get("values", {}).get(f"EMA{ema_period}")
+            return round(float(ema), 2) if ema is not None else np.nan
+        except (NotImplementedError, Exception):
+            # Fallback to local calculation
+            df = self.history(period="3mo")
+            if df.empty:
+                return np.nan
+            ema_series = calculate_ema(df, ema_period)
+            return round(float(ema_series.iloc[-1]), 2)
 
-    def macd(
-        self, period: str = "3mo", fast: int = 12, slow: int = 26, signal: int = 9
-    ) -> dict[str, float]:
-        """Get latest MACD values.
+    def macd(self, interval: str = "1d", **kwargs: Any) -> dict[str, float]:
+        """Get latest MACD values from TradingView.
 
         Args:
-            period: History period to fetch
-            fast: Fast EMA period
-            slow: Slow EMA period
-            signal: Signal line period
+            interval: Timeframe (1m, 5m, 15m, 30m, 1h, 4h, 1d, 1W, 1M)
+            **kwargs: Ignored (for backwards compatibility)
 
         Returns:
             Dictionary with 'macd', 'signal', 'histogram' keys
         """
-        df = self.history(period=period)
-        if df.empty:
+        try:
+            signals = self.ta_signals(interval=interval)
+            osc_values = signals.get("oscillators", {}).get("values", {})
+            macd = osc_values.get("MACD.macd")
+            signal = osc_values.get("MACD.signal")
+            if macd is not None and signal is not None:
+                return {
+                    "macd": round(float(macd), 4),
+                    "signal": round(float(signal), 4),
+                    "histogram": round(float(macd - signal), 4),
+                }
             return {"macd": np.nan, "signal": np.nan, "histogram": np.nan}
-        macd_df = calculate_macd(df, fast, slow, signal)
-        return {
-            "macd": round(float(macd_df["MACD"].iloc[-1]), 4),
-            "signal": round(float(macd_df["Signal"].iloc[-1]), 4),
-            "histogram": round(float(macd_df["Histogram"].iloc[-1]), 4),
-        }
+        except (NotImplementedError, Exception):
+            # Fallback to local calculation
+            df = self.history(period="3mo")
+            if df.empty:
+                return {"macd": np.nan, "signal": np.nan, "histogram": np.nan}
+            macd_df = calculate_macd(df, 12, 26, 9)
+            return {
+                "macd": round(float(macd_df["MACD"].iloc[-1]), 4),
+                "signal": round(float(macd_df["Signal"].iloc[-1]), 4),
+                "histogram": round(float(macd_df["Histogram"].iloc[-1]), 4),
+            }
 
-    def bollinger_bands(
-        self, period: str = "3mo", bb_period: int = 20, std_dev: float = 2.0
-    ) -> dict[str, float]:
-        """Get latest Bollinger Bands values.
+    def bollinger_bands(self, interval: str = "1d", **kwargs: Any) -> dict[str, float]:
+        """Get latest Bollinger Bands values from TradingView.
 
         Args:
-            period: History period to fetch
-            bb_period: Bollinger Bands period
-            std_dev: Standard deviation multiplier
+            interval: Timeframe (1m, 5m, 15m, 30m, 1h, 4h, 1d, 1W, 1M)
+            **kwargs: Ignored (for backwards compatibility)
 
         Returns:
             Dictionary with 'upper', 'middle', 'lower' keys
         """
-        df = self.history(period=period)
-        if df.empty:
+        try:
+            signals = self.ta_signals(interval=interval)
+            ma_values = signals.get("moving_averages", {}).get("values", {})
+            upper = ma_values.get("BB.upper")
+            lower = ma_values.get("BB.lower")
+            middle = ma_values.get("BB.middle")
+            if upper is not None and lower is not None:
+                return {
+                    "upper": round(float(upper), 2),
+                    "middle": round(float(middle), 2) if middle else round((upper + lower) / 2, 2),
+                    "lower": round(float(lower), 2),
+                }
             return {"upper": np.nan, "middle": np.nan, "lower": np.nan}
-        bb_df = calculate_bollinger_bands(df, bb_period, std_dev)
-        return {
-            "upper": round(float(bb_df["BB_Upper"].iloc[-1]), 2),
-            "middle": round(float(bb_df["BB_Middle"].iloc[-1]), 2),
-            "lower": round(float(bb_df["BB_Lower"].iloc[-1]), 2),
-        }
+        except (NotImplementedError, Exception):
+            # Fallback to local calculation
+            df = self.history(period="3mo")
+            if df.empty:
+                return {"upper": np.nan, "middle": np.nan, "lower": np.nan}
+            bb_df = calculate_bollinger_bands(df, 20, 2.0)
+            return {
+                "upper": round(float(bb_df["BB_Upper"].iloc[-1]), 2),
+                "middle": round(float(bb_df["BB_Middle"].iloc[-1]), 2),
+                "lower": round(float(bb_df["BB_Lower"].iloc[-1]), 2),
+            }
 
-    def atr(self, period: str = "3mo", atr_period: int = 14) -> float:
-        """Get latest ATR value.
+    def atr(self, interval: str = "1d", **kwargs: Any) -> float:
+        """Get latest ATR value from TradingView.
 
         Args:
-            period: History period to fetch
-            atr_period: ATR calculation period
+            interval: Timeframe (1m, 5m, 15m, 30m, 1h, 4h, 1d, 1W, 1M)
+            **kwargs: Ignored (for backwards compatibility)
 
         Returns:
             Latest ATR value
         """
-        df = self.history(period=period)
-        if df.empty:
-            return np.nan
-        atr_series = calculate_atr(df, atr_period)
-        return round(float(atr_series.iloc[-1]), 4)
+        try:
+            signals = self.ta_signals(interval=interval)
+            atr = signals.get("moving_averages", {}).get("values", {}).get("ATR")
+            return round(float(atr), 4) if atr is not None else np.nan
+        except (NotImplementedError, Exception):
+            # Fallback to local calculation
+            df = self.history(period="3mo")
+            if df.empty:
+                return np.nan
+            atr_series = calculate_atr(df, 14)
+            return round(float(atr_series.iloc[-1]), 4)
 
-    def stochastic(
-        self, period: str = "3mo", k_period: int = 14, d_period: int = 3
-    ) -> dict[str, float]:
-        """Get latest Stochastic Oscillator values.
+    def stochastic(self, interval: str = "1d", **kwargs: Any) -> dict[str, float]:
+        """Get latest Stochastic Oscillator values from TradingView.
 
         Args:
-            period: History period to fetch
-            k_period: %K period
-            d_period: %D period
+            interval: Timeframe (1m, 5m, 15m, 30m, 1h, 4h, 1d, 1W, 1M)
+            **kwargs: Ignored (for backwards compatibility)
 
         Returns:
             Dictionary with 'k' and 'd' keys (0-100 scale)
         """
-        df = self.history(period=period)
-        if df.empty:
+        try:
+            signals = self.ta_signals(interval=interval)
+            osc_values = signals.get("oscillators", {}).get("values", {})
+            k = osc_values.get("Stoch.K")
+            d = osc_values.get("Stoch.D")
+            if k is not None and d is not None:
+                return {
+                    "k": round(float(k), 2),
+                    "d": round(float(d), 2),
+                }
             return {"k": np.nan, "d": np.nan}
-        stoch_df = calculate_stochastic(df, k_period, d_period)
-        return {
-            "k": round(float(stoch_df["Stoch_K"].iloc[-1]), 2),
-            "d": round(float(stoch_df["Stoch_D"].iloc[-1]), 2),
-        }
+        except (NotImplementedError, Exception):
+            # Fallback to local calculation
+            df = self.history(period="3mo")
+            if df.empty:
+                return {"k": np.nan, "d": np.nan}
+            stoch_df = calculate_stochastic(df, 14, 3)
+            return {
+                "k": round(float(stoch_df["Stoch_K"].iloc[-1]), 2),
+                "d": round(float(stoch_df["Stoch_D"].iloc[-1]), 2),
+            }
 
     def obv(self, period: str = "3mo") -> float:
         """Get latest OBV value.
@@ -810,36 +869,49 @@ class TechnicalMixin:
         obv_series = calculate_obv(df)
         return round(float(obv_series.iloc[-1]), 0)
 
-    def vwap(self, period: str = "3mo") -> float:
-        """Get latest VWAP value.
+    def vwap(self, interval: str = "1d", **kwargs: Any) -> float:
+        """Get latest VWAP value from TradingView.
 
         Args:
-            period: History period to fetch
+            interval: Timeframe (1m, 5m, 15m, 30m, 1h, 4h, 1d, 1W, 1M)
+            **kwargs: Ignored (for backwards compatibility)
 
         Returns:
             Latest VWAP value
         """
-        df = self.history(period=period)
-        if df.empty:
-            return np.nan
-        vwap_series = calculate_vwap(df)
-        return round(float(vwap_series.iloc[-1]), 2)
+        try:
+            signals = self.ta_signals(interval=interval)
+            vwap = signals.get("moving_averages", {}).get("values", {}).get("VWAP")
+            return round(float(vwap), 2) if vwap is not None else np.nan
+        except (NotImplementedError, Exception):
+            # Fallback to local calculation
+            df = self.history(period="3mo")
+            if df.empty:
+                return np.nan
+            vwap_series = calculate_vwap(df)
+            return round(float(vwap_series.iloc[-1]), 2)
 
-    def adx(self, period: str = "3mo", adx_period: int = 14) -> float:
-        """Get latest ADX value.
+    def adx(self, interval: str = "1d", **kwargs: Any) -> float:
+        """Get latest ADX value from TradingView.
 
         Args:
-            period: History period to fetch
-            adx_period: ADX calculation period
+            interval: Timeframe (1m, 5m, 15m, 30m, 1h, 4h, 1d, 1W, 1M)
+            **kwargs: Ignored (for backwards compatibility)
 
         Returns:
             Latest ADX value (0-100 scale)
         """
-        df = self.history(period=period)
-        if df.empty:
-            return np.nan
-        adx_series = calculate_adx(df, adx_period)
-        return round(float(adx_series.iloc[-1]), 2)
+        try:
+            signals = self.ta_signals(interval=interval)
+            adx = signals.get("oscillators", {}).get("values", {}).get("ADX")
+            return round(float(adx), 2) if adx is not None else np.nan
+        except (NotImplementedError, Exception):
+            # Fallback to local calculation
+            df = self.history(period="3mo")
+            if df.empty:
+                return np.nan
+            adx_series = calculate_adx(df, 14)
+            return round(float(adx_series.iloc[-1]), 2)
 
     def heikin_ashi(self, period: str = "1mo") -> pd.DataFrame:
         """Get Heikin Ashi candlestick data.

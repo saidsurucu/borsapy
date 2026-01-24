@@ -179,7 +179,7 @@ from borsapy.technical import (
 from borsapy.ticker import Ticker
 from borsapy.viop import VIOP
 
-__version__ = "0.6.1"
+__version__ = "0.6.2"
 __author__ = "Said Surucu"
 
 __all__ = [

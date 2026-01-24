@@ -80,6 +80,8 @@ print(hisse.info["dividendYield"])  # Temettü verimi
 
 ### Fiyat Geçmişi
 
+> 💡 **TradingView Veri Kaynağı:** BIST fiyat verileri TradingView WebSocket API üzerinden sağlanır. Varsayılan olarak ~15 dakika gecikmeli. Gerçek zamanlı veri için [TradingView Kimlik Doğrulama](#tradingview-kimlik-doğrulama-gerçek-zamanlı-veri) bölümüne bakın.
+
 ```python
 # Dönem bazlı
 df = hisse.history(period="1ay")    # Son 1 ay
@@ -251,6 +253,8 @@ df = bp.download(["THYAO", "GARAN"], period="1ay", group_by="column")
 
 BIST endekslerine erişim - 79 endeks, bileşen listeleri dahil.
 
+> 💡 **TradingView Veri Kaynağı:** Endeks fiyat verileri TradingView WebSocket API üzerinden sağlanır. Varsayılan olarak ~15 dakika gecikmeli. Gerçek zamanlı veri için [TradingView Kimlik Doğrulama](#tradingview-kimlik-doğrulama-gerçek-zamanlı-veri) bölümüne bakın.
+
 ### Temel Kullanım
 
 ```python
@@ -337,6 +341,8 @@ inr = bp.FX("INR")    # Hindistan Rupisi
 ### Dakikalık/Saatlik Veri (TradingView)
 
 Bazı döviz çiftleri için intraday (dakikalık/saatlik) veri TradingView üzerinden sağlanır.
+
+> 💡 **Gerçek Zamanlı Veri:** TradingView verileri varsayılan olarak ~15 dakika gecikmeli. Gerçek zamanlı veri için [TradingView Kimlik Doğrulama](#tradingview-kimlik-doğrulama-gerçek-zamanlı-veri) bölümüne bakın.
 
 ```python
 import borsapy as bp
@@ -745,6 +751,8 @@ portfolio.bollinger_bands()        # Bollinger Bands
 
 Tüm varlık sınıfları için teknik analiz göstergeleri (Ticker, Index, Crypto, FX, Fund).
 
+> 💡 **TradingView Entegrasyonu:** Teknik göstergeler (RSI, MACD, BB, ADX, ATR, Stochastic) TradingView Scanner API üzerinden hesaplanır. Bu sayede TradingView'daki değerlerle birebir uyumlu sonuçlar alırsınız. Varsayılan olarak ~15 dakika gecikmeli veri kullanılır. Gerçek zamanlı veri için [TradingView Kimlik Doğrulama](#tradingview-kimlik-doğrulama-gerçek-zamanlı-veri) bölümüne bakın.
+
 ### Tekil Değerler
 
 ```python
@@ -925,6 +933,8 @@ HA_Low   = min(Low, HA_Open, HA_Close)
 
 TradingView Scanner API ile teknik analiz sinyalleri (AL/SAT/TUT).
 
+> 💡 **Gerçek Zamanlı Veri:** Varsayılan olarak ~15 dakika gecikmeli. Gerçek zamanlı sinyaller için [TradingView Kimlik Doğrulama](#tradingview-kimlik-doğrulama-gerçek-zamanlı-veri) bölümüne bakın.
+
 ```python
 import borsapy as bp
 
@@ -986,6 +996,8 @@ bp.Crypto("BTCTRY").ta_signals()
 ## Gerçek Zamanlı Veri Akışı (TradingView Streaming)
 
 Düşük gecikmeli, yüksek verimli gerçek zamanlı veri akışı. Persistent WebSocket bağlantısı ile anlık fiyat ve mum verisi.
+
+> ⚠️ **Önemli:** Varsayılan olarak TradingView verileri ~15 dakika gecikmeli. Gerçek zamanlı BIST verisi için TradingView Pro hesabı ve BIST veri paketi gerekir. Detaylar için [TradingView Kimlik Doğrulama](#tradingview-kimlik-doğrulama-gerçek-zamanlı-veri) bölümüne bakın.
 
 ### Temel Kullanım
 
@@ -1340,6 +1352,8 @@ result = bt.run()
 ## Pine Script Streaming Indicators
 
 TradingView'ın Pine Script göstergelerini gerçek zamanlı olarak alın.
+
+> 💡 **Gerçek Zamanlı Veri:** Varsayılan olarak ~15 dakika gecikmeli. Gerçek zamanlı gösterge değerleri için [TradingView Kimlik Doğrulama](#tradingview-kimlik-doğrulama-gerçek-zamanlı-veri) bölümüne bakın.
 
 ```python
 import borsapy as bp
@@ -1955,6 +1969,8 @@ print(df.columns)
 ## Teknik Tarama (Technical Scanner)
 
 Teknik göstergelere dayalı hisse tarama. `scan()` fonksiyonu veya `TechnicalScanner` class ile kullanılabilir.
+
+> 💡 **TradingView Entegrasyonu:** Scanner, TradingView Screener API üzerinden çalışır. Varsayılan olarak ~15 dakika gecikmeli veri kullanır. Gerçek zamanlı tarama için [TradingView Kimlik Doğrulama](#tradingview-kimlik-doğrulama-gerçek-zamanlı-veri) bölümüne bakın.
 
 ### Basit Kullanım
 

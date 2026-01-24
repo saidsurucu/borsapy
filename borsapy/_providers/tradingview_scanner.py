@@ -60,6 +60,18 @@ MOVING_AVERAGE_COLUMNS = [
     "Rec.HullMA9",
     "HullMA9",
     "close",  # For comparison
+    # Bollinger Bands
+    "BB.upper",
+    "BB.lower",
+    # ATR
+    "ATR",
+    # Parabolic SAR
+    "P.SAR",
+    # Volume indicators
+    "VWAP",
+    "volume",
+    # Relative volume
+    "relative_volume_10d_calc",
 ]
 
 # Interval to TradingView suffix mapping
@@ -82,9 +94,8 @@ class TradingViewScannerProvider(BaseProvider):
     """
     TradingView Scanner API provider for technical analysis signals.
 
-    The Scanner API is public and doesn't require authentication.
-    It returns technical analysis recommendations (BUY/SELL/NEUTRAL)
-    along with indicator values.
+    Supports both public (delayed) and authenticated (real-time) data.
+    Use `borsapy.set_tradingview_auth()` for real-time data access.
 
     Based on: https://github.com/brian-the-dev/python-tradingview-ta
     """
@@ -105,6 +116,18 @@ class TradingViewScannerProvider(BaseProvider):
         super().__init__()
         # Cache for TA signals (1 minute TTL)
         self._cache_ttl = 60
+
+    def _get_auth_cookies(self) -> dict[str, str] | None:
+        """Get TradingView auth cookies if available."""
+        from borsapy._providers.tradingview import get_tradingview_auth
+
+        creds = get_tradingview_auth()
+        if creds and creds.get("session"):
+            cookies = {"sessionid": creds["session"]}
+            if creds.get("session_sign"):
+                cookies["sessionid_sign"] = creds["session_sign"]
+            return cookies
+        return None
 
     def _get_columns_with_interval(
         self, columns: list[str], interval: str
@@ -192,8 +215,11 @@ class TradingViewScannerProvider(BaseProvider):
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
         }
 
+        # Get auth cookies for real-time data (if available)
+        cookies = self._get_auth_cookies()
+
         try:
-            response = self._post(url, json=payload, headers=headers)
+            response = self._post(url, json=payload, headers=headers, cookies=cookies)
         except Exception as e:
             raise APIError(f"TradingView Scanner API error: {e}") from e
 
@@ -416,6 +442,37 @@ class TradingViewScannerProvider(BaseProvider):
         if rec_hull is not None:
             ma_values["HullMA9"] = raw_values.get(f"HullMA9{suffix}")
             ma_compute["HullMA9"] = self._recommendation_to_signal(rec_hull)
+
+        # Bollinger Bands
+        bb_upper = raw_values.get(f"BB.upper{suffix}")
+        bb_lower = raw_values.get(f"BB.lower{suffix}")
+        if bb_upper is not None:
+            ma_values["BB.upper"] = round(bb_upper, 4)
+        if bb_lower is not None:
+            ma_values["BB.lower"] = round(bb_lower, 4)
+        # Calculate BB middle (SMA20 is typically the middle band)
+        if bb_upper is not None and bb_lower is not None:
+            ma_values["BB.middle"] = round((bb_upper + bb_lower) / 2, 4)
+
+        # ATR (Average True Range)
+        atr = raw_values.get(f"ATR{suffix}")
+        if atr is not None:
+            ma_values["ATR"] = round(atr, 4)
+
+        # Parabolic SAR
+        psar = raw_values.get(f"P.SAR{suffix}")
+        if psar is not None:
+            ma_values["P.SAR"] = round(psar, 4)
+
+        # VWAP (Volume Weighted Average Price)
+        vwap = raw_values.get(f"VWAP{suffix}")
+        if vwap is not None:
+            ma_values["VWAP"] = round(vwap, 4)
+
+        # Relative volume
+        rel_vol = raw_values.get(f"relative_volume_10d_calc{suffix}")
+        if rel_vol is not None:
+            ma_values["relative_volume"] = round(rel_vol, 4)
 
         # Calculate counts
         osc_buy = sum(1 for v in osc_compute.values() if v == "BUY")

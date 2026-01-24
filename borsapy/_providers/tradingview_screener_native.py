@@ -44,6 +44,9 @@ class TVScreenerProvider:
     Uses tradingview-screener package for direct API access without
     local indicator calculations.
 
+    Supports both public (delayed) and authenticated (real-time) data.
+    Use `borsapy.set_tradingview_auth()` for real-time data access.
+
     Examples:
         >>> provider = TVScreenerProvider()
         >>> df = provider.scan(
@@ -173,6 +176,22 @@ class TVScreenerProvider:
         """Initialize the provider."""
         pass
 
+    def _get_auth_cookies(self) -> dict[str, str] | None:
+        """Get TradingView auth cookies if available.
+
+        Returns:
+            Dictionary of cookies or None if not authenticated.
+        """
+        from borsapy._providers.tradingview import get_tradingview_auth
+
+        creds = get_tradingview_auth()
+        if creds and creds.get("session"):
+            cookies = {"sessionid": creds["session"]}
+            if creds.get("session_sign"):
+                cookies["sessionid_sign"] = creds["session_sign"]
+            return cookies
+        return None
+
     def scan(
         self,
         symbols: list[str],
@@ -244,8 +263,12 @@ class TVScreenerProvider:
         query = query.limit(query_limit)
 
         try:
-            # Execute query
-            count, df = query.get_scanner_data()
+            # Execute query with auth cookies for real-time data (if available)
+            cookies = self._get_auth_cookies()
+            if cookies:
+                count, df = query.get_scanner_data(cookies=cookies)
+            else:
+                count, df = query.get_scanner_data()
         except Exception as e:
             import warnings
 

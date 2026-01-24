@@ -4,11 +4,11 @@ build-backend = "hatchling.build"
 
 [project]
 name = "borsapy"
-version = "0.6.1"
+version = "0.6.2"
 description = "Turkish financial markets data library - yfinance-like API for BIST stocks, forex, crypto, and more"
 readme = "README.md"
 license = { text = "Apache-2.0" }
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 authors = [
     { name = "Said Surucu" }
 ]
@@ -28,7 +28,6 @@ classifiers = [
     "License :: OSI Approved :: Apache Software License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -46,6 +45,7 @@ dependencies = [
     "pdfplumber>=0.11.8",
     "openai>=2.15.0",
     "tradingview-screener>=3.0.0",
+    "markitdown",
 ]
 
 [project.optional-dependencies]
