@@ -178,6 +178,40 @@ print(hisse.info["website"])        # Web sitesi
 print(hisse.info["longBusinessSummary"])  # Faaliyet konusu
 ```
 
+### ETF Sahipliği
+
+Uluslararası ETF'lerin hisse pozisyonlarını görüntüleme.
+
+```python
+import borsapy as bp
+
+stock = bp.Ticker("ASELS")
+
+# ETF holder listesi (DataFrame)
+holders = stock.etf_holders
+print(holders)
+#    symbol exchange                                      name  market_cap_usd  holding_weight_pct           issuer
+# 0    IEMG     AMEX  iShares Core MSCI Emerging Markets ETF    118225730.76            0.090686  BlackRock, Inc.
+# 1     VWO     AMEX     Vanguard FTSE Emerging Markets ETF     85480000.00            0.060000     Vanguard Inc
+
+print(f"Total ETFs: {len(holders)}")
+print(f"Top holder: {holders.iloc[0]['name']}")
+print(f"Total weight: {holders['holding_weight_pct'].sum():.2f}%")
+```
+
+**DataFrame Sütunları:**
+
+| Sütun | Açıklama |
+|-------|----------|
+| `symbol` | ETF sembolü (IEMG, VWO, TUR) |
+| `exchange` | Borsa (AMEX, NASDAQ, LSE, XETR) |
+| `name` | ETF tam adı |
+| `market_cap_usd` | ETF'in bu hissedeki pozisyon değeri (USD) |
+| `holding_weight_pct` | Ağırlık yüzdesi (0.09 = %0.09) |
+| `issuer` | İhraççı (BlackRock, Vanguard, vb.) |
+| `expense_ratio` | Gider oranı |
+| `aum_usd` | Toplam varlık (USD) |
+
 ---
 
 ## Tickers ve download (Çoklu Hisse)
@@ -857,6 +891,540 @@ df_with_indicators = add_indicators(df, indicators=["sma", "rsi"])  # Sadece bel
 | VWAP | `vwap()` | Hacim Ağırlıklı Ortalama Fiyat (Volume gerektirir) |
 | ADX | `adx()` | Ortalama Yön Endeksi (0-100) |
 
+### Heikin Ashi Charts
+
+Alternatif mum grafiği hesaplama yöntemi.
+
+```python
+import borsapy as bp
+
+stock = bp.Ticker("THYAO")
+
+# Pure function ile
+df = stock.history(period="1y")
+ha_df = bp.calculate_heikin_ashi(df)
+# Sütunlar: HA_Open, HA_High, HA_Low, HA_Close, Volume
+
+# Convenience method
+ha_df = stock.heikin_ashi(period="1y")
+
+# TechnicalAnalyzer ile
+ta = stock.technicals(period="1y")
+ha_df = ta.heikin_ashi()
+```
+
+**Heikin Ashi Formülü:**
+```
+HA_Close = (Open + High + Low + Close) / 4
+HA_Open  = (Prev_HA_Open + Prev_HA_Close) / 2  (ilk satır: (O+C)/2)
+HA_High  = max(High, HA_Open, HA_Close)
+HA_Low   = min(Low, HA_Open, HA_Close)
+```
+
+### TradingView TA Sinyalleri
+
+TradingView Scanner API ile teknik analiz sinyalleri (AL/SAT/TUT).
+
+```python
+import borsapy as bp
+
+stock = bp.Ticker("THYAO")
+
+# Tek timeframe (varsayılan: günlük)
+signals = stock.ta_signals()
+print(signals['summary']['recommendation'])  # "STRONG_BUY", "BUY", "NEUTRAL", "SELL", "STRONG_SELL"
+print(signals['summary']['buy'])             # 12 (AL sinyali veren gösterge sayısı)
+print(signals['oscillators']['compute']['RSI'])  # "BUY", "SELL", "NEUTRAL"
+print(signals['moving_averages']['values']['EMA20'])  # 285.5
+
+# Belirli timeframe
+signals_1h = stock.ta_signals(interval="1h")   # Saatlik
+signals_4h = stock.ta_signals(interval="4h")   # 4 saatlik
+signals_1w = stock.ta_signals(interval="1W")   # Haftalık
+
+# Tüm timeframe'ler tek seferde
+all_signals = stock.ta_signals_all_timeframes()
+print(all_signals['1h']['summary']['recommendation'])
+print(all_signals['1d']['summary']['recommendation'])
+print(all_signals['1W']['summary']['recommendation'])
+
+# Diğer varlık sınıfları için de çalışır
+bp.Index("XU100").ta_signals()
+bp.FX("USD").ta_signals()
+bp.Crypto("BTCTRY").ta_signals()
+```
+
+**Desteklenen Timeframe'ler:** `1m`, `5m`, `15m`, `30m`, `1h`, `2h`, `4h`, `1d`, `1W`, `1M`
+
+**Sinyal Çıktı Formatı:**
+```python
+{
+    "symbol": "THYAO",
+    "exchange": "BIST",
+    "interval": "1d",
+    "summary": {
+        "recommendation": "BUY",  # STRONG_BUY, BUY, NEUTRAL, SELL, STRONG_SELL
+        "buy": 12, "sell": 5, "neutral": 9
+    },
+    "oscillators": {
+        "recommendation": "NEUTRAL",
+        "buy": 2, "sell": 2, "neutral": 7,
+        "compute": {"RSI": "NEUTRAL", "MACD": "SELL", ...},
+        "values": {"RSI": 48.95, "MACD.macd": 3.78, ...}
+    },
+    "moving_averages": {
+        "recommendation": "BUY",
+        "buy": 10, "sell": 3, "neutral": 2,
+        "compute": {"EMA10": "BUY", "SMA20": "BUY", ...},
+        "values": {"EMA10": 285.5, "SMA20": 284.2, ...}
+    }
+}
+```
+
+---
+
+## Gerçek Zamanlı Veri Akışı (TradingView Streaming)
+
+Düşük gecikmeli, yüksek verimli gerçek zamanlı veri akışı. Persistent WebSocket bağlantısı ile anlık fiyat ve mum verisi.
+
+### Temel Kullanım
+
+```python
+import borsapy as bp
+
+# Stream oluştur ve bağlan
+stream = bp.TradingViewStream()
+stream.connect()
+
+# Sembollere abone ol
+stream.subscribe("THYAO")
+stream.subscribe("GARAN")
+stream.subscribe("ASELS")
+
+# Anlık fiyat al (cached, <1ms)
+quote = stream.get_quote("THYAO")
+print(quote['last'])           # 299.0
+print(quote['bid'])            # 298.9
+print(quote['ask'])            # 299.1
+print(quote['volume'])         # 12345678
+print(quote['change_percent']) # 2.5
+
+# İlk quote için bekle (blocking)
+quote = stream.wait_for_quote("THYAO", timeout=5.0)
+
+# Callback ile real-time updates
+def on_price_update(symbol, quote):
+    print(f"{symbol}: {quote['last']} ({quote['change_percent']:+.2f}%)")
+
+stream.on_quote("THYAO", on_price_update)
+
+# Tüm semboller için callback
+stream.on_any_quote(lambda s, q: print(f"{s}: {q['last']}"))
+
+# Bağlantıyı kapat
+stream.disconnect()
+```
+
+### Context Manager Kullanımı
+
+```python
+import borsapy as bp
+
+with bp.TradingViewStream() as stream:
+    stream.subscribe("THYAO")
+    quote = stream.wait_for_quote("THYAO", timeout=5.0)
+    print(quote['last'])
+```
+
+### Chart Verileri (OHLCV Streaming)
+
+Gerçek zamanlı mum grafiği verisi.
+
+```python
+import borsapy as bp
+
+stream = bp.TradingViewStream()
+stream.connect()
+
+# Mum grafiği aboneliği
+stream.subscribe_chart("THYAO", "1m")   # 1 dakikalık mumlar
+stream.subscribe_chart("GARAN", "5m")   # 5 dakikalık mumlar
+stream.subscribe_chart("ASELS", "1h")   # Saatlik mumlar
+
+# Callback ile mum güncellemeleri
+def on_candle(symbol, interval, candle):
+    print(f"{symbol} {interval}: O={candle['open']} H={candle['high']} L={candle['low']} C={candle['close']}")
+
+stream.on_candle("THYAO", "1m", on_candle)
+
+# Tüm mumlar için callback
+stream.on_any_candle(lambda s, i, c: print(f"{s} {i}: {c['close']}"))
+
+# Cached mum verisi al
+candle = stream.get_candle("THYAO", "1m")
+candles = stream.get_candles("THYAO", "1m")  # Tüm mumlar (list)
+
+# İlk mum için bekle
+candle = stream.wait_for_candle("THYAO", "1m", timeout=10.0)
+
+stream.disconnect()
+```
+
+**Desteklenen Timeframe'ler:** `1m`, `5m`, `15m`, `30m`, `1h`, `4h`, `1d`, `1wk`, `1mo`
+
+### TradingView Kimlik Doğrulama (Gerçek Zamanlı Veri)
+
+Varsayılan olarak TradingView verileri ~15 dakika gecikmeli. Gerçek zamanlı BIST verisi için TradingView'da aşağıdaki aboneliklere ihtiyacınız var:
+
+1. **Essential** veya üzeri plan (Pro, Pro+, Premium)
+2. **BIST Real-time Market Data** paketi (ek ücretli)
+
+> TradingView hesabınızda: Profil → Hesap ve Faturalama → Piyasa Verileri Abonelikleri → "Borsa Istanbul" ekleyin.
+
+```python
+import borsapy as bp
+
+# Yöntem 1: Username/Password ile login
+bp.set_tradingview_auth(
+    username="user@email.com",
+    password="mypassword"
+)
+
+# Yöntem 2: Mevcut session token ile
+bp.set_tradingview_auth(
+    session="abc123...",          # sessionid cookie
+    session_sign="xyz789..."      # sessionid_sign cookie
+)
+
+# Artık gerçek zamanlı veri
+stream = bp.TradingViewStream()
+stream.connect()
+stream.subscribe("THYAO")
+quote = stream.wait_for_quote("THYAO")
+print(quote['last'])  # Gerçek zamanlı fiyat
+
+# Logout
+bp.clear_tradingview_auth()
+```
+
+**Session süresi:** ~30 gün (remember=on ile)
+
+**Chrome DevTools ile Cookie Alma:**
+
+1. TradingView'a giriş yapın (tradingview.com)
+2. `F12` veya `Ctrl+Shift+I` ile DevTools'u açın
+3. **Application** sekmesine gidin
+4. Sol menüden **Cookies** → `https://www.tradingview.com` seçin
+5. Aşağıdaki cookie'leri bulun ve değerlerini kopyalayın:
+   - `sessionid` → `session` parametresi
+   - `sessionid_sign` → `session_sign` parametresi
+
+```python
+bp.set_tradingview_auth(
+    session="kopyaladığınız_sessionid_değeri",
+    session_sign="kopyaladığınız_sessionid_sign_değeri"
+)
+```
+
+### Quote Alanları (46 alan)
+
+| Kategori | Alanlar |
+|----------|---------|
+| **Fiyat** | `last`, `change`, `change_percent`, `bid`, `ask`, `bid_size`, `ask_size`, `volume` |
+| **OHLC** | `open`, `high`, `low`, `prev_close` |
+| **Temel** | `market_cap`, `pe_ratio`, `eps`, `dividend_yield`, `beta` |
+| **52 Hafta** | `high_52_week`, `low_52_week` |
+| **Meta** | `description`, `currency`, `timestamp` |
+
+### Performans Karşılaştırması
+
+| Metrik | Eski (get_quote) | Yeni (TradingViewStream) |
+|--------|------------------|--------------------------|
+| Gecikme | ~7000ms | ~50-100ms |
+| Throughput | 0.1 req/s | 10-20 req/s |
+| Bağlantı | Her istekte yeni | Tek persistent |
+| Cached Quote | N/A | <1ms |
+
+> **Teşekkür:** Bu TradingView entegrasyonu [Mathieu2301/TradingView-API](https://github.com/Mathieu2301/TradingView-API) projesinden ilham alınarak geliştirilmiştir.
+
+---
+
+## Sembol Arama (Search)
+
+TradingView symbol search API ile çoklu piyasada sembol arama.
+
+```python
+import borsapy as bp
+
+# Basit arama
+bp.search("banka")           # ['AKBNK', 'GARAN', 'ISCTR', ...]
+bp.search("enerji")          # ['AKSEN', 'ODAS', 'ZOREN', ...]
+bp.search("THY")             # ['THYAO']
+
+# Tip filtreleme
+bp.search("gold", type="forex")     # Altın pariteleri
+bp.search("BTC", type="crypto")     # Kripto
+bp.search("XU", type="index")       # Endeksler
+bp.search("F_XU030", type="futures") # Vadeli kontratlar
+
+# Exchange filtresi
+bp.search("GARAN", exchange="BIST")  # Sadece BIST
+
+# Detaylı sonuç
+results = bp.search("THYAO", full_info=True)
+# [{'symbol': 'THYAO', 'exchange': 'BIST', 'description': 'TURK HAVA YOLLARI', ...}]
+
+# Kısa yol fonksiyonları
+bp.search_bist("banka")      # Sadece BIST hisseleri
+bp.search_crypto("ETH")      # Sadece kripto
+bp.search_forex("USD")       # Sadece forex
+bp.search_index("XU")        # Sadece endeksler
+```
+
+**Desteklenen Tipler:** `stock`, `forex`, `crypto`, `index`, `futures`, `bond`, `fund`
+
+---
+
+## Replay Mode (Backtesting için Tarihsel Oynatma)
+
+Backtesting için tarihsel veriyi candle-by-candle oynatma.
+
+```python
+import borsapy as bp
+
+# Basit replay
+session = bp.create_replay("THYAO", period="6mo", speed=5.0)
+
+for candle in session.replay():
+    print(f"{candle['timestamp']}: Close={candle['close']}")
+    # Trading logic...
+
+# Callback ile
+def on_candle(c):
+    print(f"Progress: {c['_index']}/{c['_total']} ({c['_progress']:.1%})")
+
+session.on_candle(on_candle)
+list(session.replay())  # Callback'ler otomatik çalışır
+
+# Tarih filtresi ile
+for candle in session.replay_filtered(
+    start_date="2024-01-01",
+    end_date="2024-06-01"
+):
+    # Sadece belirlenen tarih aralığı
+    pass
+
+# İstatistikler
+print(session.stats())
+# {'symbol': 'THYAO', 'total_candles': 252, 'progress': 0.5, ...}
+```
+
+**Candle Formatı:**
+```python
+{
+    "timestamp": datetime,
+    "open": 285.0,
+    "high": 286.5,
+    "low": 284.0,
+    "close": 285.5,
+    "volume": 123456,
+    "_index": 42,      # Kaçıncı candle
+    "_total": 252,     # Toplam candle sayısı
+    "_progress": 0.167 # İlerleme (0.0-1.0)
+}
+```
+
+---
+
+## Backtest Engine
+
+Strateji backtesting framework'ü. Kendi stratejilerinizi geçmiş verilere karşı test edin.
+
+### Temel Kullanım
+
+```python
+import borsapy as bp
+
+# Strateji tanımla
+def rsi_strategy(candle, position, indicators):
+    """
+    Args:
+        candle: {'timestamp', 'open', 'high', 'low', 'close', 'volume'}
+        position: 'long' | 'short' | None
+        indicators: {'rsi': 48.5, 'sma_20': 285.5, ...}
+    Returns:
+        'BUY' | 'SELL' | 'HOLD' | None
+    """
+    if indicators.get('rsi', 50) < 30 and position is None:
+        return 'BUY'
+    elif indicators.get('rsi', 50) > 70 and position == 'long':
+        return 'SELL'
+    return 'HOLD'
+
+# Backtest çalıştır
+result = bp.backtest(
+    "THYAO",
+    rsi_strategy,
+    period="1y",
+    capital=100000,
+    commission=0.001,
+    indicators=['rsi', 'sma_20']
+)
+
+# Sonuçlar
+print(result.summary())
+print(f"Net Profit: {result.net_profit:.2f} TL")
+print(f"Net Profit %: {result.net_profit_pct:.2f}%")
+print(f"Win Rate: {result.win_rate:.1f}%")
+print(f"Sharpe Ratio: {result.sharpe_ratio:.2f}")
+print(f"Max Drawdown: {result.max_drawdown:.2f}%")
+print(f"Total Trades: {result.total_trades}")
+
+# DataFrame export
+print(result.trades_df)      # Trade history
+print(result.equity_curve)   # Equity over time
+```
+
+### Backtest Class ile Detaylı Kullanım
+
+```python
+import borsapy as bp
+
+bt = bp.Backtest(
+    symbol="GARAN",
+    strategy=rsi_strategy,
+    period="2y",
+    capital=50000,
+    commission=0.001,
+    indicators=['rsi', 'macd', 'bollinger']
+)
+
+result = bt.run()
+```
+
+### BacktestResult Metrikleri
+
+| Metrik | Açıklama |
+|--------|----------|
+| `net_profit` | Net kar (TL) |
+| `net_profit_pct` | Net kar yüzdesi |
+| `total_trades` | Toplam işlem sayısı |
+| `winning_trades` | Kazançlı işlem sayısı |
+| `losing_trades` | Kayıplı işlem sayısı |
+| `win_rate` | Kazanç oranı (%) |
+| `profit_factor` | Brüt kar / Brüt zarar |
+| `sharpe_ratio` | Risk-adjusted return |
+| `sortino_ratio` | Downside risk-adjusted return |
+| `max_drawdown` | Maksimum düşüş (%) |
+| `avg_trade` | Ortalama işlem karı |
+| `buy_hold_return` | Buy & Hold getirisi |
+| `vs_buy_hold` | Strateji vs Buy & Hold |
+| `trades_df` | Trade DataFrame (entry, exit, profit, duration) |
+| `equity_curve` | Portföy değeri zaman serisi |
+
+### Desteklenen Göstergeler
+
+| Gösterge | Format | Açıklama |
+|----------|--------|----------|
+| RSI | `rsi`, `rsi_7`, `rsi_21` | RSI (varsayılan 14) |
+| SMA | `sma_20`, `sma_50`, `sma_200` | Simple Moving Average |
+| EMA | `ema_12`, `ema_26`, `ema_50` | Exponential Moving Average |
+| MACD | `macd` | MACD, Signal, Histogram |
+| Bollinger | `bollinger` | Upper, Middle, Lower bands |
+| ATR | `atr`, `atr_20` | Average True Range |
+| Stochastic | `stochastic` | %K, %D |
+| ADX | `adx` | Average Directional Index |
+
+---
+
+## Pine Script Streaming Indicators
+
+TradingView'ın Pine Script göstergelerini gerçek zamanlı olarak alın.
+
+```python
+import borsapy as bp
+
+stream = bp.TradingViewStream()
+stream.connect()
+
+# Önce chart'a abone ol
+stream.subscribe_chart("THYAO", "1m")
+
+# Pine gösterge ekle
+stream.add_study("THYAO", "1m", "RSI")           # Varsayılan ayarlar
+stream.add_study("THYAO", "1m", "RSI", length=7) # Custom period
+stream.add_study("THYAO", "1m", "MACD")
+stream.add_study("THYAO", "1m", "BB")            # Bollinger Bands
+
+# Değerleri bekle ve al
+rsi = stream.wait_for_study("THYAO", "1m", "RSI", timeout=10)
+print(rsi['value'])  # 48.5
+
+# Tüm göstergeleri al
+studies = stream.get_studies("THYAO", "1m")
+print(studies)
+# {
+#     'RSI': {'value': 48.5},
+#     'MACD': {'macd': 3.2, 'signal': 2.8, 'histogram': 0.4},
+#     'BB': {'upper': 296.8, 'middle': 285.0, 'lower': 273.2}
+# }
+
+# Callback ile real-time updates
+def on_rsi_update(symbol, interval, indicator, values):
+    print(f"{symbol} {indicator}: {values}")
+
+stream.on_study("THYAO", "1m", "RSI", on_rsi_update)
+stream.on_any_study(lambda s, i, n, v: print(f"{s} {n}: {v}"))
+
+stream.disconnect()
+```
+
+### Desteklenen Pine Göstergeler
+
+| Gösterge | TradingView ID | Outputs |
+|----------|----------------|---------|
+| RSI | `STD;RSI` | value |
+| MACD | `STD;MACD` | macd, signal, histogram |
+| BB/Bollinger | `STD;BB` | upper, middle, lower |
+| EMA | `STD;EMA` | value |
+| SMA | `STD;SMA` | value |
+| Stochastic | `STD;Stochastic` | k, d |
+| ATR | `STD;ATR` | value |
+| ADX | `STD;ADX` | adx, plus_di, minus_di |
+| OBV | `STD;OBV` | value |
+| VWAP | `STD;VWAP` | value |
+| Ichimoku | `STD;Ichimoku%Cloud` | conversion, base, span_a, span_b |
+| Supertrend | `STD;Supertrend` | value, direction |
+| Parabolic SAR | `STD;Parabolic%SAR` | value |
+| CCI | `STD;CCI` | value |
+| MFI | `STD;MFI` | value |
+
+### Custom Indicator Kullanımı
+
+TradingView auth ile custom/community göstergeler kullanabilirsiniz.
+
+```python
+import borsapy as bp
+
+# TradingView auth ayarla
+bp.set_tradingview_auth(
+    session="sessionid_cookie",
+    signature="sessionid_sign_cookie"
+)
+
+stream = bp.TradingViewStream()
+stream.connect()
+stream.subscribe_chart("THYAO", "1m")
+
+# Public community indicator
+stream.add_study("THYAO", "1m", "PUB;abc123")
+
+# User's own indicator
+stream.add_study("THYAO", "1m", "USER;xyz789")
+
+values = stream.get_study("THYAO", "1m", "PUB;abc123")
+```
+
 ---
 
 ## Inflation (Enflasyon)
@@ -887,6 +1455,8 @@ print(sonuc)
 
 İş Yatırım üzerinden vadeli işlem ve opsiyon verileri.
 
+### Temel Kullanım
+
 ```python
 import borsapy as bp
 
@@ -911,6 +1481,96 @@ print(viop.index_options)      # Endeks opsiyonları
 # Sembol bazlı arama
 print(viop.get_by_symbol("THYAO"))  # THYAO'nun tüm türevleri
 ```
+
+### VIOP Kontrat Arama ve Listeleme
+
+```python
+import borsapy as bp
+
+# Mevcut VIOP kontratlarını listele
+contracts = bp.viop_contracts("XU030D")  # BIST30 vadeli kontratları
+print(contracts)  # ['XU030DG2026', 'XU030DJ2026', ...]
+
+# Altın vadeli kontratları (D eki yok)
+gold_contracts = bp.viop_contracts("XAUTRY")
+print(gold_contracts)  # ['XAUTRYG2026', 'XAUTRYJ2026', ...]
+
+# VIOP sembol arama
+bp.search_viop("XU030")    # ['XU030D', 'XU030DG2026', ...]
+bp.search_viop("gold")     # Altın vadeli kontratları
+
+# Detaylı kontrat bilgisi
+contracts = bp.viop_contracts("XU030D", full_info=True)
+# [
+#     {'symbol': 'XU030DG2026', 'month_code': 'G', 'year': '2026', ...},
+#     {'symbol': 'XU030DJ2026', 'month_code': 'J', 'year': '2026', ...},
+# ]
+```
+
+### VIOP Gerçek Zamanlı Streaming
+
+TradingView WebSocket ile vadeli kontratların gerçek zamanlı fiyatları.
+
+```python
+import borsapy as bp
+
+stream = bp.TradingViewStream()
+stream.connect()
+
+# Vadeli kontrata abone ol (belirli vade)
+stream.subscribe("XU030DG2026")      # BIST30 Şubat 2026
+stream.subscribe("XAUTRYG2026")      # Altın TRY Şubat 2026
+stream.subscribe("USDTRYG2026")      # Dolar TRY Şubat 2026
+
+# Fiyat al
+quote = stream.wait_for_quote("XU030DG2026", timeout=5)
+print(f"BIST30 Vadeli: {quote['last']} TL, Değişim: {quote['change_percent']:.2f}%")
+
+# Callback ile
+def on_viop_update(symbol, quote):
+    print(f"{symbol}: {quote['last']} TL, Vol: {quote['volume']}")
+
+stream.on_quote("XU030DG2026", on_viop_update)
+
+# Chart verileri (OHLCV)
+stream.subscribe_chart("XU030DG2026", "1m")
+candle = stream.wait_for_candle("XU030DG2026", "1m")
+print(f"Open: {candle['open']}, Close: {candle['close']}")
+
+stream.disconnect()
+```
+
+### VIOP Kontrat Formatı
+
+Kontrat formatı: Base symbol + Month code + Year (örn: `XU030DG2026`)
+
+**Ay Kodları:**
+
+| Kod | Ay |
+|-----|-----|
+| F | Ocak |
+| G | Şubat |
+| H | Mart |
+| J | Nisan |
+| K | Mayıs |
+| M | Haziran |
+| N | Temmuz |
+| Q | Ağustos |
+| U | Eylül |
+| V | Ekim |
+| X | Kasım |
+| Z | Aralık |
+
+**Desteklenen VIOP Kontratları:**
+
+| Tip | Örnek Base Symbol | Açıklama |
+|-----|-------------------|----------|
+| Endeks | `XU030D`, `XU100D`, `XLBNKD` | BIST endeks vadeli |
+| Döviz | `USDTRYD`, `EURTRD` | Döviz vadeli |
+| Altın | `XAUTRY`, `XAUUSD` | Altın vadeli (TRY/USD, D eki yok) |
+| Hisse | `THYAOD`, `GARAND` | Pay vadeli |
+
+> **Not**: Continuous kontratlar (`XU030D1!`) TradingView WebSocket'te çalışmıyor. Belirli vade kontratları kullanın (örn: `XU030DG2026`).
 
 ---
 
@@ -1314,18 +1974,21 @@ print(sonuc)
 
 | Modül | Kaynak | Açıklama |
 |-------|--------|----------|
-| Ticker | İş Yatırım, TradingView, KAP, hedeffiyat.com.tr, isinturkiye.com.tr | Hisse verileri, finansallar, bildirimler, analist hedefleri, ISIN |
-| Index | TradingView | BIST endeksleri |
-| FX | canlidoviz.com, doviz.com | 65 döviz, altın, emtia (canlidoviz); banka/kurum kurları (doviz.com) |
+| Ticker | İş Yatırım, TradingView, KAP, hedeffiyat.com.tr, isinturkiye.com.tr | Hisse verileri, finansallar, bildirimler, analist hedefleri, ISIN, ETF sahipliği |
+| Index | TradingView, BIST | BIST endeksleri, bileşen listeleri |
+| FX | canlidoviz.com, doviz.com, TradingView | 65 döviz, altın, emtia; banka/kurum kurları; intraday (TradingView) |
 | Crypto | BtcTurk | Kripto para verileri |
 | Fund | TEFAS | Yatırım fonu verileri, varlık dağılımı, tarama/karşılaştırma |
 | Inflation | TCMB | Enflasyon verileri |
-| VIOP | İş Yatırım | Vadeli işlem ve opsiyon |
+| VIOP | İş Yatırım, TradingView | Vadeli işlem/opsiyon; gerçek zamanlı streaming |
 | Bond | doviz.com | Devlet tahvili faiz oranları (2Y, 5Y, 10Y) |
 | TCMB | tcmb.gov.tr | Merkez Bankası faiz oranları (politika, gecelik, LON) |
 | Eurobond | ziraatbank.com.tr | Türk devlet eurobondları (USD/EUR, 38+ tahvil) |
 | EconomicCalendar | doviz.com | Ekonomik takvim (TR, US, EU, DE, GB, JP, CN) |
 | Screener | İş Yatırım | Hisse tarama (İş Yatırım gelişmiş hisse arama) |
+| TradingViewStream | TradingView WebSocket | Gerçek zamanlı fiyat, OHLCV, Pine Script göstergeleri |
+| Search | TradingView | Sembol arama (hisse, döviz, kripto, endeks, vadeli) |
+| Backtest | Yerel | Strateji backtesting engine |
 
 ---
 
@@ -1339,18 +2002,25 @@ print(sonuc)
 - Analist hedefleri ve tavsiyeler
 
 ### borsapy'ye Özgü
+- **TradingViewStream**: Gerçek zamanlı WebSocket streaming - quote, OHLCV, Pine Script göstergeleri
+- **Backtest Engine**: Strateji backtesting framework - Sharpe, max drawdown, trade analizi
+- **Replay Mode**: Backtesting için tarihsel candle-by-candle oynatma
+- **Search**: TradingView sembol arama - hisse, döviz, kripto, endeks, vadeli
+- **TA Signals**: TradingView teknik analiz sinyalleri - AL/SAT/TUT (11 oscillator + 17 MA)
+- **Heikin Ashi**: Alternatif mum grafiği hesaplama
+- **ETF Holders**: Uluslararası ETF'lerin hisse pozisyonları
 - **Portfolio**: Çoklu varlık portföy yönetimi + risk metrikleri (Sharpe, Sortino, Beta, Alpha)
-- **FX**: Döviz ve emtia verileri + banka kurları (doviz.com)
+- **FX**: Döviz ve emtia verileri + banka kurları + intraday (TradingView)
 - **Crypto**: Kripto para (BtcTurk)
 - **Fund**: Yatırım fonları + varlık dağılımı + tarama/karşılaştırma (TEFAS)
 - **Inflation**: Enflasyon verileri ve hesaplayıcı (TCMB)
-- **VIOP**: Vadeli işlem ve opsiyon (İş Yatırım)
+- **VIOP**: Vadeli işlem/opsiyon + gerçek zamanlı streaming + kontrat arama
 - **Bond**: Devlet tahvili faiz oranları + risk_free_rate (doviz.com)
 - **TCMB**: Merkez Bankası faiz oranları - politika, gecelik, LON + geçmiş (tcmb.gov.tr)
 - **Eurobond**: Türk devlet eurobondları - 38+ tahvil, USD/EUR (ziraatbank.com.tr)
 - **EconomicCalendar**: Ekonomik takvim - 7 ülke desteği (doviz.com)
 - **Screener**: Hisse tarama - 50+ kriter, sektör/endeks filtreleme (İş Yatırım)
-- **Teknik Analiz**: 10 gösterge (SMA, EMA, RSI, MACD, Bollinger, ATR, Stochastic, OBV, VWAP, ADX)
+- **Teknik Analiz**: 10+ gösterge (SMA, EMA, RSI, MACD, Bollinger, ATR, Stochastic, OBV, VWAP, ADX, Heikin Ashi)
 - **KAP Entegrasyonu**: Resmi bildirimler ve takvim
 
 ---
@@ -1365,12 +2035,13 @@ Ek özellik istekleri ve öneriler için [GitHub Discussions](https://github.com
 
 Bu kütüphane aracılığıyla erişilen veriler, ilgili veri kaynaklarına aittir:
 - **İş Yatırım** (isyatirim.com.tr): Finansal tablolar, hisse tarama, VIOP
-- **TradingView** (tradingview.com): Hisse OHLCV, endeksler
+- **TradingView** (tradingview.com): Hisse OHLCV, endeksler, gerçek zamanlı streaming, teknik analiz sinyalleri, sembol arama, ETF sahipliği
 - **KAP** (kap.org.tr): Şirket bildirimleri, ortaklık yapısı
 - **TCMB** (tcmb.gov.tr): Enflasyon verileri, merkez bankası faiz oranları
 - **BtcTurk**: Kripto para verileri
 - **TEFAS** (tefas.gov.tr): Yatırım fonu verileri
 - **doviz.com**: Döviz kurları, banka kurları, ekonomik takvim, tahvil faizleri
+- **canlidoviz.com**: Döviz kurları, emtia fiyatları
 - **Ziraat Bankası** (ziraatbank.com.tr): Eurobond verileri
 - **hedeffiyat.com.tr**: Analist hedef fiyatları
 - **isinturkiye.com.tr**: ISIN kodları

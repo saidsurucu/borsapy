@@ -141,6 +141,8 @@ from borsapy.market import companies, search_companies
 from borsapy.multi import Tickers, download
 from borsapy.portfolio import Portfolio
 from borsapy.replay import ReplaySession, create_replay
+from borsapy.condition import ConditionParser, ParseError
+from borsapy.scanner import TechnicalScanner, ScanResult, scan
 from borsapy.screener import Screener, screen_stocks, screener_criteria, sectors, stock_indices
 from borsapy.search import search, search_bist, search_crypto, search_forex, search_index, search_viop, viop_contracts
 from borsapy.tcmb import TCMB, policy_rate
@@ -171,7 +173,7 @@ from borsapy._providers.tradingview import (
 # TradingView streaming for real-time updates
 from borsapy.stream import TradingViewStream, create_stream
 
-__version__ = "0.5.8"
+__version__ = "0.6.0"
 __author__ = "Said Surucu"
 
 __all__ = [
@@ -226,6 +228,12 @@ __all__ = [
     "screener_criteria",
     "sectors",
     "stock_indices",
+    # Technical Scanner
+    "TechnicalScanner",
+    "ScanResult",
+    "scan",
+    "ConditionParser",
+    "ParseError",
     # Technical analysis
     "TechnicalAnalyzer",
     "add_indicators",

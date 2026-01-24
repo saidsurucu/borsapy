@@ -213,6 +213,35 @@ class Index(TechnicalMixin):
         """
         return (f"BIST:{self._symbol}", "turkey")
 
+    def scan(
+        self,
+        condition: str,
+        period: str = "3mo",
+        interval: str = "1d",
+    ) -> "pd.DataFrame":
+        """Scan index components for technical conditions.
+
+        Convenience method for scanning all stocks in this index.
+
+        Args:
+            condition: Condition string (e.g., "rsi < 30", "price > sma_50")
+            period: Historical data period for indicator calculation
+            interval: Data interval
+
+        Returns:
+            DataFrame with matching symbols and their data
+
+        Examples:
+            >>> import borsapy as bp
+            >>> xu030 = bp.Index("XU030")
+            >>> xu030.scan("rsi < 30")
+            >>> xu030.scan("price > sma_50 and rsi > 50")
+            >>> xu030.scan("sma_20 crosses_above sma_50")
+        """
+        from borsapy.scanner import scan
+
+        return scan(self.component_symbols, condition, period, interval)
+
     def __repr__(self) -> str:
         return f"Index('{self._symbol}')"
 

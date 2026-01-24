@@ -54,6 +54,9 @@
                         <li>
                                 <a class="function" href="#Index.history">history</a>
                         </li>
+                        <li>
+                                <a class="function" href="#Index.scan">scan</a>
+                        </li>
                 </ul>
 
             </li>
@@ -296,85 +299,122 @@
 </span><span id="L-205"><a href="#L-205"><span class="linenos">205</span></a>                <span class="k">continue</span>
 </span><span id="L-206"><a href="#L-206"><span class="linenos">206</span></a>        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Could not parse date: </span><span class="si">{</span><span class="n">date</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 </span><span id="L-207"><a href="#L-207"><span class="linenos">207</span></a>
-</span><span id="L-208"><a href="#L-208"><span class="linenos">208</span></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-</span><span id="L-209"><a href="#L-209"><span class="linenos">209</span></a>        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;Index(&#39;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_symbol</span><span class="si">}</span><span class="s2">&#39;)&quot;</span>
+</span><span id="L-208"><a href="#L-208"><span class="linenos">208</span></a>    <span class="k">def</span><span class="w"> </span><span class="nf">_get_ta_symbol_info</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]:</span>
+</span><span id="L-209"><a href="#L-209"><span class="linenos">209</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Get TradingView symbol and screener for TA signals.</span>
 </span><span id="L-210"><a href="#L-210"><span class="linenos">210</span></a>
-</span><span id="L-211"><a href="#L-211"><span class="linenos">211</span></a>
-</span><span id="L-212"><a href="#L-212"><span class="linenos">212</span></a><span class="k">def</span><span class="w"> </span><span class="nf">indices</span><span class="p">(</span><span class="n">detailed</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]:</span>
-</span><span id="L-213"><a href="#L-213"><span class="linenos">213</span></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span id="L-214"><a href="#L-214"><span class="linenos">214</span></a><span class="sd">    Get list of available market indices.</span>
+</span><span id="L-211"><a href="#L-211"><span class="linenos">211</span></a><span class="sd">        Returns:</span>
+</span><span id="L-212"><a href="#L-212"><span class="linenos">212</span></a><span class="sd">            Tuple of (tv_symbol, screener) for TradingView Scanner API.</span>
+</span><span id="L-213"><a href="#L-213"><span class="linenos">213</span></a><span class="sd">        &quot;&quot;&quot;</span>
+</span><span id="L-214"><a href="#L-214"><span class="linenos">214</span></a>        <span class="k">return</span> <span class="p">(</span><span class="sa">f</span><span class="s2">&quot;BIST:</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_symbol</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="s2">&quot;turkey&quot;</span><span class="p">)</span>
 </span><span id="L-215"><a href="#L-215"><span class="linenos">215</span></a>
-</span><span id="L-216"><a href="#L-216"><span class="linenos">216</span></a><span class="sd">    Args:</span>
-</span><span id="L-217"><a href="#L-217"><span class="linenos">217</span></a><span class="sd">        detailed: If True, return list of dicts with symbol, name, and count.</span>
-</span><span id="L-218"><a href="#L-218"><span class="linenos">218</span></a><span class="sd">                  If False (default), return just the symbol list.</span>
-</span><span id="L-219"><a href="#L-219"><span class="linenos">219</span></a>
-</span><span id="L-220"><a href="#L-220"><span class="linenos">220</span></a><span class="sd">    Returns:</span>
-</span><span id="L-221"><a href="#L-221"><span class="linenos">221</span></a><span class="sd">        List of index symbols, or list of dicts if detailed=True.</span>
-</span><span id="L-222"><a href="#L-222"><span class="linenos">222</span></a>
-</span><span id="L-223"><a href="#L-223"><span class="linenos">223</span></a><span class="sd">    Examples:</span>
-</span><span id="L-224"><a href="#L-224"><span class="linenos">224</span></a><span class="sd">        &gt;&gt;&gt; import borsapy as bp</span>
-</span><span id="L-225"><a href="#L-225"><span class="linenos">225</span></a><span class="sd">        &gt;&gt;&gt; bp.indices()</span>
-</span><span id="L-226"><a href="#L-226"><span class="linenos">226</span></a><span class="sd">        [&#39;XU100&#39;, &#39;XU050&#39;, &#39;XU030&#39;, &#39;XBANK&#39;, &#39;XUSIN&#39;, ...]</span>
-</span><span id="L-227"><a href="#L-227"><span class="linenos">227</span></a><span class="sd">        &gt;&gt;&gt; bp.indices(detailed=True)</span>
-</span><span id="L-228"><a href="#L-228"><span class="linenos">228</span></a><span class="sd">        [{&#39;symbol&#39;: &#39;XU100&#39;, &#39;name&#39;: &#39;BIST 100&#39;, &#39;count&#39;: 100}, ...]</span>
-</span><span id="L-229"><a href="#L-229"><span class="linenos">229</span></a><span class="sd">    &quot;&quot;&quot;</span>
-</span><span id="L-230"><a href="#L-230"><span class="linenos">230</span></a>    <span class="k">if</span> <span class="ow">not</span> <span class="n">detailed</span><span class="p">:</span>
-</span><span id="L-231"><a href="#L-231"><span class="linenos">231</span></a>        <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="n">INDICES</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
-</span><span id="L-232"><a href="#L-232"><span class="linenos">232</span></a>
-</span><span id="L-233"><a href="#L-233"><span class="linenos">233</span></a>    <span class="c1"># Get component counts from provider</span>
-</span><span id="L-234"><a href="#L-234"><span class="linenos">234</span></a>    <span class="n">provider</span> <span class="o">=</span> <span class="n">get_bist_index_provider</span><span class="p">()</span>
-</span><span id="L-235"><a href="#L-235"><span class="linenos">235</span></a>    <span class="n">available</span> <span class="o">=</span> <span class="n">provider</span><span class="o">.</span><span class="n">get_available_indices</span><span class="p">()</span>
-</span><span id="L-236"><a href="#L-236"><span class="linenos">236</span></a>
-</span><span id="L-237"><a href="#L-237"><span class="linenos">237</span></a>    <span class="c1"># Create lookup for counts</span>
-</span><span id="L-238"><a href="#L-238"><span class="linenos">238</span></a>    <span class="n">count_map</span> <span class="o">=</span> <span class="p">{</span><span class="n">item</span><span class="p">[</span><span class="s2">&quot;symbol&quot;</span><span class="p">]:</span> <span class="n">item</span><span class="p">[</span><span class="s2">&quot;count&quot;</span><span class="p">]</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">available</span><span class="p">}</span>
-</span><span id="L-239"><a href="#L-239"><span class="linenos">239</span></a>
-</span><span id="L-240"><a href="#L-240"><span class="linenos">240</span></a>    <span class="n">result</span> <span class="o">=</span> <span class="p">[]</span>
-</span><span id="L-241"><a href="#L-241"><span class="linenos">241</span></a>    <span class="k">for</span> <span class="n">symbol</span><span class="p">,</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">INDICES</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
-</span><span id="L-242"><a href="#L-242"><span class="linenos">242</span></a>        <span class="n">result</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
-</span><span id="L-243"><a href="#L-243"><span class="linenos">243</span></a>            <span class="s2">&quot;symbol&quot;</span><span class="p">:</span> <span class="n">symbol</span><span class="p">,</span>
-</span><span id="L-244"><a href="#L-244"><span class="linenos">244</span></a>            <span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="n">name</span><span class="p">,</span>
-</span><span id="L-245"><a href="#L-245"><span class="linenos">245</span></a>            <span class="s2">&quot;count&quot;</span><span class="p">:</span> <span class="n">count_map</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">symbol</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
-</span><span id="L-246"><a href="#L-246"><span class="linenos">246</span></a>        <span class="p">})</span>
-</span><span id="L-247"><a href="#L-247"><span class="linenos">247</span></a>    <span class="k">return</span> <span class="n">result</span>
+</span><span id="L-216"><a href="#L-216"><span class="linenos">216</span></a>    <span class="k">def</span><span class="w"> </span><span class="nf">scan</span><span class="p">(</span>
+</span><span id="L-217"><a href="#L-217"><span class="linenos">217</span></a>        <span class="bp">self</span><span class="p">,</span>
+</span><span id="L-218"><a href="#L-218"><span class="linenos">218</span></a>        <span class="n">condition</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+</span><span id="L-219"><a href="#L-219"><span class="linenos">219</span></a>        <span class="n">period</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;3mo&quot;</span><span class="p">,</span>
+</span><span id="L-220"><a href="#L-220"><span class="linenos">220</span></a>        <span class="n">interval</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;1d&quot;</span><span class="p">,</span>
+</span><span id="L-221"><a href="#L-221"><span class="linenos">221</span></a>    <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;pd.DataFrame&quot;</span><span class="p">:</span>
+</span><span id="L-222"><a href="#L-222"><span class="linenos">222</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Scan index components for technical conditions.</span>
+</span><span id="L-223"><a href="#L-223"><span class="linenos">223</span></a>
+</span><span id="L-224"><a href="#L-224"><span class="linenos">224</span></a><span class="sd">        Convenience method for scanning all stocks in this index.</span>
+</span><span id="L-225"><a href="#L-225"><span class="linenos">225</span></a>
+</span><span id="L-226"><a href="#L-226"><span class="linenos">226</span></a><span class="sd">        Args:</span>
+</span><span id="L-227"><a href="#L-227"><span class="linenos">227</span></a><span class="sd">            condition: Condition string (e.g., &quot;rsi &lt; 30&quot;, &quot;price &gt; sma_50&quot;)</span>
+</span><span id="L-228"><a href="#L-228"><span class="linenos">228</span></a><span class="sd">            period: Historical data period for indicator calculation</span>
+</span><span id="L-229"><a href="#L-229"><span class="linenos">229</span></a><span class="sd">            interval: Data interval</span>
+</span><span id="L-230"><a href="#L-230"><span class="linenos">230</span></a>
+</span><span id="L-231"><a href="#L-231"><span class="linenos">231</span></a><span class="sd">        Returns:</span>
+</span><span id="L-232"><a href="#L-232"><span class="linenos">232</span></a><span class="sd">            DataFrame with matching symbols and their data</span>
+</span><span id="L-233"><a href="#L-233"><span class="linenos">233</span></a>
+</span><span id="L-234"><a href="#L-234"><span class="linenos">234</span></a><span class="sd">        Examples:</span>
+</span><span id="L-235"><a href="#L-235"><span class="linenos">235</span></a><span class="sd">            &gt;&gt;&gt; import borsapy as bp</span>
+</span><span id="L-236"><a href="#L-236"><span class="linenos">236</span></a><span class="sd">            &gt;&gt;&gt; xu030 = bp.Index(&quot;XU030&quot;)</span>
+</span><span id="L-237"><a href="#L-237"><span class="linenos">237</span></a><span class="sd">            &gt;&gt;&gt; xu030.scan(&quot;rsi &lt; 30&quot;)</span>
+</span><span id="L-238"><a href="#L-238"><span class="linenos">238</span></a><span class="sd">            &gt;&gt;&gt; xu030.scan(&quot;price &gt; sma_50 and rsi &gt; 50&quot;)</span>
+</span><span id="L-239"><a href="#L-239"><span class="linenos">239</span></a><span class="sd">            &gt;&gt;&gt; xu030.scan(&quot;sma_20 crosses_above sma_50&quot;)</span>
+</span><span id="L-240"><a href="#L-240"><span class="linenos">240</span></a><span class="sd">        &quot;&quot;&quot;</span>
+</span><span id="L-241"><a href="#L-241"><span class="linenos">241</span></a>        <span class="kn">from</span><span class="w"> </span><span class="nn">borsapy.scanner</span><span class="w"> </span><span class="kn">import</span> <span class="n">scan</span>
+</span><span id="L-242"><a href="#L-242"><span class="linenos">242</span></a>
+</span><span id="L-243"><a href="#L-243"><span class="linenos">243</span></a>        <span class="k">return</span> <span class="n">scan</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">component_symbols</span><span class="p">,</span> <span class="n">condition</span><span class="p">,</span> <span class="n">period</span><span class="p">,</span> <span class="n">interval</span><span class="p">)</span>
+</span><span id="L-244"><a href="#L-244"><span class="linenos">244</span></a>
+</span><span id="L-245"><a href="#L-245"><span class="linenos">245</span></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+</span><span id="L-246"><a href="#L-246"><span class="linenos">246</span></a>        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;Index(&#39;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_symbol</span><span class="si">}</span><span class="s2">&#39;)&quot;</span>
+</span><span id="L-247"><a href="#L-247"><span class="linenos">247</span></a>
 </span><span id="L-248"><a href="#L-248"><span class="linenos">248</span></a>
-</span><span id="L-249"><a href="#L-249"><span class="linenos">249</span></a>
-</span><span id="L-250"><a href="#L-250"><span class="linenos">250</span></a><span class="k">def</span><span class="w"> </span><span class="nf">all_indices</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]:</span>
-</span><span id="L-251"><a href="#L-251"><span class="linenos">251</span></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span id="L-252"><a href="#L-252"><span class="linenos">252</span></a><span class="sd">    Get all indices from BIST with component counts.</span>
-</span><span id="L-253"><a href="#L-253"><span class="linenos">253</span></a>
-</span><span id="L-254"><a href="#L-254"><span class="linenos">254</span></a><span class="sd">    This returns all 79 indices available in the BIST data,</span>
-</span><span id="L-255"><a href="#L-255"><span class="linenos">255</span></a><span class="sd">    not just the commonly used ones in indices().</span>
+</span><span id="L-249"><a href="#L-249"><span class="linenos">249</span></a><span class="k">def</span><span class="w"> </span><span class="nf">indices</span><span class="p">(</span><span class="n">detailed</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]:</span>
+</span><span id="L-250"><a href="#L-250"><span class="linenos">250</span></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span id="L-251"><a href="#L-251"><span class="linenos">251</span></a><span class="sd">    Get list of available market indices.</span>
+</span><span id="L-252"><a href="#L-252"><span class="linenos">252</span></a>
+</span><span id="L-253"><a href="#L-253"><span class="linenos">253</span></a><span class="sd">    Args:</span>
+</span><span id="L-254"><a href="#L-254"><span class="linenos">254</span></a><span class="sd">        detailed: If True, return list of dicts with symbol, name, and count.</span>
+</span><span id="L-255"><a href="#L-255"><span class="linenos">255</span></a><span class="sd">                  If False (default), return just the symbol list.</span>
 </span><span id="L-256"><a href="#L-256"><span class="linenos">256</span></a>
 </span><span id="L-257"><a href="#L-257"><span class="linenos">257</span></a><span class="sd">    Returns:</span>
-</span><span id="L-258"><a href="#L-258"><span class="linenos">258</span></a><span class="sd">        List of dicts with &#39;symbol&#39;, &#39;name&#39;, and &#39;count&#39; keys.</span>
+</span><span id="L-258"><a href="#L-258"><span class="linenos">258</span></a><span class="sd">        List of index symbols, or list of dicts if detailed=True.</span>
 </span><span id="L-259"><a href="#L-259"><span class="linenos">259</span></a>
 </span><span id="L-260"><a href="#L-260"><span class="linenos">260</span></a><span class="sd">    Examples:</span>
 </span><span id="L-261"><a href="#L-261"><span class="linenos">261</span></a><span class="sd">        &gt;&gt;&gt; import borsapy as bp</span>
-</span><span id="L-262"><a href="#L-262"><span class="linenos">262</span></a><span class="sd">        &gt;&gt;&gt; bp.all_indices()</span>
-</span><span id="L-263"><a href="#L-263"><span class="linenos">263</span></a><span class="sd">        [{&#39;symbol&#39;: &#39;X030C&#39;, &#39;name&#39;: &#39;BIST 30 Capped&#39;, &#39;count&#39;: 30}, ...]</span>
-</span><span id="L-264"><a href="#L-264"><span class="linenos">264</span></a><span class="sd">    &quot;&quot;&quot;</span>
-</span><span id="L-265"><a href="#L-265"><span class="linenos">265</span></a>    <span class="n">provider</span> <span class="o">=</span> <span class="n">get_bist_index_provider</span><span class="p">()</span>
-</span><span id="L-266"><a href="#L-266"><span class="linenos">266</span></a>    <span class="k">return</span> <span class="n">provider</span><span class="o">.</span><span class="n">get_available_indices</span><span class="p">()</span>
-</span><span id="L-267"><a href="#L-267"><span class="linenos">267</span></a>
-</span><span id="L-268"><a href="#L-268"><span class="linenos">268</span></a>
-</span><span id="L-269"><a href="#L-269"><span class="linenos">269</span></a><span class="k">def</span><span class="w"> </span><span class="nf">index</span><span class="p">(</span><span class="n">symbol</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Index</span><span class="p">:</span>
-</span><span id="L-270"><a href="#L-270"><span class="linenos">270</span></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span id="L-271"><a href="#L-271"><span class="linenos">271</span></a><span class="sd">    Get an Index object for the given symbol.</span>
-</span><span id="L-272"><a href="#L-272"><span class="linenos">272</span></a>
-</span><span id="L-273"><a href="#L-273"><span class="linenos">273</span></a><span class="sd">    This is a convenience function that creates an Index object.</span>
-</span><span id="L-274"><a href="#L-274"><span class="linenos">274</span></a>
-</span><span id="L-275"><a href="#L-275"><span class="linenos">275</span></a><span class="sd">    Args:</span>
-</span><span id="L-276"><a href="#L-276"><span class="linenos">276</span></a><span class="sd">        symbol: Index symbol (e.g., &quot;XU100&quot;, &quot;XBANK&quot;).</span>
-</span><span id="L-277"><a href="#L-277"><span class="linenos">277</span></a>
-</span><span id="L-278"><a href="#L-278"><span class="linenos">278</span></a><span class="sd">    Returns:</span>
-</span><span id="L-279"><a href="#L-279"><span class="linenos">279</span></a><span class="sd">        Index object.</span>
-</span><span id="L-280"><a href="#L-280"><span class="linenos">280</span></a>
-</span><span id="L-281"><a href="#L-281"><span class="linenos">281</span></a><span class="sd">    Examples:</span>
-</span><span id="L-282"><a href="#L-282"><span class="linenos">282</span></a><span class="sd">        &gt;&gt;&gt; import borsapy as bp</span>
-</span><span id="L-283"><a href="#L-283"><span class="linenos">283</span></a><span class="sd">        &gt;&gt;&gt; xu100 = bp.index(&quot;XU100&quot;)</span>
-</span><span id="L-284"><a href="#L-284"><span class="linenos">284</span></a><span class="sd">        &gt;&gt;&gt; xu100.history(period=&quot;1mo&quot;)</span>
-</span><span id="L-285"><a href="#L-285"><span class="linenos">285</span></a><span class="sd">    &quot;&quot;&quot;</span>
-</span><span id="L-286"><a href="#L-286"><span class="linenos">286</span></a>    <span class="k">return</span> <span class="n">Index</span><span class="p">(</span><span class="n">symbol</span><span class="p">)</span>
+</span><span id="L-262"><a href="#L-262"><span class="linenos">262</span></a><span class="sd">        &gt;&gt;&gt; bp.indices()</span>
+</span><span id="L-263"><a href="#L-263"><span class="linenos">263</span></a><span class="sd">        [&#39;XU100&#39;, &#39;XU050&#39;, &#39;XU030&#39;, &#39;XBANK&#39;, &#39;XUSIN&#39;, ...]</span>
+</span><span id="L-264"><a href="#L-264"><span class="linenos">264</span></a><span class="sd">        &gt;&gt;&gt; bp.indices(detailed=True)</span>
+</span><span id="L-265"><a href="#L-265"><span class="linenos">265</span></a><span class="sd">        [{&#39;symbol&#39;: &#39;XU100&#39;, &#39;name&#39;: &#39;BIST 100&#39;, &#39;count&#39;: 100}, ...]</span>
+</span><span id="L-266"><a href="#L-266"><span class="linenos">266</span></a><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="L-267"><a href="#L-267"><span class="linenos">267</span></a>    <span class="k">if</span> <span class="ow">not</span> <span class="n">detailed</span><span class="p">:</span>
+</span><span id="L-268"><a href="#L-268"><span class="linenos">268</span></a>        <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="n">INDICES</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
+</span><span id="L-269"><a href="#L-269"><span class="linenos">269</span></a>
+</span><span id="L-270"><a href="#L-270"><span class="linenos">270</span></a>    <span class="c1"># Get component counts from provider</span>
+</span><span id="L-271"><a href="#L-271"><span class="linenos">271</span></a>    <span class="n">provider</span> <span class="o">=</span> <span class="n">get_bist_index_provider</span><span class="p">()</span>
+</span><span id="L-272"><a href="#L-272"><span class="linenos">272</span></a>    <span class="n">available</span> <span class="o">=</span> <span class="n">provider</span><span class="o">.</span><span class="n">get_available_indices</span><span class="p">()</span>
+</span><span id="L-273"><a href="#L-273"><span class="linenos">273</span></a>
+</span><span id="L-274"><a href="#L-274"><span class="linenos">274</span></a>    <span class="c1"># Create lookup for counts</span>
+</span><span id="L-275"><a href="#L-275"><span class="linenos">275</span></a>    <span class="n">count_map</span> <span class="o">=</span> <span class="p">{</span><span class="n">item</span><span class="p">[</span><span class="s2">&quot;symbol&quot;</span><span class="p">]:</span> <span class="n">item</span><span class="p">[</span><span class="s2">&quot;count&quot;</span><span class="p">]</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">available</span><span class="p">}</span>
+</span><span id="L-276"><a href="#L-276"><span class="linenos">276</span></a>
+</span><span id="L-277"><a href="#L-277"><span class="linenos">277</span></a>    <span class="n">result</span> <span class="o">=</span> <span class="p">[]</span>
+</span><span id="L-278"><a href="#L-278"><span class="linenos">278</span></a>    <span class="k">for</span> <span class="n">symbol</span><span class="p">,</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">INDICES</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+</span><span id="L-279"><a href="#L-279"><span class="linenos">279</span></a>        <span class="n">result</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+</span><span id="L-280"><a href="#L-280"><span class="linenos">280</span></a>            <span class="s2">&quot;symbol&quot;</span><span class="p">:</span> <span class="n">symbol</span><span class="p">,</span>
+</span><span id="L-281"><a href="#L-281"><span class="linenos">281</span></a>            <span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="n">name</span><span class="p">,</span>
+</span><span id="L-282"><a href="#L-282"><span class="linenos">282</span></a>            <span class="s2">&quot;count&quot;</span><span class="p">:</span> <span class="n">count_map</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">symbol</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+</span><span id="L-283"><a href="#L-283"><span class="linenos">283</span></a>        <span class="p">})</span>
+</span><span id="L-284"><a href="#L-284"><span class="linenos">284</span></a>    <span class="k">return</span> <span class="n">result</span>
+</span><span id="L-285"><a href="#L-285"><span class="linenos">285</span></a>
+</span><span id="L-286"><a href="#L-286"><span class="linenos">286</span></a>
+</span><span id="L-287"><a href="#L-287"><span class="linenos">287</span></a><span class="k">def</span><span class="w"> </span><span class="nf">all_indices</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]:</span>
+</span><span id="L-288"><a href="#L-288"><span class="linenos">288</span></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span id="L-289"><a href="#L-289"><span class="linenos">289</span></a><span class="sd">    Get all indices from BIST with component counts.</span>
+</span><span id="L-290"><a href="#L-290"><span class="linenos">290</span></a>
+</span><span id="L-291"><a href="#L-291"><span class="linenos">291</span></a><span class="sd">    This returns all 79 indices available in the BIST data,</span>
+</span><span id="L-292"><a href="#L-292"><span class="linenos">292</span></a><span class="sd">    not just the commonly used ones in indices().</span>
+</span><span id="L-293"><a href="#L-293"><span class="linenos">293</span></a>
+</span><span id="L-294"><a href="#L-294"><span class="linenos">294</span></a><span class="sd">    Returns:</span>
+</span><span id="L-295"><a href="#L-295"><span class="linenos">295</span></a><span class="sd">        List of dicts with &#39;symbol&#39;, &#39;name&#39;, and &#39;count&#39; keys.</span>
+</span><span id="L-296"><a href="#L-296"><span class="linenos">296</span></a>
+</span><span id="L-297"><a href="#L-297"><span class="linenos">297</span></a><span class="sd">    Examples:</span>
+</span><span id="L-298"><a href="#L-298"><span class="linenos">298</span></a><span class="sd">        &gt;&gt;&gt; import borsapy as bp</span>
+</span><span id="L-299"><a href="#L-299"><span class="linenos">299</span></a><span class="sd">        &gt;&gt;&gt; bp.all_indices()</span>
+</span><span id="L-300"><a href="#L-300"><span class="linenos">300</span></a><span class="sd">        [{&#39;symbol&#39;: &#39;X030C&#39;, &#39;name&#39;: &#39;BIST 30 Capped&#39;, &#39;count&#39;: 30}, ...]</span>
+</span><span id="L-301"><a href="#L-301"><span class="linenos">301</span></a><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="L-302"><a href="#L-302"><span class="linenos">302</span></a>    <span class="n">provider</span> <span class="o">=</span> <span class="n">get_bist_index_provider</span><span class="p">()</span>
+</span><span id="L-303"><a href="#L-303"><span class="linenos">303</span></a>    <span class="k">return</span> <span class="n">provider</span><span class="o">.</span><span class="n">get_available_indices</span><span class="p">()</span>
+</span><span id="L-304"><a href="#L-304"><span class="linenos">304</span></a>
+</span><span id="L-305"><a href="#L-305"><span class="linenos">305</span></a>
+</span><span id="L-306"><a href="#L-306"><span class="linenos">306</span></a><span class="k">def</span><span class="w"> </span><span class="nf">index</span><span class="p">(</span><span class="n">symbol</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Index</span><span class="p">:</span>
+</span><span id="L-307"><a href="#L-307"><span class="linenos">307</span></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span id="L-308"><a href="#L-308"><span class="linenos">308</span></a><span class="sd">    Get an Index object for the given symbol.</span>
+</span><span id="L-309"><a href="#L-309"><span class="linenos">309</span></a>
+</span><span id="L-310"><a href="#L-310"><span class="linenos">310</span></a><span class="sd">    This is a convenience function that creates an Index object.</span>
+</span><span id="L-311"><a href="#L-311"><span class="linenos">311</span></a>
+</span><span id="L-312"><a href="#L-312"><span class="linenos">312</span></a><span class="sd">    Args:</span>
+</span><span id="L-313"><a href="#L-313"><span class="linenos">313</span></a><span class="sd">        symbol: Index symbol (e.g., &quot;XU100&quot;, &quot;XBANK&quot;).</span>
+</span><span id="L-314"><a href="#L-314"><span class="linenos">314</span></a>
+</span><span id="L-315"><a href="#L-315"><span class="linenos">315</span></a><span class="sd">    Returns:</span>
+</span><span id="L-316"><a href="#L-316"><span class="linenos">316</span></a><span class="sd">        Index object.</span>
+</span><span id="L-317"><a href="#L-317"><span class="linenos">317</span></a>
+</span><span id="L-318"><a href="#L-318"><span class="linenos">318</span></a><span class="sd">    Examples:</span>
+</span><span id="L-319"><a href="#L-319"><span class="linenos">319</span></a><span class="sd">        &gt;&gt;&gt; import borsapy as bp</span>
+</span><span id="L-320"><a href="#L-320"><span class="linenos">320</span></a><span class="sd">        &gt;&gt;&gt; xu100 = bp.index(&quot;XU100&quot;)</span>
+</span><span id="L-321"><a href="#L-321"><span class="linenos">321</span></a><span class="sd">        &gt;&gt;&gt; xu100.history(period=&quot;1mo&quot;)</span>
+</span><span id="L-322"><a href="#L-322"><span class="linenos">322</span></a><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="L-323"><a href="#L-323"><span class="linenos">323</span></a>    <span class="k">return</span> <span class="n">Index</span><span class="p">(</span><span class="n">symbol</span><span class="p">)</span>
 </span></pre></div>
 
 
@@ -557,8 +597,45 @@
 </span><span id="Index-206"><a href="#Index-206"><span class="linenos">206</span></a>                <span class="k">continue</span>
 </span><span id="Index-207"><a href="#Index-207"><span class="linenos">207</span></a>        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Could not parse date: </span><span class="si">{</span><span class="n">date</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 </span><span id="Index-208"><a href="#Index-208"><span class="linenos">208</span></a>
-</span><span id="Index-209"><a href="#Index-209"><span class="linenos">209</span></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-</span><span id="Index-210"><a href="#Index-210"><span class="linenos">210</span></a>        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;Index(&#39;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_symbol</span><span class="si">}</span><span class="s2">&#39;)&quot;</span>
+</span><span id="Index-209"><a href="#Index-209"><span class="linenos">209</span></a>    <span class="k">def</span><span class="w"> </span><span class="nf">_get_ta_symbol_info</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]:</span>
+</span><span id="Index-210"><a href="#Index-210"><span class="linenos">210</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Get TradingView symbol and screener for TA signals.</span>
+</span><span id="Index-211"><a href="#Index-211"><span class="linenos">211</span></a>
+</span><span id="Index-212"><a href="#Index-212"><span class="linenos">212</span></a><span class="sd">        Returns:</span>
+</span><span id="Index-213"><a href="#Index-213"><span class="linenos">213</span></a><span class="sd">            Tuple of (tv_symbol, screener) for TradingView Scanner API.</span>
+</span><span id="Index-214"><a href="#Index-214"><span class="linenos">214</span></a><span class="sd">        &quot;&quot;&quot;</span>
+</span><span id="Index-215"><a href="#Index-215"><span class="linenos">215</span></a>        <span class="k">return</span> <span class="p">(</span><span class="sa">f</span><span class="s2">&quot;BIST:</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_symbol</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="s2">&quot;turkey&quot;</span><span class="p">)</span>
+</span><span id="Index-216"><a href="#Index-216"><span class="linenos">216</span></a>
+</span><span id="Index-217"><a href="#Index-217"><span class="linenos">217</span></a>    <span class="k">def</span><span class="w"> </span><span class="nf">scan</span><span class="p">(</span>
+</span><span id="Index-218"><a href="#Index-218"><span class="linenos">218</span></a>        <span class="bp">self</span><span class="p">,</span>
+</span><span id="Index-219"><a href="#Index-219"><span class="linenos">219</span></a>        <span class="n">condition</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+</span><span id="Index-220"><a href="#Index-220"><span class="linenos">220</span></a>        <span class="n">period</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;3mo&quot;</span><span class="p">,</span>
+</span><span id="Index-221"><a href="#Index-221"><span class="linenos">221</span></a>        <span class="n">interval</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;1d&quot;</span><span class="p">,</span>
+</span><span id="Index-222"><a href="#Index-222"><span class="linenos">222</span></a>    <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;pd.DataFrame&quot;</span><span class="p">:</span>
+</span><span id="Index-223"><a href="#Index-223"><span class="linenos">223</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Scan index components for technical conditions.</span>
+</span><span id="Index-224"><a href="#Index-224"><span class="linenos">224</span></a>
+</span><span id="Index-225"><a href="#Index-225"><span class="linenos">225</span></a><span class="sd">        Convenience method for scanning all stocks in this index.</span>
+</span><span id="Index-226"><a href="#Index-226"><span class="linenos">226</span></a>
+</span><span id="Index-227"><a href="#Index-227"><span class="linenos">227</span></a><span class="sd">        Args:</span>
+</span><span id="Index-228"><a href="#Index-228"><span class="linenos">228</span></a><span class="sd">            condition: Condition string (e.g., &quot;rsi &lt; 30&quot;, &quot;price &gt; sma_50&quot;)</span>
+</span><span id="Index-229"><a href="#Index-229"><span class="linenos">229</span></a><span class="sd">            period: Historical data period for indicator calculation</span>
+</span><span id="Index-230"><a href="#Index-230"><span class="linenos">230</span></a><span class="sd">            interval: Data interval</span>
+</span><span id="Index-231"><a href="#Index-231"><span class="linenos">231</span></a>
+</span><span id="Index-232"><a href="#Index-232"><span class="linenos">232</span></a><span class="sd">        Returns:</span>
+</span><span id="Index-233"><a href="#Index-233"><span class="linenos">233</span></a><span class="sd">            DataFrame with matching symbols and their data</span>
+</span><span id="Index-234"><a href="#Index-234"><span class="linenos">234</span></a>
+</span><span id="Index-235"><a href="#Index-235"><span class="linenos">235</span></a><span class="sd">        Examples:</span>
+</span><span id="Index-236"><a href="#Index-236"><span class="linenos">236</span></a><span class="sd">            &gt;&gt;&gt; import borsapy as bp</span>
+</span><span id="Index-237"><a href="#Index-237"><span class="linenos">237</span></a><span class="sd">            &gt;&gt;&gt; xu030 = bp.Index(&quot;XU030&quot;)</span>
+</span><span id="Index-238"><a href="#Index-238"><span class="linenos">238</span></a><span class="sd">            &gt;&gt;&gt; xu030.scan(&quot;rsi &lt; 30&quot;)</span>
+</span><span id="Index-239"><a href="#Index-239"><span class="linenos">239</span></a><span class="sd">            &gt;&gt;&gt; xu030.scan(&quot;price &gt; sma_50 and rsi &gt; 50&quot;)</span>
+</span><span id="Index-240"><a href="#Index-240"><span class="linenos">240</span></a><span class="sd">            &gt;&gt;&gt; xu030.scan(&quot;sma_20 crosses_above sma_50&quot;)</span>
+</span><span id="Index-241"><a href="#Index-241"><span class="linenos">241</span></a><span class="sd">        &quot;&quot;&quot;</span>
+</span><span id="Index-242"><a href="#Index-242"><span class="linenos">242</span></a>        <span class="kn">from</span><span class="w"> </span><span class="nn">borsapy.scanner</span><span class="w"> </span><span class="kn">import</span> <span class="n">scan</span>
+</span><span id="Index-243"><a href="#Index-243"><span class="linenos">243</span></a>
+</span><span id="Index-244"><a href="#Index-244"><span class="linenos">244</span></a>        <span class="k">return</span> <span class="n">scan</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">component_symbols</span><span class="p">,</span> <span class="n">condition</span><span class="p">,</span> <span class="n">period</span><span class="p">,</span> <span class="n">interval</span><span class="p">)</span>
+</span><span id="Index-245"><a href="#Index-245"><span class="linenos">245</span></a>
+</span><span id="Index-246"><a href="#Index-246"><span class="linenos">246</span></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+</span><span id="Index-247"><a href="#Index-247"><span class="linenos">247</span></a>        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;Index(&#39;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_symbol</span><span class="si">}</span><span class="s2">&#39;)&quot;</span>
 </span></pre></div>
 
 
@@ -807,7 +884,7 @@
 <div class="attr function">
             
         <span class="def">def</span>
-        <span class="name">history</span><span class="signature pdoc-code multiline">(<span class="param">	<span class="bp">self</span>,</span><span class="param">	<span class="n">period</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;1mo&#39;</span>,</span><span class="param">	<span class="n">interval</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;1d&#39;</span>,</span><span class="param">	<span class="n">start</span><span class="p">:</span> <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span> <span class="o">|</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>,</span><span class="param">	<span class="n">end</span><span class="p">:</span> <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span> <span class="o">|</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span></span><span class="return-annotation">) -> <span class="n">pandas</span><span class="o">.</span><span class="n">core</span><span class="o">.</span><span class="n">frame</span><span class="o">.</span><span class="n">DataFrame</span>:</span></span>
+        <span class="name">history</span><span class="signature pdoc-code multiline">(<span class="param">	<span class="bp">self</span>,</span><span class="param">	<span class="n">period</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;1mo&#39;</span>,</span><span class="param">	<span class="n">interval</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;1d&#39;</span>,</span><span class="param">	<span class="n">start</span><span class="p">:</span> <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span> <span class="o">|</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>,</span><span class="param">	<span class="n">end</span><span class="p">:</span> <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span> <span class="o">|</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span></span><span class="return-annotation">) -> <span class="n">pandas</span><span class="o">.</span><span class="n">DataFrame</span>:</span></span>
 
                 <label class="view-source-button" for="Index.history-view-source"><span>View Source</span></label>
 
@@ -888,6 +965,77 @@
 
 
                             </div>
+                            <div id="Index.scan" class="classattr">
+                                        <input id="Index.scan-view-source" class="view-source-toggle-state" type="checkbox" aria-hidden="true" tabindex="-1">
+<div class="attr function">
+            
+        <span class="def">def</span>
+        <span class="name">scan</span><span class="signature pdoc-code multiline">(<span class="param">	<span class="bp">self</span>,</span><span class="param">	<span class="n">condition</span><span class="p">:</span> <span class="nb">str</span>,</span><span class="param">	<span class="n">period</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;3mo&#39;</span>,</span><span class="param">	<span class="n">interval</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;1d&#39;</span></span><span class="return-annotation">) -> <span class="n">pandas</span><span class="o">.</span><span class="n">DataFrame</span>:</span></span>
+
+                <label class="view-source-button" for="Index.scan-view-source"><span>View Source</span></label>
+
+    </div>
+    <a class="headerlink" href="#Index.scan"></a>
+            <div class="pdoc-code codehilite"><pre><span></span><span id="Index.scan-217"><a href="#Index.scan-217"><span class="linenos">217</span></a>    <span class="k">def</span><span class="w"> </span><span class="nf">scan</span><span class="p">(</span>
+</span><span id="Index.scan-218"><a href="#Index.scan-218"><span class="linenos">218</span></a>        <span class="bp">self</span><span class="p">,</span>
+</span><span id="Index.scan-219"><a href="#Index.scan-219"><span class="linenos">219</span></a>        <span class="n">condition</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+</span><span id="Index.scan-220"><a href="#Index.scan-220"><span class="linenos">220</span></a>        <span class="n">period</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;3mo&quot;</span><span class="p">,</span>
+</span><span id="Index.scan-221"><a href="#Index.scan-221"><span class="linenos">221</span></a>        <span class="n">interval</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;1d&quot;</span><span class="p">,</span>
+</span><span id="Index.scan-222"><a href="#Index.scan-222"><span class="linenos">222</span></a>    <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;pd.DataFrame&quot;</span><span class="p">:</span>
+</span><span id="Index.scan-223"><a href="#Index.scan-223"><span class="linenos">223</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Scan index components for technical conditions.</span>
+</span><span id="Index.scan-224"><a href="#Index.scan-224"><span class="linenos">224</span></a>
+</span><span id="Index.scan-225"><a href="#Index.scan-225"><span class="linenos">225</span></a><span class="sd">        Convenience method for scanning all stocks in this index.</span>
+</span><span id="Index.scan-226"><a href="#Index.scan-226"><span class="linenos">226</span></a>
+</span><span id="Index.scan-227"><a href="#Index.scan-227"><span class="linenos">227</span></a><span class="sd">        Args:</span>
+</span><span id="Index.scan-228"><a href="#Index.scan-228"><span class="linenos">228</span></a><span class="sd">            condition: Condition string (e.g., &quot;rsi &lt; 30&quot;, &quot;price &gt; sma_50&quot;)</span>
+</span><span id="Index.scan-229"><a href="#Index.scan-229"><span class="linenos">229</span></a><span class="sd">            period: Historical data period for indicator calculation</span>
+</span><span id="Index.scan-230"><a href="#Index.scan-230"><span class="linenos">230</span></a><span class="sd">            interval: Data interval</span>
+</span><span id="Index.scan-231"><a href="#Index.scan-231"><span class="linenos">231</span></a>
+</span><span id="Index.scan-232"><a href="#Index.scan-232"><span class="linenos">232</span></a><span class="sd">        Returns:</span>
+</span><span id="Index.scan-233"><a href="#Index.scan-233"><span class="linenos">233</span></a><span class="sd">            DataFrame with matching symbols and their data</span>
+</span><span id="Index.scan-234"><a href="#Index.scan-234"><span class="linenos">234</span></a>
+</span><span id="Index.scan-235"><a href="#Index.scan-235"><span class="linenos">235</span></a><span class="sd">        Examples:</span>
+</span><span id="Index.scan-236"><a href="#Index.scan-236"><span class="linenos">236</span></a><span class="sd">            &gt;&gt;&gt; import borsapy as bp</span>
+</span><span id="Index.scan-237"><a href="#Index.scan-237"><span class="linenos">237</span></a><span class="sd">            &gt;&gt;&gt; xu030 = bp.Index(&quot;XU030&quot;)</span>
+</span><span id="Index.scan-238"><a href="#Index.scan-238"><span class="linenos">238</span></a><span class="sd">            &gt;&gt;&gt; xu030.scan(&quot;rsi &lt; 30&quot;)</span>
+</span><span id="Index.scan-239"><a href="#Index.scan-239"><span class="linenos">239</span></a><span class="sd">            &gt;&gt;&gt; xu030.scan(&quot;price &gt; sma_50 and rsi &gt; 50&quot;)</span>
+</span><span id="Index.scan-240"><a href="#Index.scan-240"><span class="linenos">240</span></a><span class="sd">            &gt;&gt;&gt; xu030.scan(&quot;sma_20 crosses_above sma_50&quot;)</span>
+</span><span id="Index.scan-241"><a href="#Index.scan-241"><span class="linenos">241</span></a><span class="sd">        &quot;&quot;&quot;</span>
+</span><span id="Index.scan-242"><a href="#Index.scan-242"><span class="linenos">242</span></a>        <span class="kn">from</span><span class="w"> </span><span class="nn">borsapy.scanner</span><span class="w"> </span><span class="kn">import</span> <span class="n">scan</span>
+</span><span id="Index.scan-243"><a href="#Index.scan-243"><span class="linenos">243</span></a>
+</span><span id="Index.scan-244"><a href="#Index.scan-244"><span class="linenos">244</span></a>        <span class="k">return</span> <span class="n">scan</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">component_symbols</span><span class="p">,</span> <span class="n">condition</span><span class="p">,</span> <span class="n">period</span><span class="p">,</span> <span class="n">interval</span><span class="p">)</span>
+</span></pre></div>
+
+
+            <div class="docstring"><p>Scan index components for technical conditions.</p>
+
+<p>Convenience method for scanning all stocks in this index.</p>
+
+<p>Args:
+    condition: Condition string (e.g., "rsi &lt; 30", "price &gt; sma_50")
+    period: Historical data period for indicator calculation
+    interval: Data interval</p>
+
+<p>Returns:
+    DataFrame with matching symbols and their data</p>
+
+<p>Examples:</p>
+
+<blockquote>
+  <blockquote>
+    <blockquote>
+      <p>import borsapy as bp
+      xu030 = bp.Index("XU030")
+      xu030.scan("rsi &lt; 30")
+      xu030.scan("price &gt; sma_50 and rsi &gt; 50")
+      xu030.scan("sma_20 crosses_above sma_50")</p>
+    </blockquote>
+  </blockquote>
+</blockquote>
+</div>
+
+
+                            </div>
                 </section>
                 <section id="indices">
                             <input id="indices-view-source" class="view-source-toggle-state" type="checkbox" aria-hidden="true" tabindex="-1">
@@ -900,42 +1048,42 @@
 
     </div>
     <a class="headerlink" href="#indices"></a>
-            <div class="pdoc-code codehilite"><pre><span></span><span id="indices-213"><a href="#indices-213"><span class="linenos">213</span></a><span class="k">def</span><span class="w"> </span><span class="nf">indices</span><span class="p">(</span><span class="n">detailed</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]:</span>
-</span><span id="indices-214"><a href="#indices-214"><span class="linenos">214</span></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span id="indices-215"><a href="#indices-215"><span class="linenos">215</span></a><span class="sd">    Get list of available market indices.</span>
-</span><span id="indices-216"><a href="#indices-216"><span class="linenos">216</span></a>
-</span><span id="indices-217"><a href="#indices-217"><span class="linenos">217</span></a><span class="sd">    Args:</span>
-</span><span id="indices-218"><a href="#indices-218"><span class="linenos">218</span></a><span class="sd">        detailed: If True, return list of dicts with symbol, name, and count.</span>
-</span><span id="indices-219"><a href="#indices-219"><span class="linenos">219</span></a><span class="sd">                  If False (default), return just the symbol list.</span>
-</span><span id="indices-220"><a href="#indices-220"><span class="linenos">220</span></a>
-</span><span id="indices-221"><a href="#indices-221"><span class="linenos">221</span></a><span class="sd">    Returns:</span>
-</span><span id="indices-222"><a href="#indices-222"><span class="linenos">222</span></a><span class="sd">        List of index symbols, or list of dicts if detailed=True.</span>
-</span><span id="indices-223"><a href="#indices-223"><span class="linenos">223</span></a>
-</span><span id="indices-224"><a href="#indices-224"><span class="linenos">224</span></a><span class="sd">    Examples:</span>
-</span><span id="indices-225"><a href="#indices-225"><span class="linenos">225</span></a><span class="sd">        &gt;&gt;&gt; import borsapy as bp</span>
-</span><span id="indices-226"><a href="#indices-226"><span class="linenos">226</span></a><span class="sd">        &gt;&gt;&gt; bp.indices()</span>
-</span><span id="indices-227"><a href="#indices-227"><span class="linenos">227</span></a><span class="sd">        [&#39;XU100&#39;, &#39;XU050&#39;, &#39;XU030&#39;, &#39;XBANK&#39;, &#39;XUSIN&#39;, ...]</span>
-</span><span id="indices-228"><a href="#indices-228"><span class="linenos">228</span></a><span class="sd">        &gt;&gt;&gt; bp.indices(detailed=True)</span>
-</span><span id="indices-229"><a href="#indices-229"><span class="linenos">229</span></a><span class="sd">        [{&#39;symbol&#39;: &#39;XU100&#39;, &#39;name&#39;: &#39;BIST 100&#39;, &#39;count&#39;: 100}, ...]</span>
-</span><span id="indices-230"><a href="#indices-230"><span class="linenos">230</span></a><span class="sd">    &quot;&quot;&quot;</span>
-</span><span id="indices-231"><a href="#indices-231"><span class="linenos">231</span></a>    <span class="k">if</span> <span class="ow">not</span> <span class="n">detailed</span><span class="p">:</span>
-</span><span id="indices-232"><a href="#indices-232"><span class="linenos">232</span></a>        <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="n">INDICES</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
-</span><span id="indices-233"><a href="#indices-233"><span class="linenos">233</span></a>
-</span><span id="indices-234"><a href="#indices-234"><span class="linenos">234</span></a>    <span class="c1"># Get component counts from provider</span>
-</span><span id="indices-235"><a href="#indices-235"><span class="linenos">235</span></a>    <span class="n">provider</span> <span class="o">=</span> <span class="n">get_bist_index_provider</span><span class="p">()</span>
-</span><span id="indices-236"><a href="#indices-236"><span class="linenos">236</span></a>    <span class="n">available</span> <span class="o">=</span> <span class="n">provider</span><span class="o">.</span><span class="n">get_available_indices</span><span class="p">()</span>
-</span><span id="indices-237"><a href="#indices-237"><span class="linenos">237</span></a>
-</span><span id="indices-238"><a href="#indices-238"><span class="linenos">238</span></a>    <span class="c1"># Create lookup for counts</span>
-</span><span id="indices-239"><a href="#indices-239"><span class="linenos">239</span></a>    <span class="n">count_map</span> <span class="o">=</span> <span class="p">{</span><span class="n">item</span><span class="p">[</span><span class="s2">&quot;symbol&quot;</span><span class="p">]:</span> <span class="n">item</span><span class="p">[</span><span class="s2">&quot;count&quot;</span><span class="p">]</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">available</span><span class="p">}</span>
-</span><span id="indices-240"><a href="#indices-240"><span class="linenos">240</span></a>
-</span><span id="indices-241"><a href="#indices-241"><span class="linenos">241</span></a>    <span class="n">result</span> <span class="o">=</span> <span class="p">[]</span>
-</span><span id="indices-242"><a href="#indices-242"><span class="linenos">242</span></a>    <span class="k">for</span> <span class="n">symbol</span><span class="p">,</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">INDICES</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
-</span><span id="indices-243"><a href="#indices-243"><span class="linenos">243</span></a>        <span class="n">result</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
-</span><span id="indices-244"><a href="#indices-244"><span class="linenos">244</span></a>            <span class="s2">&quot;symbol&quot;</span><span class="p">:</span> <span class="n">symbol</span><span class="p">,</span>
-</span><span id="indices-245"><a href="#indices-245"><span class="linenos">245</span></a>            <span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="n">name</span><span class="p">,</span>
-</span><span id="indices-246"><a href="#indices-246"><span class="linenos">246</span></a>            <span class="s2">&quot;count&quot;</span><span class="p">:</span> <span class="n">count_map</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">symbol</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
-</span><span id="indices-247"><a href="#indices-247"><span class="linenos">247</span></a>        <span class="p">})</span>
-</span><span id="indices-248"><a href="#indices-248"><span class="linenos">248</span></a>    <span class="k">return</span> <span class="n">result</span>
+            <div class="pdoc-code codehilite"><pre><span></span><span id="indices-250"><a href="#indices-250"><span class="linenos">250</span></a><span class="k">def</span><span class="w"> </span><span class="nf">indices</span><span class="p">(</span><span class="n">detailed</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]:</span>
+</span><span id="indices-251"><a href="#indices-251"><span class="linenos">251</span></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span id="indices-252"><a href="#indices-252"><span class="linenos">252</span></a><span class="sd">    Get list of available market indices.</span>
+</span><span id="indices-253"><a href="#indices-253"><span class="linenos">253</span></a>
+</span><span id="indices-254"><a href="#indices-254"><span class="linenos">254</span></a><span class="sd">    Args:</span>
+</span><span id="indices-255"><a href="#indices-255"><span class="linenos">255</span></a><span class="sd">        detailed: If True, return list of dicts with symbol, name, and count.</span>
+</span><span id="indices-256"><a href="#indices-256"><span class="linenos">256</span></a><span class="sd">                  If False (default), return just the symbol list.</span>
+</span><span id="indices-257"><a href="#indices-257"><span class="linenos">257</span></a>
+</span><span id="indices-258"><a href="#indices-258"><span class="linenos">258</span></a><span class="sd">    Returns:</span>
+</span><span id="indices-259"><a href="#indices-259"><span class="linenos">259</span></a><span class="sd">        List of index symbols, or list of dicts if detailed=True.</span>
+</span><span id="indices-260"><a href="#indices-260"><span class="linenos">260</span></a>
+</span><span id="indices-261"><a href="#indices-261"><span class="linenos">261</span></a><span class="sd">    Examples:</span>
+</span><span id="indices-262"><a href="#indices-262"><span class="linenos">262</span></a><span class="sd">        &gt;&gt;&gt; import borsapy as bp</span>
+</span><span id="indices-263"><a href="#indices-263"><span class="linenos">263</span></a><span class="sd">        &gt;&gt;&gt; bp.indices()</span>
+</span><span id="indices-264"><a href="#indices-264"><span class="linenos">264</span></a><span class="sd">        [&#39;XU100&#39;, &#39;XU050&#39;, &#39;XU030&#39;, &#39;XBANK&#39;, &#39;XUSIN&#39;, ...]</span>
+</span><span id="indices-265"><a href="#indices-265"><span class="linenos">265</span></a><span class="sd">        &gt;&gt;&gt; bp.indices(detailed=True)</span>
+</span><span id="indices-266"><a href="#indices-266"><span class="linenos">266</span></a><span class="sd">        [{&#39;symbol&#39;: &#39;XU100&#39;, &#39;name&#39;: &#39;BIST 100&#39;, &#39;count&#39;: 100}, ...]</span>
+</span><span id="indices-267"><a href="#indices-267"><span class="linenos">267</span></a><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="indices-268"><a href="#indices-268"><span class="linenos">268</span></a>    <span class="k">if</span> <span class="ow">not</span> <span class="n">detailed</span><span class="p">:</span>
+</span><span id="indices-269"><a href="#indices-269"><span class="linenos">269</span></a>        <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="n">INDICES</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
+</span><span id="indices-270"><a href="#indices-270"><span class="linenos">270</span></a>
+</span><span id="indices-271"><a href="#indices-271"><span class="linenos">271</span></a>    <span class="c1"># Get component counts from provider</span>
+</span><span id="indices-272"><a href="#indices-272"><span class="linenos">272</span></a>    <span class="n">provider</span> <span class="o">=</span> <span class="n">get_bist_index_provider</span><span class="p">()</span>
+</span><span id="indices-273"><a href="#indices-273"><span class="linenos">273</span></a>    <span class="n">available</span> <span class="o">=</span> <span class="n">provider</span><span class="o">.</span><span class="n">get_available_indices</span><span class="p">()</span>
+</span><span id="indices-274"><a href="#indices-274"><span class="linenos">274</span></a>
+</span><span id="indices-275"><a href="#indices-275"><span class="linenos">275</span></a>    <span class="c1"># Create lookup for counts</span>
+</span><span id="indices-276"><a href="#indices-276"><span class="linenos">276</span></a>    <span class="n">count_map</span> <span class="o">=</span> <span class="p">{</span><span class="n">item</span><span class="p">[</span><span class="s2">&quot;symbol&quot;</span><span class="p">]:</span> <span class="n">item</span><span class="p">[</span><span class="s2">&quot;count&quot;</span><span class="p">]</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">available</span><span class="p">}</span>
+</span><span id="indices-277"><a href="#indices-277"><span class="linenos">277</span></a>
+</span><span id="indices-278"><a href="#indices-278"><span class="linenos">278</span></a>    <span class="n">result</span> <span class="o">=</span> <span class="p">[]</span>
+</span><span id="indices-279"><a href="#indices-279"><span class="linenos">279</span></a>    <span class="k">for</span> <span class="n">symbol</span><span class="p">,</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">INDICES</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+</span><span id="indices-280"><a href="#indices-280"><span class="linenos">280</span></a>        <span class="n">result</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+</span><span id="indices-281"><a href="#indices-281"><span class="linenos">281</span></a>            <span class="s2">&quot;symbol&quot;</span><span class="p">:</span> <span class="n">symbol</span><span class="p">,</span>
+</span><span id="indices-282"><a href="#indices-282"><span class="linenos">282</span></a>            <span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="n">name</span><span class="p">,</span>
+</span><span id="indices-283"><a href="#indices-283"><span class="linenos">283</span></a>            <span class="s2">&quot;count&quot;</span><span class="p">:</span> <span class="n">count_map</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">symbol</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+</span><span id="indices-284"><a href="#indices-284"><span class="linenos">284</span></a>        <span class="p">})</span>
+</span><span id="indices-285"><a href="#indices-285"><span class="linenos">285</span></a>    <span class="k">return</span> <span class="n">result</span>
 </span></pre></div>
 
 
@@ -976,23 +1124,23 @@
 
     </div>
     <a class="headerlink" href="#all_indices"></a>
-            <div class="pdoc-code codehilite"><pre><span></span><span id="all_indices-251"><a href="#all_indices-251"><span class="linenos">251</span></a><span class="k">def</span><span class="w"> </span><span class="nf">all_indices</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]:</span>
-</span><span id="all_indices-252"><a href="#all_indices-252"><span class="linenos">252</span></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span id="all_indices-253"><a href="#all_indices-253"><span class="linenos">253</span></a><span class="sd">    Get all indices from BIST with component counts.</span>
-</span><span id="all_indices-254"><a href="#all_indices-254"><span class="linenos">254</span></a>
-</span><span id="all_indices-255"><a href="#all_indices-255"><span class="linenos">255</span></a><span class="sd">    This returns all 79 indices available in the BIST data,</span>
-</span><span id="all_indices-256"><a href="#all_indices-256"><span class="linenos">256</span></a><span class="sd">    not just the commonly used ones in indices().</span>
-</span><span id="all_indices-257"><a href="#all_indices-257"><span class="linenos">257</span></a>
-</span><span id="all_indices-258"><a href="#all_indices-258"><span class="linenos">258</span></a><span class="sd">    Returns:</span>
-</span><span id="all_indices-259"><a href="#all_indices-259"><span class="linenos">259</span></a><span class="sd">        List of dicts with &#39;symbol&#39;, &#39;name&#39;, and &#39;count&#39; keys.</span>
-</span><span id="all_indices-260"><a href="#all_indices-260"><span class="linenos">260</span></a>
-</span><span id="all_indices-261"><a href="#all_indices-261"><span class="linenos">261</span></a><span class="sd">    Examples:</span>
-</span><span id="all_indices-262"><a href="#all_indices-262"><span class="linenos">262</span></a><span class="sd">        &gt;&gt;&gt; import borsapy as bp</span>
-</span><span id="all_indices-263"><a href="#all_indices-263"><span class="linenos">263</span></a><span class="sd">        &gt;&gt;&gt; bp.all_indices()</span>
-</span><span id="all_indices-264"><a href="#all_indices-264"><span class="linenos">264</span></a><span class="sd">        [{&#39;symbol&#39;: &#39;X030C&#39;, &#39;name&#39;: &#39;BIST 30 Capped&#39;, &#39;count&#39;: 30}, ...]</span>
-</span><span id="all_indices-265"><a href="#all_indices-265"><span class="linenos">265</span></a><span class="sd">    &quot;&quot;&quot;</span>
-</span><span id="all_indices-266"><a href="#all_indices-266"><span class="linenos">266</span></a>    <span class="n">provider</span> <span class="o">=</span> <span class="n">get_bist_index_provider</span><span class="p">()</span>
-</span><span id="all_indices-267"><a href="#all_indices-267"><span class="linenos">267</span></a>    <span class="k">return</span> <span class="n">provider</span><span class="o">.</span><span class="n">get_available_indices</span><span class="p">()</span>
+            <div class="pdoc-code codehilite"><pre><span></span><span id="all_indices-288"><a href="#all_indices-288"><span class="linenos">288</span></a><span class="k">def</span><span class="w"> </span><span class="nf">all_indices</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]:</span>
+</span><span id="all_indices-289"><a href="#all_indices-289"><span class="linenos">289</span></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span id="all_indices-290"><a href="#all_indices-290"><span class="linenos">290</span></a><span class="sd">    Get all indices from BIST with component counts.</span>
+</span><span id="all_indices-291"><a href="#all_indices-291"><span class="linenos">291</span></a>
+</span><span id="all_indices-292"><a href="#all_indices-292"><span class="linenos">292</span></a><span class="sd">    This returns all 79 indices available in the BIST data,</span>
+</span><span id="all_indices-293"><a href="#all_indices-293"><span class="linenos">293</span></a><span class="sd">    not just the commonly used ones in indices().</span>
+</span><span id="all_indices-294"><a href="#all_indices-294"><span class="linenos">294</span></a>
+</span><span id="all_indices-295"><a href="#all_indices-295"><span class="linenos">295</span></a><span class="sd">    Returns:</span>
+</span><span id="all_indices-296"><a href="#all_indices-296"><span class="linenos">296</span></a><span class="sd">        List of dicts with &#39;symbol&#39;, &#39;name&#39;, and &#39;count&#39; keys.</span>
+</span><span id="all_indices-297"><a href="#all_indices-297"><span class="linenos">297</span></a>
+</span><span id="all_indices-298"><a href="#all_indices-298"><span class="linenos">298</span></a><span class="sd">    Examples:</span>
+</span><span id="all_indices-299"><a href="#all_indices-299"><span class="linenos">299</span></a><span class="sd">        &gt;&gt;&gt; import borsapy as bp</span>
+</span><span id="all_indices-300"><a href="#all_indices-300"><span class="linenos">300</span></a><span class="sd">        &gt;&gt;&gt; bp.all_indices()</span>
+</span><span id="all_indices-301"><a href="#all_indices-301"><span class="linenos">301</span></a><span class="sd">        [{&#39;symbol&#39;: &#39;X030C&#39;, &#39;name&#39;: &#39;BIST 30 Capped&#39;, &#39;count&#39;: 30}, ...]</span>
+</span><span id="all_indices-302"><a href="#all_indices-302"><span class="linenos">302</span></a><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="all_indices-303"><a href="#all_indices-303"><span class="linenos">303</span></a>    <span class="n">provider</span> <span class="o">=</span> <span class="n">get_bist_index_provider</span><span class="p">()</span>
+</span><span id="all_indices-304"><a href="#all_indices-304"><span class="linenos">304</span></a>    <span class="k">return</span> <span class="n">provider</span><span class="o">.</span><span class="n">get_available_indices</span><span class="p">()</span>
 </span></pre></div>
 
 
@@ -1030,24 +1178,24 @@ not just the commonly used ones in indices().</p>
 
     </div>
     <a class="headerlink" href="#index"></a>
-            <div class="pdoc-code codehilite"><pre><span></span><span id="index-270"><a href="#index-270"><span class="linenos">270</span></a><span class="k">def</span><span class="w"> </span><span class="nf">index</span><span class="p">(</span><span class="n">symbol</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Index</span><span class="p">:</span>
-</span><span id="index-271"><a href="#index-271"><span class="linenos">271</span></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span id="index-272"><a href="#index-272"><span class="linenos">272</span></a><span class="sd">    Get an Index object for the given symbol.</span>
-</span><span id="index-273"><a href="#index-273"><span class="linenos">273</span></a>
-</span><span id="index-274"><a href="#index-274"><span class="linenos">274</span></a><span class="sd">    This is a convenience function that creates an Index object.</span>
-</span><span id="index-275"><a href="#index-275"><span class="linenos">275</span></a>
-</span><span id="index-276"><a href="#index-276"><span class="linenos">276</span></a><span class="sd">    Args:</span>
-</span><span id="index-277"><a href="#index-277"><span class="linenos">277</span></a><span class="sd">        symbol: Index symbol (e.g., &quot;XU100&quot;, &quot;XBANK&quot;).</span>
-</span><span id="index-278"><a href="#index-278"><span class="linenos">278</span></a>
-</span><span id="index-279"><a href="#index-279"><span class="linenos">279</span></a><span class="sd">    Returns:</span>
-</span><span id="index-280"><a href="#index-280"><span class="linenos">280</span></a><span class="sd">        Index object.</span>
-</span><span id="index-281"><a href="#index-281"><span class="linenos">281</span></a>
-</span><span id="index-282"><a href="#index-282"><span class="linenos">282</span></a><span class="sd">    Examples:</span>
-</span><span id="index-283"><a href="#index-283"><span class="linenos">283</span></a><span class="sd">        &gt;&gt;&gt; import borsapy as bp</span>
-</span><span id="index-284"><a href="#index-284"><span class="linenos">284</span></a><span class="sd">        &gt;&gt;&gt; xu100 = bp.index(&quot;XU100&quot;)</span>
-</span><span id="index-285"><a href="#index-285"><span class="linenos">285</span></a><span class="sd">        &gt;&gt;&gt; xu100.history(period=&quot;1mo&quot;)</span>
-</span><span id="index-286"><a href="#index-286"><span class="linenos">286</span></a><span class="sd">    &quot;&quot;&quot;</span>
-</span><span id="index-287"><a href="#index-287"><span class="linenos">287</span></a>    <span class="k">return</span> <span class="n">Index</span><span class="p">(</span><span class="n">symbol</span><span class="p">)</span>
+            <div class="pdoc-code codehilite"><pre><span></span><span id="index-307"><a href="#index-307"><span class="linenos">307</span></a><span class="k">def</span><span class="w"> </span><span class="nf">index</span><span class="p">(</span><span class="n">symbol</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Index</span><span class="p">:</span>
+</span><span id="index-308"><a href="#index-308"><span class="linenos">308</span></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span id="index-309"><a href="#index-309"><span class="linenos">309</span></a><span class="sd">    Get an Index object for the given symbol.</span>
+</span><span id="index-310"><a href="#index-310"><span class="linenos">310</span></a>
+</span><span id="index-311"><a href="#index-311"><span class="linenos">311</span></a><span class="sd">    This is a convenience function that creates an Index object.</span>
+</span><span id="index-312"><a href="#index-312"><span class="linenos">312</span></a>
+</span><span id="index-313"><a href="#index-313"><span class="linenos">313</span></a><span class="sd">    Args:</span>
+</span><span id="index-314"><a href="#index-314"><span class="linenos">314</span></a><span class="sd">        symbol: Index symbol (e.g., &quot;XU100&quot;, &quot;XBANK&quot;).</span>
+</span><span id="index-315"><a href="#index-315"><span class="linenos">315</span></a>
+</span><span id="index-316"><a href="#index-316"><span class="linenos">316</span></a><span class="sd">    Returns:</span>
+</span><span id="index-317"><a href="#index-317"><span class="linenos">317</span></a><span class="sd">        Index object.</span>
+</span><span id="index-318"><a href="#index-318"><span class="linenos">318</span></a>
+</span><span id="index-319"><a href="#index-319"><span class="linenos">319</span></a><span class="sd">    Examples:</span>
+</span><span id="index-320"><a href="#index-320"><span class="linenos">320</span></a><span class="sd">        &gt;&gt;&gt; import borsapy as bp</span>
+</span><span id="index-321"><a href="#index-321"><span class="linenos">321</span></a><span class="sd">        &gt;&gt;&gt; xu100 = bp.index(&quot;XU100&quot;)</span>
+</span><span id="index-322"><a href="#index-322"><span class="linenos">322</span></a><span class="sd">        &gt;&gt;&gt; xu100.history(period=&quot;1mo&quot;)</span>
+</span><span id="index-323"><a href="#index-323"><span class="linenos">323</span></a><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="index-324"><a href="#index-324"><span class="linenos">324</span></a>    <span class="k">return</span> <span class="n">Index</span><span class="p">(</span><span class="n">symbol</span><span class="p">)</span>
 </span></pre></div>
 
 
