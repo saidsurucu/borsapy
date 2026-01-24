@@ -384,9 +384,13 @@ class TEFASProvider(BaseProvider):
 
             return df
 
+        except DataNotAvailableError:
+            # Re-raise DataNotAvailableError so chunked fetch can handle it
+            raise
+        except APIError:
+            # Re-raise APIError (including WAF errors)
+            raise
         except Exception as e:
-            if "WAF" in str(e):
-                raise
             raise APIError(f"Failed to fetch history for {fund_code}: {e}") from e
 
     def get_allocation(
