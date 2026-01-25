@@ -573,16 +573,27 @@ class StudySession:
         # Build inputs for TradingView format
         tv_inputs = self._build_tv_inputs(study)
 
+        # Determine script type based on indicator
+        # Built-in indicators (STD;*) use format: {name}@tv-basicstudies-241
+        # e.g., STD;RSI → RSI@tv-basicstudies-241
+        # Custom indicators (PUB;*, USER;*) use Script@tv-scripting-101!
+        if study.indicator_id.startswith("STD;"):
+            # Extract indicator name after "STD;" prefix
+            indicator_name = study.indicator_id[4:]  # Remove "STD;" prefix
+            script_type = f"{indicator_name}@tv-basicstudies-241"
+        else:
+            script_type = "Script@tv-scripting-101!"
+
         # The study references the chart series
-        # Format: create_study(session_id, study_id, "st1", "$prices", script_type, inputs)
+        # Format: create_study(session_id, study_id, study_id, "$prices", script_type, inputs)
         message = self._stream._create_message(
             "create_study",
             [
                 self._stream._chart_session,
                 study.study_id,
-                "st1",
+                study.study_id,  # Use study_id for both params
                 "$prices",  # Data source (chart series)
-                "Script@tv-scripting-101!",
+                script_type,
                 tv_inputs,
             ],
         )
@@ -601,7 +612,16 @@ class StudySession:
         Build TradingView-format inputs for create_study.
 
         Converts user inputs to TradingView's expected format.
+        Built-in indicators (STD;*) use simple key-value format.
+        Pine/Custom indicators use complex format with pineId, text, etc.
         """
+        # Built-in indicators use simple options format
+        if study.indicator_id.startswith("STD;"):
+            # For built-in indicators, just return user inputs directly
+            # TradingView will use defaults for any missing values
+            return study.inputs if study.inputs else {}
+
+        # Pine/Custom indicators use complex format
         inputs = {
             "pineId": study.indicator_id,
             "pineVersion": "last",
@@ -794,7 +814,7 @@ class TradingViewStream:
                 # Trading logic...
     """
 
-    WS_URL = "wss://data.tradingview.com/socket.io/websocket"
+    WS_URL = "wss://data.tradingview.com/socket.io/websocket?type=chart"
     ORIGIN = "https://www.tradingview.com"
 
     # Reconnection settings

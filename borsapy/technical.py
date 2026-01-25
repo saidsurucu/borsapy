@@ -22,6 +22,7 @@ __all__ = [
     "TechnicalMixin",
     "calculate_sma",
     "calculate_ema",
+    "calculate_tilson_t3",
     "calculate_rsi",
     "calculate_macd",
     "calculate_bollinger_bands",
@@ -30,6 +31,7 @@ __all__ = [
     "calculate_obv",
     "calculate_vwap",
     "calculate_adx",
+    "calculate_supertrend",
     "add_indicators",
 ]
 
@@ -85,6 +87,63 @@ def calculate_ema(
     if col not in df.columns:
         return pd.Series(np.nan, index=df.index, name=f"EMA_{period}")
     return df[col].ewm(span=period, adjust=False).mean()
+
+
+def calculate_tilson_t3(
+    df: pd.DataFrame,
+    period: int = 5,
+    vfactor: float = 0.7,
+    column: str = "Close",
+) -> pd.Series:
+    """Calculate Tilson T3 Moving Average.
+
+    T3 is a triple-smoothed exponential moving average that reduces lag
+    while maintaining smoothness. Developed by Tim Tilson.
+
+    The T3 uses a volume factor (vfactor) to control the amount of
+    smoothing vs responsiveness:
+    - vfactor = 0: T3 behaves like a triple EMA
+    - vfactor = 1: Maximum smoothing (may overshoot)
+    - vfactor = 0.7: Tilson's recommended default
+
+    Args:
+        df: DataFrame with price data
+        period: Number of periods for EMA calculations (default 5)
+        vfactor: Volume factor for smoothing (0-1, default 0.7)
+        column: Column name to use for calculation
+
+    Returns:
+        Series with T3 values
+
+    Examples:
+        >>> t3 = calculate_tilson_t3(df, period=5, vfactor=0.7)
+        >>> # More responsive (less smooth)
+        >>> t3_fast = calculate_tilson_t3(df, period=5, vfactor=0.5)
+        >>> # More smooth (more lag)
+        >>> t3_smooth = calculate_tilson_t3(df, period=5, vfactor=0.9)
+    """
+    col = _get_price_column(df, column)
+    if col not in df.columns:
+        return pd.Series(np.nan, index=df.index, name=f"T3_{period}")
+
+    # Calculate coefficients
+    c1 = -(vfactor**3)
+    c2 = 3 * vfactor**2 + 3 * vfactor**3
+    c3 = -6 * vfactor**2 - 3 * vfactor - 3 * vfactor**3
+    c4 = 1 + 3 * vfactor + vfactor**3 + 3 * vfactor**2
+
+    # Calculate 6 consecutive EMAs
+    ema1 = df[col].ewm(span=period, adjust=False).mean()
+    ema2 = ema1.ewm(span=period, adjust=False).mean()
+    ema3 = ema2.ewm(span=period, adjust=False).mean()
+    ema4 = ema3.ewm(span=period, adjust=False).mean()
+    ema5 = ema4.ewm(span=period, adjust=False).mean()
+    ema6 = ema5.ewm(span=period, adjust=False).mean()
+
+    # T3 = c1*e6 + c2*e5 + c3*e4 + c4*e3
+    t3 = c1 * ema6 + c2 * ema5 + c3 * ema4 + c4 * ema3
+
+    return t3.rename(f"T3_{period}")
 
 
 def calculate_rsi(
@@ -387,6 +446,111 @@ def calculate_adx(df: pd.DataFrame, period: int = 14) -> pd.Series:
     return adx.rename(f"ADX_{period}")
 
 
+def calculate_supertrend(
+    df: pd.DataFrame, atr_period: int = 10, multiplier: float = 3.0
+) -> pd.DataFrame:
+    """Calculate Supertrend indicator.
+
+    Supertrend is a trend-following indicator based on ATR.
+    - When price is above Supertrend line: Bullish (uptrend)
+    - When price is below Supertrend line: Bearish (downtrend)
+
+    Args:
+        df: DataFrame with High, Low, Close columns
+        atr_period: Period for ATR calculation (default: 10)
+        multiplier: ATR multiplier for bands (default: 3.0)
+
+    Returns:
+        DataFrame with columns:
+        - Supertrend: The Supertrend line value
+        - Supertrend_Direction: 1 for bullish, -1 for bearish
+        - Supertrend_Upper: Upper band
+        - Supertrend_Lower: Lower band
+    """
+    required = ["High", "Low", "Close"]
+    if not all(col in df.columns for col in required):
+        return pd.DataFrame(
+            {
+                "Supertrend": np.nan,
+                "Supertrend_Direction": np.nan,
+                "Supertrend_Upper": np.nan,
+                "Supertrend_Lower": np.nan,
+            },
+            index=df.index,
+        )
+
+    high = df["High"]
+    low = df["Low"]
+    close = df["Close"]
+
+    # Calculate ATR
+    tr1 = high - low
+    tr2 = abs(high - close.shift(1))
+    tr3 = abs(low - close.shift(1))
+    tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+    atr = tr.ewm(alpha=1 / atr_period, adjust=False).mean()
+
+    # Calculate basic bands
+    hl2 = (high + low) / 2
+    basic_upper = hl2 + (multiplier * atr)
+    basic_lower = hl2 - (multiplier * atr)
+
+    # Initialize arrays
+    n = len(df)
+    supertrend = np.zeros(n)
+    direction = np.zeros(n)
+    final_upper = np.zeros(n)
+    final_lower = np.zeros(n)
+
+    # First value
+    final_upper[0] = basic_upper.iloc[0]
+    final_lower[0] = basic_lower.iloc[0]
+    supertrend[0] = basic_upper.iloc[0]
+    direction[0] = -1  # Start bearish
+
+    # Calculate Supertrend
+    for i in range(1, n):
+        # Final Upper Band
+        if basic_upper.iloc[i] < final_upper[i - 1] or close.iloc[i - 1] > final_upper[i - 1]:
+            final_upper[i] = basic_upper.iloc[i]
+        else:
+            final_upper[i] = final_upper[i - 1]
+
+        # Final Lower Band
+        if basic_lower.iloc[i] > final_lower[i - 1] or close.iloc[i - 1] < final_lower[i - 1]:
+            final_lower[i] = basic_lower.iloc[i]
+        else:
+            final_lower[i] = final_lower[i - 1]
+
+        # Supertrend and Direction
+        if supertrend[i - 1] == final_upper[i - 1]:
+            # Was bearish
+            if close.iloc[i] > final_upper[i]:
+                supertrend[i] = final_lower[i]
+                direction[i] = 1  # Bullish
+            else:
+                supertrend[i] = final_upper[i]
+                direction[i] = -1  # Bearish
+        else:
+            # Was bullish
+            if close.iloc[i] < final_lower[i]:
+                supertrend[i] = final_upper[i]
+                direction[i] = -1  # Bearish
+            else:
+                supertrend[i] = final_lower[i]
+                direction[i] = 1  # Bullish
+
+    return pd.DataFrame(
+        {
+            "Supertrend": supertrend,
+            "Supertrend_Direction": direction,
+            "Supertrend_Upper": final_upper,
+            "Supertrend_Lower": final_lower,
+        },
+        index=df.index,
+    )
+
+
 # =============================================================================
 # Convenience Function - Add all indicators to DataFrame
 # =============================================================================
@@ -403,7 +567,7 @@ def add_indicators(
         df: DataFrame with OHLCV data (Open, High, Low, Close, Volume)
         indicators: List of indicators to add. If None, adds all applicable.
             Options: 'sma', 'ema', 'rsi', 'macd', 'bollinger', 'atr',
-                     'stochastic', 'obv', 'vwap', 'adx'
+                     'stochastic', 'obv', 'vwap', 'adx', 'supertrend'
         **kwargs: Additional arguments for specific indicators:
             - sma_period: SMA period (default 20)
             - ema_period: EMA period (default 12)
@@ -411,6 +575,8 @@ def add_indicators(
             - bb_period: Bollinger Bands period (default 20)
             - atr_period: ATR period (default 14)
             - adx_period: ADX period (default 14)
+            - supertrend_period: Supertrend ATR period (default 10)
+            - supertrend_multiplier: Supertrend ATR multiplier (default 3.0)
 
     Returns:
         DataFrame with indicator columns added
@@ -424,7 +590,7 @@ def add_indicators(
     if indicators is None:
         indicators = ["sma", "ema", "rsi", "macd", "bollinger"]
         if has_hlc:
-            indicators.extend(["atr", "stochastic", "adx"])
+            indicators.extend(["atr", "stochastic", "adx", "supertrend"])
         if has_volume:
             indicators.append("obv")
         if has_volume and has_hlc:
@@ -437,6 +603,8 @@ def add_indicators(
     bb_period = kwargs.get("bb_period", 20)
     atr_period = kwargs.get("atr_period", 14)
     adx_period = kwargs.get("adx_period", 14)
+    supertrend_period = kwargs.get("supertrend_period", 10)
+    supertrend_multiplier = kwargs.get("supertrend_multiplier", 3.0)
 
     # Add indicators
     for indicator in indicators:
@@ -470,6 +638,10 @@ def add_indicators(
             result["VWAP"] = calculate_vwap(df)
         elif indicator == "adx" and has_hlc:
             result[f"ADX_{adx_period}"] = calculate_adx(df, adx_period)
+        elif indicator == "supertrend" and has_hlc:
+            st_df = calculate_supertrend(df, supertrend_period, supertrend_multiplier)
+            result["Supertrend"] = st_df["Supertrend"]
+            result["Supertrend_Direction"] = st_df["Supertrend_Direction"]
 
     return result
 
@@ -509,6 +681,10 @@ class TechnicalAnalyzer:
         """Calculate Exponential Moving Average."""
         return calculate_ema(self._df, period)
 
+    def tilson_t3(self, period: int = 5, vfactor: float = 0.7) -> pd.Series:
+        """Calculate Tilson T3 Moving Average."""
+        return calculate_tilson_t3(self._df, period, vfactor)
+
     def rsi(self, period: int = 14) -> pd.Series:
         """Calculate Relative Strength Index."""
         return calculate_rsi(self._df, period)
@@ -545,6 +721,18 @@ class TechnicalAnalyzer:
         """Calculate Average Directional Index."""
         return calculate_adx(self._df, period)
 
+    def supertrend(self, atr_period: int = 10, multiplier: float = 3.0) -> pd.DataFrame:
+        """Calculate Supertrend indicator.
+
+        Args:
+            atr_period: Period for ATR calculation (default 10)
+            multiplier: ATR multiplier for bands (default 3.0)
+
+        Returns:
+            DataFrame with Supertrend, Supertrend_Direction, Supertrend_Upper, Supertrend_Lower
+        """
+        return calculate_supertrend(self._df, atr_period, multiplier)
+
     def heikin_ashi(self) -> pd.DataFrame:
         """Calculate Heikin Ashi candlestick values.
 
@@ -575,6 +763,7 @@ class TechnicalAnalyzer:
             result["sma_50"] = float(self.sma(50).iloc[-1])
             result["ema_12"] = float(self.ema(12).iloc[-1])
             result["ema_26"] = float(self.ema(26).iloc[-1])
+            result["t3_5"] = float(self.tilson_t3(5).iloc[-1])
             result["rsi_14"] = float(self.rsi(14).iloc[-1])
 
             macd_df = self.macd()
@@ -595,6 +784,10 @@ class TechnicalAnalyzer:
             stoch_df = self.stochastic()
             result["stoch_k"] = float(stoch_df["Stoch_K"].iloc[-1])
             result["stoch_d"] = float(stoch_df["Stoch_D"].iloc[-1])
+
+            st_df = self.supertrend()
+            result["supertrend"] = float(st_df["Supertrend"].iloc[-1])
+            result["supertrend_direction"] = float(st_df["Supertrend_Direction"].iloc[-1])
 
         # Need Volume
         if self._has_volume and len(self._df) > 0:
@@ -730,6 +923,35 @@ class TechnicalMixin:
                 return np.nan
             ema_series = calculate_ema(df, ema_period)
             return round(float(ema_series.iloc[-1]), 2)
+
+    def tilson_t3(
+        self, period: str = "3mo", t3_period: int = 5, vfactor: float = 0.7
+    ) -> float:
+        """Get latest Tilson T3 value.
+
+        T3 is a triple-smoothed EMA that reduces lag while maintaining smoothness.
+
+        Note: This indicator uses local calculation as it's not available
+        in TradingView Scanner API.
+
+        Args:
+            period: History period to fetch (default "3mo")
+            t3_period: T3 period (default 5)
+            vfactor: Volume factor (0-1, default 0.7)
+
+        Returns:
+            Latest T3 value
+
+        Examples:
+            >>> stock = bp.Ticker("THYAO")
+            >>> stock.tilson_t3()
+            285.5
+        """
+        df = self.history(period=period)
+        if df.empty:
+            return np.nan
+        t3_series = calculate_tilson_t3(df, t3_period, vfactor)
+        return round(float(t3_series.iloc[-1]), 2)
 
     def macd(self, interval: str = "1d", **kwargs: Any) -> dict[str, float]:
         """Get latest MACD values from TradingView.
@@ -1064,3 +1286,51 @@ class TechnicalMixin:
                 # Include error info for failed intervals
                 result[interval] = {"error": str(e)}
         return result
+
+    def supertrend(
+        self, period: str = "3mo", atr_period: int = 10, multiplier: float = 3.0
+    ) -> dict[str, float]:
+        """Get latest Supertrend values.
+
+        Supertrend is a trend-following indicator based on ATR.
+        - Direction = 1: Bullish (price above Supertrend line)
+        - Direction = -1: Bearish (price below Supertrend line)
+
+        Note: This indicator uses local calculation as it's not available
+        in TradingView Scanner API.
+
+        Args:
+            period: History period to fetch (default "3mo")
+            atr_period: Period for ATR calculation (default 10)
+            multiplier: ATR multiplier for bands (default 3.0)
+
+        Returns:
+            Dictionary with keys:
+            - value: Current Supertrend line value
+            - direction: 1 (bullish) or -1 (bearish)
+            - upper: Upper band value
+            - lower: Lower band value
+
+        Examples:
+            >>> stock = bp.Ticker("THYAO")
+            >>> st = stock.supertrend()
+            >>> st['direction']  # 1 = bullish, -1 = bearish
+            1
+            >>> st['value']
+            275.5
+        """
+        df = self.history(period=period)
+        if df.empty:
+            return {
+                "value": np.nan,
+                "direction": np.nan,
+                "upper": np.nan,
+                "lower": np.nan,
+            }
+        st_df = calculate_supertrend(df, atr_period, multiplier)
+        return {
+            "value": round(float(st_df["Supertrend"].iloc[-1]), 2),
+            "direction": int(st_df["Supertrend_Direction"].iloc[-1]),
+            "upper": round(float(st_df["Supertrend_Upper"].iloc[-1]), 2),
+            "lower": round(float(st_df["Supertrend_Lower"].iloc[-1]), 2),
+        }

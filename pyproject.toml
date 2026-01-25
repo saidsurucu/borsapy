@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "borsapy"
-version = "0.6.2"
+version = "0.6.3"
 description = "Turkish financial markets data library - yfinance-like API for BIST stocks, forex, crypto, and more"
 readme = "README.md"
 license = { text = "Apache-2.0" }
@@ -42,10 +42,9 @@ dependencies = [
     "openpyxl>=3.1.0",
     "urllib3>=2.0.0",
     "websocket-client>=1.9.0",
-    "pdfplumber>=0.11.8",
-    "openai>=2.15.0",
+    "openai>=1.0.0",
     "tradingview-screener>=3.0.0",
-    "markitdown",
+    "pymupdf4llm>=0.2.9",
 ]
 
 [project.optional-dependencies]
@@ -53,12 +52,6 @@ dev = [
     "pytest>=7.0.0",
     "pytest-cov>=4.0.0",
     "ruff>=0.1.0",
-]
-holdings = [
-    "pdfplumber>=0.10.0",
-]
-all = [
-    "pdfplumber>=0.10.0",
 ]
 
 [project.urls]
@@ -72,7 +65,7 @@ packages = ["borsapy"]
 
 [tool.ruff]
 line-length = 100
-target-version = "py39"
+target-version = "py310"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "N", "UP", "B", "C4"]

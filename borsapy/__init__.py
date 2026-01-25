@@ -174,12 +174,14 @@ from borsapy.technical import (
     calculate_rsi,
     calculate_sma,
     calculate_stochastic,
+    calculate_supertrend,
+    calculate_tilson_t3,
     calculate_vwap,
 )
 from borsapy.ticker import Ticker
 from borsapy.viop import VIOP
 
-__version__ = "0.6.2"
+__version__ = "0.6.3"
 __author__ = "Said Surucu"
 
 __all__ = [
@@ -251,6 +253,8 @@ __all__ = [
     "calculate_obv",
     "calculate_vwap",
     "calculate_adx",
+    "calculate_supertrend",
+    "calculate_tilson_t3",
     # Charts
     "calculate_heikin_ashi",
     # Replay

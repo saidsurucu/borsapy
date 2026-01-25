@@ -868,7 +868,8 @@ import borsapy as bp
 from borsapy.technical import (
     calculate_sma, calculate_ema, calculate_rsi, calculate_macd,
     calculate_bollinger_bands, calculate_atr, calculate_stochastic,
-    calculate_obv, calculate_vwap, calculate_adx, add_indicators
+    calculate_obv, calculate_vwap, calculate_adx, calculate_supertrend,
+    calculate_tilson_t3, add_indicators
 )
 
 # Herhangi bir DataFrame üzerinde kullanım
@@ -898,6 +899,70 @@ df_with_indicators = add_indicators(df, indicators=["sma", "rsi"])  # Sadece bel
 | OBV | `obv()` | Denge Hacmi (Volume gerektirir) |
 | VWAP | `vwap()` | Hacim Ağırlıklı Ortalama Fiyat (Volume gerektirir) |
 | ADX | `adx()` | Ortalama Yön Endeksi (0-100) |
+| Supertrend | `supertrend()` | Trend takip göstergesi (ATR-tabanlı) |
+| Tilson T3 | `tilson_t3()` | Triple-smoothed EMA (düşük gecikme) |
+
+### Supertrend
+
+ATR-tabanlı trend takip göstergesi.
+
+```python
+import borsapy as bp
+
+stock = bp.Ticker("THYAO")
+
+# Son değerler
+st = stock.supertrend()
+print(st['value'])       # 282.21 (Supertrend çizgisi)
+print(st['direction'])   # 1 (bullish) veya -1 (bearish)
+print(st['upper'])       # 303.69 (üst band)
+print(st['lower'])       # 282.21 (alt band)
+
+# Custom parametreler
+st = stock.supertrend(period="6mo", atr_period=7, multiplier=2.0)
+
+# TechnicalAnalyzer ile tüm seriler
+ta = stock.technicals(period="1y")
+st_df = ta.supertrend()  # DataFrame: Supertrend, Direction, Upper, Lower
+
+# Pure function
+df = stock.history(period="1y")
+st_df = bp.calculate_supertrend(df, atr_period=10, multiplier=3.0)
+```
+
+**Supertrend Yorumlama:**
+- `direction = 1`: Bullish trend (fiyat Supertrend üzerinde)
+- `direction = -1`: Bearish trend (fiyat Supertrend altında)
+- Trend değişimi: direction'ın işaret değiştirmesi
+
+### Tilson T3
+
+Triple-smoothed EMA ile düşük gecikmeli hareketli ortalama.
+
+```python
+import borsapy as bp
+
+stock = bp.Ticker("THYAO")
+
+# Son değer
+t3 = stock.tilson_t3()              # 296.24
+t3 = stock.tilson_t3(t3_period=8)   # Farklı period
+
+# TechnicalAnalyzer ile
+ta = stock.technicals(period="1y")
+t3_series = ta.tilson_t3(period=5, vfactor=0.7)
+
+# Pure function
+df = stock.history(period="1y")
+t3_series = bp.calculate_tilson_t3(df, period=5, vfactor=0.7)
+```
+
+**Tilson T3 Parametreleri:**
+- `period`: T3 periyodu (varsayılan 5)
+- `vfactor`: Volume faktörü (varsayılan 0.7)
+  - 0.5 = daha responsive (hızlı tepki)
+  - 0.7 = Tilson'ın önerisi
+  - 0.9 = daha smooth (pürüzsüz)
 
 ### Heikin Ashi Charts
 
@@ -2145,7 +2210,7 @@ print(sonuc)
 - **Eurobond**: Türk devlet eurobondları - 38+ tahvil, USD/EUR (ziraatbank.com.tr)
 - **EconomicCalendar**: Ekonomik takvim - 7 ülke desteği (doviz.com)
 - **Screener**: Hisse tarama - 50+ kriter, sektör/endeks filtreleme (İş Yatırım)
-- **Teknik Analiz**: 10+ gösterge (SMA, EMA, RSI, MACD, Bollinger, ATR, Stochastic, OBV, VWAP, ADX, Heikin Ashi)
+- **Teknik Analiz**: 12+ gösterge (SMA, EMA, RSI, MACD, Bollinger, ATR, Stochastic, OBV, VWAP, ADX, Supertrend, Tilson T3, Heikin Ashi)
 - **KAP Entegrasyonu**: Resmi bildirimler ve takvim
 
 ---
