@@ -2087,6 +2087,7 @@ print(results[['symbol', 'rsi', 'volume', 'conditions_met']])
 |----------|----------|-------|
 | **Quote** | `price`, `volume`, `change_percent`, `bid`, `ask` | `price > 100` |
 | **Göstergeler** | `rsi`, `sma_N`, `ema_N`, `macd`, `signal`, `bb_upper/lower`, `adx`, `atr`, `cci`, `stoch_k/d` | `rsi < 30` |
+| **Lokal** | `supertrend`, `supertrend_direction`, `t3` | `supertrend_direction == 1` |
 | **Crossover** | `crosses`, `crosses_above`, `crosses_below` | `sma_20 crosses_above sma_50` |
 | **Yüzde** | `above_pct`, `below_pct` | `close above_pct sma_50 1.05` |
 
@@ -2139,6 +2140,38 @@ bb_low = bp.scan("XU030", "close < bb_lower")
 # Saatlik RSI oversold
 hourly_oversold = bp.scan("XU030", "rsi < 30", interval="1h")
 ```
+
+### Lokal Hesaplanan Göstergeler (Supertrend, T3)
+
+Supertrend ve Tilson T3 göstergeleri TradingView Scanner API'de bulunmadığı için lokal olarak hesaplanır.
+
+```python
+import borsapy as bp
+
+# Supertrend Taramaları
+bullish = bp.scan("XU030", "supertrend_direction == 1")   # Yükseliş trendi
+bearish = bp.scan("XU030", "supertrend_direction == -1")  # Düşüş trendi
+above_st = bp.scan("XU030", "close > supertrend")         # Fiyat supertrend üstünde
+
+# Tilson T3 Taramaları
+above_t3 = bp.scan("XU030", "close > t3")                 # Fiyat T3 üstünde
+below_t3 = bp.scan("XU030", "close < t3")                 # Fiyat T3 altında
+
+# Kombinasyon: RSI oversold + Supertrend bullish
+combo = bp.scan("XU030", "rsi < 30 and supertrend_direction == 1")
+
+# Sonuçları incele
+print(bullish[['symbol', 'supertrend', 'supertrend_direction', 'close']])
+```
+
+**Desteklenen Lokal Alanlar:**
+| Alan | Açıklama |
+|------|----------|
+| `supertrend` | Supertrend değeri |
+| `supertrend_direction` | 1 = yükseliş, -1 = düşüş |
+| `supertrend_upper` | Üst band |
+| `supertrend_lower` | Alt band |
+| `t3` / `tilson_t3` | Tilson T3 değeri |
 
 ---
 

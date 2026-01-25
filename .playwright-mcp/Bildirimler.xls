@@ -1,0 +1,195 @@
+<html xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+ <head>
+  <meta http-equiv="Content-Type" content="text/html;" charset="utf-8"> 
+  <meta name="ProgId" content="Excel.Sheet">
+  <meta name="Generator" content="Microsoft Excel 11">
+  <title>Document and Custom Property </title>
+  <!--[if gte mso 9]><xml><o:CustomDocumentProperties><o:BUSINESSGROUP dt:dt="string">CHANNELA</o:BUSINESSGROUP><o:BUSINESSGROUPID dt:dt="string">2</o:BUSINESSGROUPID></o:CustomDocumentProperties></xml><![endif]-->
+  <style> body { text-align: left; } </style>
+ </head>
+ <body>
+  <h1 style="font-size: medium">YAPI KREDİ PORTFÖY YABANCI TEKNOLOJİ SEKTÖRÜ HİSSE SENEDİ FONU</h1>
+  <h1 style="font-size: medium">Portföy Dağılım Raporu</h1>
+  <div>
+   Gönderim Tarihi:08.01.2026 17:07:56
+  </div>
+  <div>
+   Bildirim Tipi:DG
+  </div>
+  <div>
+   Yıl:2025
+  </div>
+  <div>
+   Periyot:12
+  </div>
+  <div>
+   <table class="financial-header-table" border="1" style="font-size:10px"> 
+    <tbody> 
+    </tbody>
+   </table> 
+   <table class="financial-table tbl_oda-01070_Portfolio-Allocation-Report" border="1" style="font-size:10px">
+    <tbody>
+     <tr>
+      <td colspan="3" rowspan="3">
+       <div class="gwt-Label"></div></td>
+     </tr>
+     <tr>
+      <td colspan="0" align="center" class="taxonomy-dimensional-header-cell col-index-3 multi-language-content content-tr report-lang-header" parent="0" rowspan="1" style="display: table-cell;">
+       <div>
+        <div class="gwt-Label multi-language-content content-tr" style="display: block;">
+         Türkçe
+        </div>
+       </div></td>
+     </tr>
+     <tr>
+      <td></td>
+      <td rowspan="0" class="taxonomy-context-cell" style="white-space: nowrap;">
+       <div>
+        <div class="gwt-HTML multi-language-content content-tr" style="display: block;">
+         <br>
+        </div>
+       </div></td>
+     </tr>
+     <tr class="oda-01070_Portfolio-Allocation-Report-row-3 abstract-row">
+      <td class="taxonomy-dimensional-context-cell"></td>
+      <td class="taxonomy-field-title">
+       <table cellspacing="0" cellpadding="0" class="taxonomy-title-panel taxonomy-abstract-title standardLabel" border="1" style="font-size:10px">
+        <tbody>
+         <tr>
+          <td align="left" style="vertical-align: top;">
+           <div class="gwt-Label multi-language-content content-tr" style="display: block;">
+            Portföy Dağılım Raporu
+           </div></td>
+          <td align="left" style="vertical-align: top;"></td>
+          <td align="left" style="vertical-align: top;">
+           <div class="fa fa-question-circle fa-2x taxonomy-field-documentation  multi-language-content content-tr" aria-hidden="true" style="display: inline-block;"></div></td>
+          <td align="left" style="vertical-align: top;"></td>
+         </tr>
+        </tbody>
+       </table></td>
+     </tr>
+     <tr class="oda-01070_Portfolio-Allocation-Report-row-4 data-input-row presentation-enabled">
+      <td class="taxonomy-dimensional-context-cell"></td>
+      <td class="taxonomy-field-title">
+       <table cellspacing="0" cellpadding="0" class="taxonomy-title-panel standardLabel" border="1" style="font-size:10px">
+        <tbody>
+         <tr>
+          <td align="left" style="vertical-align: top;">
+           <div class="gwt-Label multi-language-content content-tr" style="display: block;">
+            Yapılan Açıklama Güncelleme mi?
+           </div></td>
+          <td align="left" style="vertical-align: top;"></td>
+          <td align="left" style="vertical-align: top;">
+           <div class="fa fa-question-circle fa-2x taxonomy-field-documentation  multi-language-content content-tr" aria-hidden="true" style="display: inline-block;"></div></td>
+          <td align="left" style="vertical-align: top;"></td>
+         </tr>
+        </tbody>
+       </table></td>
+      <td class="taxonomy-context-value col-order-class-3 multi-language-content content-tr" style="display: table-cell;">
+       <div>
+        <div class="gwt-Label taxonomy-label-field standardLabel" title="Hayır (No)">
+         Hayır (No)
+        </div>
+       </div></td>
+     </tr>
+     <tr class="oda-01070_Portfolio-Allocation-Report-row-5 data-input-row presentation-enabled alternate-row">
+      <td class="taxonomy-dimensional-context-cell"></td>
+      <td class="taxonomy-field-title">
+       <table cellspacing="0" cellpadding="0" class="taxonomy-title-panel standardLabel" border="1" style="font-size:10px">
+        <tbody>
+         <tr>
+          <td align="left" style="vertical-align: top;">
+           <div class="gwt-Label multi-language-content content-tr" style="display: block;">
+            Yapılan Açıklama Düzeltme mi?
+           </div></td>
+          <td align="left" style="vertical-align: top;"></td>
+          <td align="left" style="vertical-align: top;">
+           <div class="fa fa-question-circle fa-2x taxonomy-field-documentation  multi-language-content content-tr" aria-hidden="true" style="display: inline-block;"></div></td>
+          <td align="left" style="vertical-align: top;"></td>
+         </tr>
+        </tbody>
+       </table></td>
+      <td class="taxonomy-context-value col-order-class-3 multi-language-content content-tr" style="display: table-cell;">
+       <div>
+        <div class="gwt-Label taxonomy-label-field standardLabel" title="Hayır (No)">
+         Hayır (No)
+        </div>
+       </div></td>
+     </tr>
+     <tr class="oda-01070_Portfolio-Allocation-Report-row-6 data-input-row presentation-enabled">
+      <td class="taxonomy-dimensional-context-cell"></td>
+      <td class="taxonomy-field-title">
+       <table cellspacing="0" cellpadding="0" class="taxonomy-title-panel terseLabel" border="1" style="font-size:10px">
+        <tbody>
+         <tr>
+          <td align="left" style="vertical-align: top;">
+           <div class="gwt-Label multi-language-content content-tr" style="display: block;">
+            Konuya İlişkin Daha Önce Yapılan Açıklamanın Tarihi
+           </div></td>
+          <td align="left" style="vertical-align: top;"></td>
+          <td align="left" style="vertical-align: top;">
+           <div class="fa fa-question-circle fa-2x taxonomy-field-documentation  multi-language-content content-tr" aria-hidden="true" style="display: inline-block;"></div></td>
+          <td align="left" style="vertical-align: top;"></td>
+         </tr>
+        </tbody>
+       </table></td>
+      <td class="taxonomy-context-value col-order-class-3 multi-language-content content-tr" style="display: table-cell;">
+       <div>
+        <div class="gwt-Label taxonomy-label-field terseLabel" title="-">
+         -
+        </div>
+       </div></td>
+     </tr>
+     <tr class="oda-01070_Portfolio-Allocation-Report-row-7 abstract-row">
+      <td class="taxonomy-dimensional-context-cell"></td>
+      <td class="taxonomy-field-title">
+       <table cellspacing="0" cellpadding="0" class="taxonomy-title-panel taxonomy-abstract-title standardLabel" border="1" style="font-size:10px">
+        <tbody>
+         <tr>
+          <td align="left" style="vertical-align: top;">
+           <div class="gwt-Label multi-language-content content-tr" style="display: block;">
+            Bildirim İçeriği
+           </div></td>
+          <td align="left" style="vertical-align: top;"></td>
+         </tr>
+        </tbody>
+       </table></td>
+     </tr>
+     <tr class="oda-01070_Portfolio-Allocation-Report-row-8 abstract-row">
+      <td class="taxonomy-dimensional-context-cell"></td>
+      <td class="taxonomy-field-title">
+       <table cellspacing="0" cellpadding="0" class="taxonomy-title-panel taxonomy-abstract-title standardLabel" border="1" style="font-size:10px">
+        <tbody>
+         <tr>
+          <td align="left" style="vertical-align: top;">
+           <div class="gwt-Label multi-language-content content-tr" style="display: block;">
+            Açıklamalar
+           </div></td>
+          <td align="left" style="vertical-align: top;"></td>
+         </tr>
+        </tbody>
+       </table></td>
+     </tr>
+     <tr class="oda-01070_Portfolio-Allocation-Report-row-9 data-input-row presentation-enabled alternate-row">
+      <td class="taxonomy-dimensional-context-cell"></td>
+      <td colspan="2" class="taxonomy-context-value-summernote multi-language-content content-tr" style="display: table-cell;">
+       <div>
+        <div>
+         <div class="text-block-value">
+          Aralık 2025 Portföy Dağılım Raporu Bildirimidir.
+         </div>
+        </div>
+       </div></td>
+     </tr>
+    </tbody>
+   </table>
+  </div>
+  <br>
+  <br>
+  <div style="margin: 10px 0; text-align: center; font-weight: bold;">
+   ----------------------------------------------------------------------------------------------------------------
+  </div>
+  <br>
+  <br>
+ </body>
+</html>
