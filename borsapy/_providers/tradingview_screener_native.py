@@ -47,6 +47,9 @@ class TVScreenerProvider:
     Supports both public (delayed) and authenticated (real-time) data.
     Use `borsapy.set_tradingview_auth()` for real-time data access.
 
+    Some indicators (Supertrend, Tilson T3) are not available in TradingView
+    Scanner API and are calculated locally from historical data.
+
     Examples:
         >>> provider = TVScreenerProvider()
         >>> df = provider.scan(
@@ -54,7 +57,22 @@ class TVScreenerProvider:
         ...     conditions=["rsi < 30", "close > sma_50"],
         ...     interval="1d",
         ... )
+        >>> # Local calculation indicators
+        >>> df = provider.scan(
+        ...     symbols=["THYAO", "GARAN"],
+        ...     conditions=["supertrend_direction == 1"],  # Bullish trend
+        ... )
     """
+
+    # Fields that require local calculation (not available in TradingView Scanner API)
+    LOCAL_CALC_FIELDS: set[str] = {
+        "supertrend",
+        "supertrend_direction",
+        "supertrend_upper",
+        "supertrend_lower",
+        "t3",
+        "tilson_t3",
+    }
 
     # borsapy field name -> TradingView column name
     FIELD_MAP: dict[str, str] = {
@@ -202,9 +220,14 @@ class TVScreenerProvider:
     ) -> pd.DataFrame:
         """Execute scan using TradingView Scanner API.
 
+        Some indicators (Supertrend, Tilson T3) are calculated locally since
+        they're not available in TradingView Scanner API.
+
         Args:
             symbols: List of BIST symbols to scan (e.g., ["THYAO", "GARAN"])
             conditions: List of conditions (e.g., ["rsi < 30", "close > sma_50"])
+                Local calculation fields: supertrend, supertrend_direction,
+                supertrend_upper, supertrend_lower, t3, tilson_t3
             columns: Additional columns to retrieve
             interval: Timeframe for indicators ("1m", "5m", "15m", "30m", "1h", "4h", "1d", "1W", "1M")
             limit: Maximum number of results
@@ -215,6 +238,8 @@ class TVScreenerProvider:
         Examples:
             >>> provider = TVScreenerProvider()
             >>> df = provider.scan(["THYAO", "GARAN"], ["rsi < 30"])
+            >>> # Local calculation example
+            >>> df = provider.scan(["THYAO", "GARAN"], ["supertrend_direction == 1"])
         """
         if not symbols:
             return pd.DataFrame()
@@ -222,15 +247,78 @@ class TVScreenerProvider:
         if not conditions:
             return pd.DataFrame()
 
-        # Build query - always use turkey endpoint
-        # NOTE: set_tickers() changes endpoint to global/scan which has issues with BIST stocks
-        # So we always use set_markets('turkey') and filter results client-side
-        query = Query().set_markets("turkey")
-
         symbols_upper = [s.upper() for s in symbols]
 
+        # Separate conditions into API and local calculation
+        api_conditions, local_conditions = self._separate_conditions(conditions)
+
+        # Case 1: Only local conditions - process all symbols locally
+        if not api_conditions and local_conditions:
+            df = self._apply_local_conditions(symbols_upper, local_conditions, interval)
+            return df.head(limit) if not df.empty else df
+
+        # Case 2: Only API conditions - use TradingView API
+        if api_conditions and not local_conditions:
+            return self._scan_api(symbols_upper, api_conditions, columns, interval, limit)
+
+        # Case 3: Both API and local conditions
+        # First filter with API, then apply local conditions
+        api_df = self._scan_api(symbols_upper, api_conditions, columns, interval, limit * 5)
+
+        if api_df.empty:
+            return api_df
+
+        # Get symbols that passed API filter
+        api_symbols = api_df["symbol"].tolist() if "symbol" in api_df.columns else []
+
+        if not api_symbols:
+            return pd.DataFrame()
+
+        # Apply local conditions to API-filtered symbols
+        local_df = self._apply_local_conditions(api_symbols, local_conditions, interval)
+
+        if local_df.empty:
+            return local_df
+
+        # Merge API data with local calculations
+        if "symbol" in api_df.columns and "symbol" in local_df.columns:
+            # Keep local_df columns and add any missing from api_df
+            merged = local_df.merge(
+                api_df.drop(columns=["close", "price"], errors="ignore"),
+                on="symbol",
+                how="inner",
+                suffixes=("", "_api"),
+            )
+            # Remove duplicate columns
+            merged = merged.loc[:, ~merged.columns.str.endswith("_api")]
+            return merged.head(limit)
+
+        return local_df.head(limit)
+
+    def _scan_api(
+        self,
+        symbols: list[str],
+        conditions: list[str],
+        columns: list[str] | None,
+        interval: str,
+        limit: int,
+    ) -> pd.DataFrame:
+        """Execute scan using TradingView Scanner API only.
+
+        Args:
+            symbols: List of BIST symbols
+            conditions: API-compatible conditions
+            columns: Additional columns
+            interval: Timeframe
+            limit: Maximum results
+
+        Returns:
+            DataFrame with matching symbols
+        """
+        # Build query - always use turkey endpoint
+        query = Query().set_markets("turkey")
+
         # Parse all conditions first
-        # NOTE: Query.where() REPLACES filters, so we must pass all filters at once
         filters: list[Any] = []
         for cond in conditions:
             try:
@@ -238,7 +326,6 @@ class TVScreenerProvider:
                 if filter_expr is not None:
                     filters.append(filter_expr)
             except Exception as e:
-                # Skip invalid conditions but log warning
                 import warnings
 
                 warnings.warn(f"Failed to parse condition '{cond}': {e}", stacklevel=2)
@@ -283,7 +370,7 @@ class TVScreenerProvider:
 
         # Filter to requested symbols (client-side)
         if "symbol" in df.columns:
-            df = df[df["symbol"].isin(symbols_upper)]
+            df = df[df["symbol"].isin(symbols)]
             df = df.head(limit)
 
         return df
@@ -619,3 +706,190 @@ class TVScreenerProvider:
         result = result.rename(columns=rename_map)
 
         return result
+
+    def _requires_local_calc(self, field: str) -> bool:
+        """Check if a field requires local calculation.
+
+        Args:
+            field: Field name
+
+        Returns:
+            True if field needs local calculation
+        """
+        field = field.lower().strip()
+
+        # Check direct match
+        if field in self.LOCAL_CALC_FIELDS:
+            return True
+
+        # Check patterns: supertrend_*, t3_*, tilson_t3_*
+        if field.startswith(("supertrend", "t3_", "tilson_t3")):
+            return True
+
+        return False
+
+    def _separate_conditions(
+        self, conditions: list[str]
+    ) -> tuple[list[str], list[str]]:
+        """Separate conditions into API and local calculation conditions.
+
+        Args:
+            conditions: List of condition strings
+
+        Returns:
+            Tuple of (api_conditions, local_conditions)
+        """
+        api_conditions = []
+        local_conditions = []
+
+        for cond in conditions:
+            fields = self._extract_fields_from_condition(cond)
+            needs_local = any(self._requires_local_calc(f) for f in fields)
+
+            if needs_local:
+                local_conditions.append(cond)
+            else:
+                api_conditions.append(cond)
+
+        return api_conditions, local_conditions
+
+    def _apply_local_conditions(
+        self,
+        symbols: list[str],
+        conditions: list[str],
+        interval: str,
+    ) -> pd.DataFrame:
+        """Apply local calculation conditions to symbols.
+
+        Fetches historical data, calculates indicators, and filters.
+
+        Args:
+            symbols: List of symbols to process
+            conditions: Local calculation conditions
+            interval: Timeframe
+
+        Returns:
+            DataFrame with symbols matching all conditions
+        """
+        from borsapy.technical import calculate_supertrend, calculate_tilson_t3
+
+        if not symbols or not conditions:
+            return pd.DataFrame()
+
+        results = []
+
+        # Process each symbol
+        for symbol in symbols:
+            try:
+                # Fetch historical data
+                from borsapy.ticker import Ticker
+
+                ticker = Ticker(symbol)
+                df = ticker.history(period="3mo", interval=interval)
+
+                if df.empty or len(df) < 20:
+                    continue
+
+                # Calculate local indicators
+                indicators: dict[str, Any] = {}
+
+                # Supertrend
+                st_df = calculate_supertrend(df)
+                if not st_df.empty:
+                    indicators["supertrend"] = st_df["Supertrend"].iloc[-1]
+                    indicators["supertrend_direction"] = st_df[
+                        "Supertrend_Direction"
+                    ].iloc[-1]
+                    indicators["supertrend_upper"] = st_df["Supertrend_Upper"].iloc[-1]
+                    indicators["supertrend_lower"] = st_df["Supertrend_Lower"].iloc[-1]
+
+                # Tilson T3
+                t3_series = calculate_tilson_t3(df)
+                if not t3_series.empty:
+                    indicators["t3"] = t3_series.iloc[-1]
+                    indicators["tilson_t3"] = t3_series.iloc[-1]
+                    indicators["t3_5"] = t3_series.iloc[-1]
+
+                # Add price data
+                indicators["close"] = df["Close"].iloc[-1]
+                indicators["price"] = df["Close"].iloc[-1]
+
+                # Check all conditions
+                matches = True
+                for cond in conditions:
+                    if not self._evaluate_local_condition(cond, indicators):
+                        matches = False
+                        break
+
+                if matches:
+                    result_row = {"symbol": symbol}
+                    result_row.update(indicators)
+                    results.append(result_row)
+
+            except Exception:
+                # Skip symbols that fail
+                continue
+
+        if not results:
+            return pd.DataFrame()
+
+        return pd.DataFrame(results)
+
+    def _evaluate_local_condition(
+        self, condition: str, indicators: dict[str, Any]
+    ) -> bool:
+        """Evaluate a condition against calculated indicators.
+
+        Args:
+            condition: Condition string like "supertrend_direction == 1"
+            indicators: Dictionary of indicator values
+
+        Returns:
+            True if condition is satisfied
+        """
+        import operator
+
+        condition = condition.strip().lower()
+
+        # Parse condition: field op value
+        pattern = r"^(\w+)\s*(>=|<=|>|<|==|!=)\s*(.+)$"
+        match = re.match(pattern, condition)
+
+        if not match:
+            return True  # Skip unparseable conditions
+
+        field = match.group(1).strip()
+        op_str = match.group(2).strip()
+        right_str = match.group(3).strip()
+
+        # Get left value
+        left_val = indicators.get(field)
+        if left_val is None:
+            return False
+
+        # Get right value (number or another field)
+        try:
+            right_val = self._parse_number(right_str)
+        except ValueError:
+            right_val = indicators.get(right_str)
+            if right_val is None:
+                return False
+
+        # Apply operator
+        ops = {
+            ">": operator.gt,
+            "<": operator.lt,
+            ">=": operator.ge,
+            "<=": operator.le,
+            "==": operator.eq,
+            "!=": operator.ne,
+        }
+
+        op_func = ops.get(op_str)
+        if op_func is None:
+            return True
+
+        try:
+            return op_func(float(left_val), float(right_val))
+        except (ValueError, TypeError):
+            return False
