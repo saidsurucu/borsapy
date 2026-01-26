@@ -6,6 +6,12 @@
 [![License](https://img.shields.io/pypi/l/borsapy)](https://github.com/saidsurucu/borsapy/blob/master/LICENSE)
 [![Documentation](https://img.shields.io/badge/docs-API%20Reference-blue)](https://saidsurucu.github.io/borsapy/borsapy.html)
 
+> **Sorumluluk Reddi / Disclaimer**
+>
+> Bu kütüphane yalnızca kişisel kullanım ve eğitim amaçlıdır. Ticari yazılım ürünleri geliştirmek, ticari hizmetlerde kullanmak veya herhangi bir ticari amaçla kullanılamaz. Ticari kullanım için uygun bir lisans satın almak üzere Borsa İstanbul ile iletişime geçmelisiniz.
+>
+> This library is for personal and educational use only. It cannot be used for developing commercial software products, commercial services, or any commercial purposes. For commercial use, you must contact Borsa Istanbul to purchase an appropriate license.
+
 Türk finansal piyasaları için Python veri kütüphanesi. BIST hisseleri, döviz, kripto, yatırım fonları ve ekonomik veriler için yfinance benzeri API.
 
 [![Star History Chart](https://api.star-history.com/svg?repos=saidsurucu/borsapy&type=date&legend=top-left)](https://www.star-history.com/#saidsurucu/borsapy&type=date&legend=top-left)
