@@ -4,6 +4,7 @@ from typing import Any
 
 import pandas as pd
 
+from borsapy._providers.bist_index import get_bist_index_provider
 from borsapy._providers.isyatirim_screener import get_screener_provider
 
 
@@ -200,10 +201,12 @@ class Screener:
         Returns:
             DataFrame with matching stocks.
         """
+        # Note: İş Yatırım API doesn't support index filtering directly,
+        # so we filter locally using BIST index components
         results = self._provider.screen(
             criterias=self._filters if self._filters else None,
             sector=self._sector,
-            index=self._index,
+            index=None,  # API doesn't support this, we filter locally
             recommendation=self._recommendation,
             template=template,
         )
@@ -211,7 +214,41 @@ class Screener:
         if not results:
             return pd.DataFrame(columns=["symbol", "name"])
 
-        return pd.DataFrame(results)
+        df = pd.DataFrame(results)
+
+        # Filter by index if specified
+        if self._index and not df.empty:
+            df = self._filter_by_index(df, self._index)
+
+        return df
+
+    def _filter_by_index(self, df: pd.DataFrame, index: str) -> pd.DataFrame:
+        """Filter DataFrame to only include symbols in the specified index."""
+        # Normalize index name to code (e.g., "BIST 30" -> "XU030")
+        index_map = {
+            "BIST 30": "XU030",
+            "BIST30": "XU030",
+            "BIST 50": "XU050",
+            "BIST50": "XU050",
+            "BIST 100": "XU100",
+            "BIST100": "XU100",
+            "BIST BANKA": "XBANK",
+            "BIST SINAİ": "XUSIN",
+            "BIST HİZMETLER": "XUHIZ",
+            "BIST TEKNOLOJİ": "XUTEK",
+        }
+        index_code = index_map.get(index.upper().replace("_", " ").replace("-", " "), index.upper())
+
+        try:
+            provider = get_bist_index_provider()
+            components = provider.get_components(index_code)
+            if components:
+                symbols = [c["symbol"] for c in components]
+                return df[df["symbol"].isin(symbols)].reset_index(drop=True)
+        except Exception:
+            pass  # If index lookup fails, return unfiltered
+
+        return df
 
     def __repr__(self) -> str:
         return f"Screener(filters={len(self._filters)}, sector={self._sector}, index={self._index})"
