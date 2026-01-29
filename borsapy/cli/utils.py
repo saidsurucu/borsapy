@@ -4,13 +4,19 @@ Shared utilities for borsapy CLI.
 
 from typing import Literal
 
-import typer
 from rich.console import Console
 
 console = Console()
 err_console = Console(stderr=True)
 
 AssetType = Literal["stock", "fx", "crypto", "fund", "index"]
+Period = Literal["1d", "5d", "1mo", "3mo", "6mo", "1y", "2y", "3y", "5y", "max"]
+Interval = Literal["1m", "5m", "15m", "30m", "1h", "2h", "4h", "1d", "1wk", "1mo"]
+IndexType = Literal[
+    "XU100", "XU050", "XU030", "XBANK", "XHOLD", "XUSIN", "XGIDA", "XELKT",
+    "XILTM", "XKMYA", "XMANA", "XMESY", "XTAST", "XTEKS", "XUHIZ", "XUMAL",
+    "XUTEK", "XSIST", "XSPOR", "XK030", "XK100", "XKURY", "XYORT"
+]
 
 
 # Known FX currencies and commodities
@@ -199,22 +205,10 @@ def validate_symbols(symbols: list[str]) -> list[str]:
 
 
 def parse_period(period: str) -> str:
-    """Validate and normalize period string."""
-    valid_periods = {"1d", "5d", "1mo", "3mo", "6mo", "1y", "2y", "3y", "5y", "max"}
-    period_lower = period.lower()
-    if period_lower not in valid_periods:
-        raise typer.BadParameter(
-            f"Invalid period '{period}'. Valid options: {', '.join(sorted(valid_periods))}"
-        )
-    return period_lower
+    """Normalize period string (validation done by typer Literal type)."""
+    return period.lower()
 
 
 def parse_interval(interval: str) -> str:
-    """Validate and normalize interval string."""
-    valid_intervals = {"1m", "5m", "15m", "30m", "1h", "2h", "4h", "1d", "1wk", "1mo"}
-    interval_lower = interval.lower()
-    if interval_lower not in valid_intervals:
-        raise typer.BadParameter(
-            f"Invalid interval '{interval}'. Valid options: {', '.join(sorted(valid_intervals))}"
-        )
-    return interval_lower
+    """Normalize interval string (validation done by typer Literal type)."""
+    return interval.lower()

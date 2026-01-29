@@ -2,7 +2,7 @@
 Screen command - Stock/fund screening.
 """
 
-from typing import Annotated
+from typing import Annotated, Literal
 
 import typer
 
@@ -13,21 +13,36 @@ from borsapy.cli.formatters import (
     output_json,
     output_table,
 )
-from borsapy.cli.utils import console, handle_error
+from borsapy.cli.utils import IndexType, console, handle_error
+
+ScreenTemplate = Literal[
+    "small_cap", "mid_cap", "large_cap",
+    "high_dividend", "low_pe", "high_roe",
+    "high_upside", "low_upside",
+    "high_volume", "low_volume",
+    "buy_recommendation", "sell_recommendation",
+    "high_net_margin", "high_return", "high_foreign_ownership",
+]
+
+Recommendation = Literal["AL", "SAT", "TUT"]
 
 
 def screen(
     template: Annotated[
-        str | None,
-        typer.Option("--template", "-T", help="Use a preset template (high_dividend, low_pe, growth, value)"),
+        ScreenTemplate | None,
+        typer.Option("--template", "-T", help="Use a preset template"),
     ] = None,
     sector: Annotated[
         str | None,
-        typer.Option("--sector", "-s", help="Filter by sector"),
+        typer.Option("--sector", "-s", help="Filter by sector (e.g., Bankacılık, Holding, Enerji)"),
     ] = None,
     index: Annotated[
-        str | None,
-        typer.Option("--index", "-x", help="Filter by index (XU030, XU100, etc.)"),
+        IndexType | None,
+        typer.Option("--index", "-x", help="Filter by index"),
+    ] = None,
+    recommendation: Annotated[
+        Recommendation | None,
+        typer.Option("--rec", "-r", help="Filter by analyst recommendation"),
     ] = None,
     market_cap_min: Annotated[
         float | None,
@@ -57,6 +72,18 @@ def screen(
         float | None,
         typer.Option("--div-min", help="Minimum dividend yield (%)"),
     ] = None,
+    roe_min: Annotated[
+        float | None,
+        typer.Option("--roe-min", help="Minimum return on equity (%)"),
+    ] = None,
+    upside_min: Annotated[
+        float | None,
+        typer.Option("--upside-min", help="Minimum upside potential (%)"),
+    ] = None,
+    foreign_min: Annotated[
+        float | None,
+        typer.Option("--foreign-min", help="Minimum foreign ownership (%)"),
+    ] = None,
     limit: Annotated[
         int,
         typer.Option("--limit", "-l", help="Maximum number of results"),
@@ -69,18 +96,41 @@ def screen(
     """
     Screen stocks based on fundamental criteria.
 
-    Templates:
-        high_dividend - Stocks with dividend yield > 5%
-        low_pe - Stocks with P/E < 10
-        growth - High revenue growth stocks
-        value - Low P/E and P/B stocks
+    TEMPLATES (--template):
+
+      Size: small_cap, mid_cap, large_cap
+
+      Value: high_dividend, low_pe, high_roe
+
+      Momentum: high_upside, low_upside, high_return
+
+      Volume: high_volume, low_volume
+
+      Analyst: buy_recommendation, sell_recommendation
+
+      Other: high_net_margin, high_foreign_ownership
+
+    FILTERS:
+
+      Valuation: --pe-min/max, --pb-min/max
+
+      Fundamentals: --div-min, --roe-min, --mcap-min/max
+
+      Analyst: --upside-min, --rec (AL/SAT/TUT)
+
+      Ownership: --foreign-min
+
+    SECTORS (--sector):
+
+      Bankacılık, Holding, Enerji, Gıda, İnşaat, Otomotiv, Perakende, Teknoloji, Telekomünikasyon, vb.
 
     Examples:
         borsapy screen --template high_dividend
+        borsapy screen --template buy_recommendation --index XU030
         borsapy screen --pe-max 10 --div-min 3
-        borsapy screen --sector Bankacılık
-        borsapy screen --index XU030 --pe-max 15
-        borsapy screen --mcap-min 1000 --pe-max 10
+        borsapy screen --sector Bankacılık --roe-min 15
+        borsapy screen --index XU100 --upside-min 20
+        borsapy screen --rec AL --mcap-min 1000
     """
     import borsapy as bp
 
@@ -89,41 +139,29 @@ def screen(
             # Build screener
             screener = bp.Screener()
 
-            # Apply template
-            if template:
-                if template == "high_dividend":
-                    screener.add_filter("dividend_yield", min=5)
-                elif template == "low_pe":
-                    screener.add_filter("pe_ratio", max=10)
-                elif template == "growth":
-                    screener.add_filter("revenue_growth", min=20)
-                elif template == "value":
-                    screener.add_filter("pe_ratio", max=12)
-                    screener.add_filter("pb_ratio", max=1.5)
-                else:
-                    console.print(f"[yellow]Unknown template: {template}[/yellow]")
-
             # Apply filters
             if sector:
                 screener.set_sector(sector)
             if index:
                 screener.set_index(index)
-            if market_cap_min:
-                screener.add_filter("market_cap", min=market_cap_min)
-            if market_cap_max:
-                screener.add_filter("market_cap", max=market_cap_max)
-            if pe_min:
-                screener.add_filter("pe_ratio", min=pe_min)
-            if pe_max:
-                screener.add_filter("pe_ratio", max=pe_max)
-            if pb_min:
-                screener.add_filter("pb_ratio", min=pb_min)
-            if pb_max:
-                screener.add_filter("pb_ratio", max=pb_max)
+            if recommendation:
+                screener.set_recommendation(recommendation)
+            if market_cap_min or market_cap_max:
+                screener.add_filter("market_cap", min=market_cap_min, max=market_cap_max)
+            if pe_min or pe_max:
+                screener.add_filter("pe", min=pe_min, max=pe_max)
+            if pb_min or pb_max:
+                screener.add_filter("pb", min=pb_min, max=pb_max)
             if dividend_min:
                 screener.add_filter("dividend_yield", min=dividend_min)
+            if roe_min:
+                screener.add_filter("roe", min=roe_min)
+            if upside_min:
+                screener.add_filter("upside_potential", min=upside_min)
+            if foreign_min:
+                screener.add_filter("foreign_ratio", min=foreign_min)
 
-            results = screener.run()
+            results = screener.run(template=template)
 
             if results is None or (hasattr(results, "empty") and results.empty):
                 console.print("[yellow]No stocks match the criteria[/yellow]")

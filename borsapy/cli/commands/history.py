@@ -15,23 +15,23 @@ from borsapy.cli.formatters import (
 )
 from borsapy.cli.utils import (
     AssetType,
+    Interval,
+    Period,
     console,
     get_asset,
     handle_error,
-    parse_interval,
-    parse_period,
 )
 
 
 def history(
     symbol: Annotated[str, typer.Argument(help="Symbol to get history for")],
     period: Annotated[
-        str,
-        typer.Option("--period", "-p", help="Time period (1d, 5d, 1mo, 3mo, 6mo, 1y, 2y, 5y, max)"),
+        Period,
+        typer.Option("--period", "-p", help="Time period"),
     ] = "1mo",
     interval: Annotated[
-        str,
-        typer.Option("--interval", "-i", help="Data interval (1m, 5m, 15m, 30m, 1h, 4h, 1d, 1wk, 1mo)"),
+        Interval,
+        typer.Option("--interval", "-i", help="Data interval"),
     ] = "1d",
     asset_type: Annotated[
         AssetType | None,
@@ -62,8 +62,6 @@ def history(
         borsapy history THYAO --output json
     """
     symbol = symbol.strip().upper()
-    period = parse_period(period)
-    interval = parse_interval(interval)
 
     with console.status(f"[bold green]Fetching {symbol} history..."):
         try:

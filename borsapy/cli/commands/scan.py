@@ -13,17 +13,17 @@ from borsapy.cli.formatters import (
     output_json,
     output_table,
 )
-from borsapy.cli.utils import console, handle_error, parse_interval
+from borsapy.cli.utils import IndexType, Interval, console, handle_error
 
 
 def scan(
     condition: Annotated[str, typer.Argument(help="Scan condition (e.g., 'rsi < 30', 'close > sma_50')")],
     index: Annotated[
-        str,
-        typer.Option("--index", "-x", help="Index to scan (XU030, XU100, XBANK, etc.)"),
+        IndexType,
+        typer.Option("--index", "-x", help="Index to scan"),
     ] = "XU030",
     interval: Annotated[
-        str,
+        Interval,
         typer.Option("--interval", "-i", help="Timeframe for indicators"),
     ] = "1d",
     limit: Annotated[
@@ -38,30 +38,41 @@ def scan(
     """
     Scan for stocks matching technical conditions.
 
-    Supported conditions:
-        - rsi < 30, rsi > 70
-        - close > sma_50, close < sma_200
-        - macd > signal
-        - volume > 1000000
-        - change_percent > 3
+    SUPPORTED FIELDS:
 
-    Compound conditions:
-        - rsi < 30 and volume > 1000000
+      Price: price, close, open, high, low, volume, change_percent, market_cap
 
-    Crossover conditions:
-        - sma_20 crosses_above sma_50
-        - macd crosses signal
+      RSI: rsi, rsi_7, rsi_14
+
+      SMA: sma_5, sma_10, sma_20, sma_30, sma_50, sma_100, sma_200
+
+      EMA: ema_5, ema_10, ema_12, ema_20, ema_26, ema_50, ema_100, ema_200
+
+      MACD: macd, signal, histogram
+
+      Stochastic: stoch_k, stoch_d
+
+      Other: adx, bb_upper, bb_middle, bb_lower, atr, cci, wr
+
+    OPERATORS:
+
+      Comparison: <, >, <=, >=, ==
+
+      Logical: and, or
+
+      Crossover: crosses_above, crosses_below, crosses
+
+      Percent: above_pct, below_pct (e.g., "close above_pct sma_50 1.05")
 
     Examples:
         borsapy scan "rsi < 30" --index XU030
         borsapy scan "close > sma_50" --index XU100
         borsapy scan "rsi < 30 and volume > 1000000"
         borsapy scan "macd > signal" --interval 1h
-        borsapy scan "change_percent > 3" --index XBANK
+        borsapy scan "sma_20 crosses_above sma_50" --index XBANK
+        borsapy scan "change_percent > 3"
     """
     import borsapy as bp
-
-    interval = parse_interval(interval)
 
     with console.status(f"[bold green]Scanning {index} for '{condition}'..."):
         try:
