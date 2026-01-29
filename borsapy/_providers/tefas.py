@@ -108,19 +108,21 @@ class TEFASProvider(BaseProvider):
         # Disable SSL verification for TEFAS
         self._client.verify = False
 
-    def get_fund_detail(self, fund_code: str) -> dict[str, Any]:
+    def get_fund_detail(self, fund_code: str, fund_type: str = "YAT") -> dict[str, Any]:
         """
         Get detailed information about a fund.
 
         Args:
             fund_code: TEFAS fund code (e.g., "AAK", "TTE")
+            fund_type: Fund type - "YAT" for investment funds, "EMK" for pension funds.
 
         Returns:
             Dictionary with fund details.
         """
         fund_code = fund_code.upper()
+        fund_type = fund_type.upper()
 
-        cache_key = f"tefas:detail:{fund_code}"
+        cache_key = f"tefas:detail:{fund_code}:{fund_type}"
         cached = self._cache_get(cache_key)
         if cached is not None:
             return cached
@@ -217,6 +219,7 @@ class TEFASProvider(BaseProvider):
         period: str = "1mo",
         start: datetime | None = None,
         end: datetime | None = None,
+        fund_type: str = "YAT",
     ) -> pd.DataFrame:
         """
         Get historical price data for a fund.
@@ -226,6 +229,7 @@ class TEFASProvider(BaseProvider):
             period: Data period (1d, 5d, 1mo, 3mo, 6mo, 1y, 3y, 5y, max)
             start: Start date
             end: End date
+            fund_type: Fund type - "YAT" for investment funds, "EMK" for pension funds.
 
         Returns:
             DataFrame with price history.
@@ -235,6 +239,7 @@ class TEFASProvider(BaseProvider):
             to avoid TEFAS WAF blocking.
         """
         fund_code = fund_code.upper()
+        fund_type = fund_type.upper()
 
         # Calculate date range
         end_dt = end or datetime.now()
@@ -254,7 +259,7 @@ class TEFASProvider(BaseProvider):
             }.get(period, 30)
             start_dt = end_dt - timedelta(days=days)
 
-        cache_key = f"tefas:history:{fund_code}:{start_dt.date()}:{end_dt.date()}"
+        cache_key = f"tefas:history:{fund_code}:{fund_type}:{start_dt.date()}:{end_dt.date()}"
         cached = self._cache_get(cache_key)
         if cached is not None:
             return cached
@@ -262,9 +267,9 @@ class TEFASProvider(BaseProvider):
         # Check if we need chunked requests
         total_days = (end_dt - start_dt).days
         if total_days > self.MAX_CHUNK_DAYS:
-            df = self._get_history_chunked(fund_code, start_dt, end_dt)
+            df = self._get_history_chunked(fund_code, start_dt, end_dt, fund_type)
         else:
-            df = self._fetch_history_chunk(fund_code, start_dt, end_dt)
+            df = self._fetch_history_chunk(fund_code, start_dt, end_dt, fund_type)
 
         self._cache_set(cache_key, df, TTL.OHLCV_HISTORY)
         return df
@@ -274,6 +279,7 @@ class TEFASProvider(BaseProvider):
         fund_code: str,
         start_dt: datetime,
         end_dt: datetime,
+        fund_type: str = "YAT",
     ) -> pd.DataFrame:
         """
         Fetch history in chunks to avoid WAF blocking.
@@ -295,7 +301,7 @@ class TEFASProvider(BaseProvider):
                 if chunk_count > 0:
                     time.sleep(0.3)
 
-                chunk_df = self._fetch_history_chunk(fund_code, chunk_start, chunk_end)
+                chunk_df = self._fetch_history_chunk(fund_code, chunk_start, chunk_end, fund_type)
                 if not chunk_df.empty:
                     all_records.append(chunk_df)
                 chunk_count += 1
@@ -324,13 +330,14 @@ class TEFASProvider(BaseProvider):
         fund_code: str,
         start_dt: datetime,
         end_dt: datetime,
+        fund_type: str = "YAT",
     ) -> pd.DataFrame:
         """Fetch a single chunk of history data (max ~90 days)."""
         try:
             url = f"{self.BASE_URL}/BindHistoryInfo"
 
             data = {
-                "fontip": "YAT",
+                "fontip": fund_type,
                 "sfontur": "",
                 "fonkod": fund_code,
                 "fongrup": "",
@@ -398,6 +405,7 @@ class TEFASProvider(BaseProvider):
         fund_code: str,
         start: datetime | None = None,
         end: datetime | None = None,
+        fund_type: str = "YAT",
     ) -> pd.DataFrame:
         """
         Get portfolio allocation (asset breakdown) for a fund.
@@ -406,17 +414,19 @@ class TEFASProvider(BaseProvider):
             fund_code: TEFAS fund code
             start: Start date (default: 7 days ago)
             end: End date (default: today)
+            fund_type: Fund type - "YAT" for investment funds, "EMK" for pension funds.
 
         Returns:
             DataFrame with columns: Date, asset_type, asset_name, weight
         """
         fund_code = fund_code.upper()
+        fund_type = fund_type.upper()
 
         # Default date range (1 week)
         end_dt = end or datetime.now()
         start_dt = start or (end_dt - timedelta(days=7))
 
-        cache_key = f"tefas:allocation:{fund_code}:{start_dt.date()}:{end_dt.date()}"
+        cache_key = f"tefas:allocation:{fund_code}:{fund_type}:{start_dt.date()}:{end_dt.date()}"
         cached = self._cache_get(cache_key)
         if cached is not None:
             return cached
@@ -425,7 +435,7 @@ class TEFASProvider(BaseProvider):
             url = f"{self.BASE_URL}/BindHistoryAllocation"
 
             data = {
-                "fontip": "YAT",
+                "fontip": fund_type,
                 "sfontur": "",
                 "fonkod": fund_code,
                 "fongrup": "",

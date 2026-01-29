@@ -540,9 +540,9 @@ print(eth.current)
 
 ---
 
-## Fund (Yatırım Fonları)
+## Fund (Yatırım ve Emeklilik Fonları)
 
-TEFAS üzerinden yatırım fonu verileri.
+TEFAS üzerinden yatırım fonu ve emeklilik fonu verileri.
 
 ### Temel Kullanım
 
@@ -552,12 +552,30 @@ import borsapy as bp
 # Fon arama
 print(bp.search_funds("banka"))
 
-# Fon verisi
+# Yatırım Fonu (YAT) - varsayılan
 fon = bp.Fund("AAK")
 print(fon.info)                     # Fon bilgileri
-print(fon.history(period="1ay"))    # Fiyat geçmişi
+print(fon.history(period="1mo"))    # Fiyat geçmişi
 print(fon.performance)              # Performans verileri
+
+# Emeklilik Fonu (EMK) - explicit
+emk = bp.Fund("KJM", fund_type="EMK")
+print(emk.info)                     # Emeklilik fonu bilgileri
+print(emk.history(period="1mo"))    # Fiyat geçmişi
+
+# Auto-detection: fund_type belirtilmezse otomatik algılanır
+emk = bp.Fund("KJM")                # Otomatik olarak EMK algılanır
+print(emk.fund_type)                # "EMK"
 ```
+
+### Fon Tipleri
+
+| Kod | Açıklama | Örnek |
+|-----|----------|-------|
+| `YAT` | Yatırım Fonları (Investment Funds) | `bp.Fund("AAK")` |
+| `EMK` | Emeklilik Fonları (Pension Funds) | `bp.Fund("KJM", fund_type="EMK")` |
+
+> **Not**: `fund_type` belirtilmezse otomatik algılama yapılır (önce YAT, sonra EMK denenir).
 
 ### Varlık Dağılımı
 
@@ -581,12 +599,16 @@ print(fon.info['category_rank'])    # Kategori sırası (örn: 20/181)
 ### Fon Tarama
 
 ```python
-# Getiri kriterlerine göre filtrele
+# Yatırım fonlarını filtrele (varsayılan)
 df = bp.screen_funds(fund_type="YAT", min_return_1y=50)   # >%50 1Y getiri
-df = bp.screen_funds(fund_type="EMK", min_return_ytd=20)  # Emeklilik fonları
 df = bp.screen_funds(min_return_1m=5)                     # Son 1 ayda >%5
 
-# Fon tipleri: YAT (yatırım), EMK (emeklilik), None (tümü)
+# Emeklilik fonlarını filtrele
+df = bp.screen_funds(fund_type="EMK")                     # Tüm emeklilik fonları
+df = bp.screen_funds(fund_type="EMK", min_return_ytd=20)  # >%20 YTD getiri
+df = bp.screen_funds(fund_type="EMK", min_return_1y=30)   # >%30 1Y getiri
+
+# Fon tipleri: "YAT" (yatırım - varsayılan), "EMK" (emeklilik)
 ```
 
 ### Fon Karşılaştırma

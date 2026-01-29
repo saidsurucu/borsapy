@@ -307,7 +307,15 @@ class ReplaySession:
         if isinstance(end_date, str):
             end_date = pd.to_datetime(end_date)
 
-        # Filter DataFrame
+        # Handle timezone compatibility
+        # If DataFrame index is timezone-aware, convert filter dates to match
+        if self._df.index.tz is not None:
+            if start_date is not None and start_date.tzinfo is None:
+                start_date = start_date.tz_localize(self._df.index.tz)
+            if end_date is not None and end_date.tzinfo is None:
+                end_date = end_date.tz_localize(self._df.index.tz)
+
+        # Filter DataFrame using .date() comparison for timezone safety
         mask = pd.Series([True] * len(self._df), index=self._df.index)
 
         if start_date is not None:

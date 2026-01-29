@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 
 from borsapy._providers.tefas import get_tefas_provider
+from borsapy.exceptions import DataNotAvailableError
 from borsapy.technical import TechnicalMixin
 
 
@@ -30,16 +31,24 @@ class Fund(TechnicalMixin):
         45.67
     """
 
-    def __init__(self, fund_code: str):
+    def __init__(self, fund_code: str, fund_type: str | None = None):
         """
         Initialize a Fund object.
 
         Args:
             fund_code: TEFAS fund code (e.g., "AAK", "TTE", "YAF")
+            fund_type: Fund type - "YAT" for investment funds, "EMK" for pension funds.
+                      If None, auto-detects by trying YAT first, then EMK.
+
+        Examples:
+            >>> fund = bp.Fund("AAK")              # Investment fund (auto-detect)
+            >>> fund = bp.Fund("HEF", fund_type="EMK")  # Pension fund (explicit)
         """
         self._fund_code = fund_code.upper()
+        self._fund_type = fund_type.upper() if fund_type else None
         self._provider = get_tefas_provider()
         self._info_cache: dict[str, Any] | None = None
+        self._detected_fund_type: str | None = None
 
     @property
     def fund_code(self) -> str:
@@ -50,6 +59,57 @@ class Fund(TechnicalMixin):
     def symbol(self) -> str:
         """Return the fund code (alias)."""
         return self._fund_code
+
+    @property
+    def fund_type(self) -> str:
+        """
+        Return the fund type ("YAT" or "EMK").
+
+        If not explicitly set, auto-detects on first history() or allocation() call.
+        """
+        if self._fund_type:
+            return self._fund_type
+        if self._detected_fund_type:
+            return self._detected_fund_type
+
+        # Auto-detect by trying history with YAT first, then EMK
+        self._detect_fund_type()
+        return self._detected_fund_type or "YAT"
+
+    def _detect_fund_type(self) -> None:
+        """Auto-detect fund type by trying history API with different fund types."""
+        if self._fund_type or self._detected_fund_type:
+            return
+
+        from datetime import timedelta
+
+        end_dt = datetime.now()
+        start_dt = end_dt - timedelta(days=7)
+
+        # Try YAT first
+        try:
+            df = self._provider._fetch_history_chunk(
+                self._fund_code, start_dt, end_dt, fund_type="YAT"
+            )
+            if not df.empty:
+                self._detected_fund_type = "YAT"
+                return
+        except DataNotAvailableError:
+            pass
+
+        # Try EMK
+        try:
+            df = self._provider._fetch_history_chunk(
+                self._fund_code, start_dt, end_dt, fund_type="EMK"
+            )
+            if not df.empty:
+                self._detected_fund_type = "EMK"
+                return
+        except DataNotAvailableError:
+            pass
+
+        # Default to YAT if neither works
+        self._detected_fund_type = "YAT"
 
     @property
     def info(self) -> dict[str, Any]:
@@ -75,7 +135,14 @@ class Fund(TechnicalMixin):
             - daily_return: Daily return
         """
         if self._info_cache is None:
+            # GetAllFundAnalyzeData works for both YAT and EMK without fontip
             self._info_cache = self._provider.get_fund_detail(self._fund_code)
+
+            # If fund_type not explicitly set, we need to detect it for history/allocation
+            if not self._fund_type and not self._detected_fund_type:
+                # Detection will happen on first history() call
+                pass
+
         return self._info_cache
 
     @property
@@ -125,7 +192,7 @@ class Fund(TechnicalMixin):
             1 2024-12-20         DB        Devlet Bonusu  30.15
             ...
         """
-        return self._provider.get_allocation(self._fund_code)
+        return self._provider.get_allocation(self._fund_code, fund_type=self.fund_type)
 
     def allocation_history(
         self,
@@ -170,6 +237,7 @@ class Fund(TechnicalMixin):
             fund_code=self._fund_code,
             start=start_dt,
             end=end_dt,
+            fund_type=self.fund_type,
         )
 
     def history(
@@ -206,6 +274,7 @@ class Fund(TechnicalMixin):
             period=period,
             start=start_dt,
             end=end_dt,
+            fund_type=self.fund_type,
         )
 
     def _parse_date(self, date: str | datetime) -> datetime:
