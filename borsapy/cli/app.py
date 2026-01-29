@@ -11,8 +11,13 @@ from borsapy.cli.commands import (
     compare,
     dividends,
     economic,
+    eurobond,
+    financials,
     fund,
+    fx_rates,
     history,
+    holders,
+    index_cmd,
     inflation,
     news,
     price,
@@ -20,9 +25,12 @@ from borsapy.cli.commands import (
     scan,
     screen,
     search,
+    signals,
     splits,
+    targets,
     tcmb,
     technical,
+    viop,
     watch,
 )
 
@@ -84,3 +92,13 @@ app.command(name="bonds")(bonds.bonds)
 app.command(name="tcmb")(tcmb.tcmb)
 app.command(name="inflation")(inflation.inflation)
 app.command(name="fund")(fund.fund)
+
+# Batch 2 commands
+app.command(name="eurobond")(eurobond.eurobond)
+app.command(name="index")(index_cmd.index)
+app.command(name="financials")(financials.financials)
+app.command(name="signals")(signals.signals)
+app.command(name="holders")(holders.holders)
+app.command(name="targets")(targets.targets)
+app.command(name="fx-rates")(fx_rates.fx_rates)
+app.command(name="viop")(viop.viop)
