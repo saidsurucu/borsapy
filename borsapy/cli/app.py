@@ -6,14 +6,22 @@ import typer
 
 from borsapy.cli.commands import (
     auth,
+    bonds,
+    companies,
     compare,
+    dividends,
     economic,
+    fund,
     history,
+    inflation,
+    news,
     price,
     quote,
     scan,
     screen,
     search,
+    splits,
+    tcmb,
     technical,
     watch,
 )
@@ -66,3 +74,13 @@ app.command(name="technical")(technical.technical)
 app.command(name="compare")(compare.compare)
 app.command(name="watch")(watch.watch)
 app.command(name="economic")(economic.economic)
+
+# New commands
+app.command(name="news")(news.news)
+app.command(name="dividends")(dividends.dividends)
+app.command(name="splits")(splits.splits)
+app.command(name="companies")(companies.companies)
+app.command(name="bonds")(bonds.bonds)
+app.command(name="tcmb")(tcmb.tcmb)
+app.command(name="inflation")(inflation.inflation)
+app.command(name="fund")(fund.fund)
