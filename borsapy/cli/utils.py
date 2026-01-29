@@ -10,8 +10,15 @@ console = Console()
 err_console = Console(stderr=True)
 
 AssetType = Literal["stock", "fx", "crypto", "fund", "index"]
-Period = Literal["1d", "5d", "1mo", "3mo", "6mo", "1y", "2y", "3y", "5y", "max"]
-Interval = Literal["1m", "5m", "15m", "30m", "1h", "2h", "4h", "1d", "1wk", "1mo"]
+
+# History periods - combined from TradingViewProvider.PERIOD_DAYS and TEFAS
+Period = Literal["1d", "5d", "1mo", "3mo", "6mo", "1y", "2y", "3y", "5y", "10y", "ytd", "max"]
+
+# History intervals - based on TradingViewProvider.TIMEFRAMES (no 2h support)
+HistoryInterval = Literal["1m", "5m", "15m", "30m", "1h", "4h", "1d", "1wk", "1mo"]
+
+# Scan/Stream intervals - based on TVScreenerProvider.INTERVAL_MAP (has 2h support)
+ScanInterval = Literal["1m", "5m", "15m", "30m", "1h", "2h", "4h", "1d", "1wk", "1mo"]
 IndexType = Literal[
     "XU100", "XU050", "XU030", "XBANK", "XHOLD", "XUSIN", "XGIDA", "XELKT",
     "XILTM", "XKMYA", "XMANA", "XMESY", "XTAST", "XTEKS", "XUHIZ", "XUMAL",

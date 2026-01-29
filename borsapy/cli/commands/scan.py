@@ -13,7 +13,7 @@ from borsapy.cli.formatters import (
     output_json,
     output_table,
 )
-from borsapy.cli.utils import IndexType, Interval, console, handle_error
+from borsapy.cli.utils import IndexType, ScanInterval, console, handle_error
 
 
 def scan(
@@ -23,7 +23,7 @@ def scan(
         typer.Option("--index", "-x", help="Index to scan"),
     ] = "XU030",
     interval: Annotated[
-        Interval,
+        ScanInterval,
         typer.Option("--interval", "-i", help="Timeframe for indicators"),
     ] = "1d",
     limit: Annotated[

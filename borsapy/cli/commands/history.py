@@ -15,7 +15,7 @@ from borsapy.cli.formatters import (
 )
 from borsapy.cli.utils import (
     AssetType,
-    Interval,
+    HistoryInterval,
     Period,
     console,
     get_asset,
@@ -30,7 +30,7 @@ def history(
         typer.Option("--period", "-p", help="Time period"),
     ] = "1mo",
     interval: Annotated[
-        Interval,
+        HistoryInterval,
         typer.Option("--interval", "-i", help="Data interval"),
     ] = "1d",
     asset_type: Annotated[
