@@ -55,6 +55,32 @@ enf = bp.Inflation()
 print(enf.latest())                  # Son TÜFE verileri
 ```
 
+## Komut Satırı Arayüzü (CLI)
+
+borsapy, terminal üzerinden hızlı veri erişimi için kapsamlı bir CLI sunar:
+
+```bash
+# Fiyat sorgula
+borsapy price THYAO GARAN ASELS
+
+# Geçmiş verileri CSV'ye kaydet
+borsapy history THYAO --period 1y --output csv > thyao.csv
+
+# Teknik sinyaller
+borsapy signals THYAO --interval 1h
+
+# Canlı izleme
+borsapy watch THYAO GARAN --interval 0.5
+
+# Teknik tarama
+borsapy scan "rsi < 30 and volume > 1000000" --index XU100
+
+# Temel tarama
+borsapy screen --template high_dividend --index XU030
+```
+
+**[CLI Dokümantasyonu →](CLI.md)** | 25+ komut: fiyat, geçmiş, teknik analiz, mali tablolar, tarama ve daha fazlası.
+
 ---
 
 ## Ticker (Hisse Senedi)
