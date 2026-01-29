@@ -15,6 +15,7 @@ Examples:
 """
 
 from dataclasses import dataclass
+from datetime import date, datetime
 from typing import Any, Literal
 
 import numpy as np
@@ -65,6 +66,7 @@ class Holding:
     shares: float
     cost_per_share: float | None
     asset_type: AssetType
+    purchase_date: date | None = None
 
 
 def _detect_asset_type(symbol: str) -> AssetType:
@@ -156,6 +158,7 @@ class Portfolio(TechnicalMixin):
         shares: float,
         cost: float | None = None,
         asset_type: str | None = None,
+        purchase_date: str | date | datetime | None = None,
     ) -> "Portfolio":
         """
         Add an asset to the portfolio.
@@ -166,6 +169,9 @@ class Portfolio(TechnicalMixin):
             cost: Cost per share/unit. If None, uses current price.
             asset_type: Asset type override. Auto-detected if None.
                         Valid values: "stock", "fx", "crypto", "fund"
+            purchase_date: Date when the asset was purchased.
+                          Accepts string (YYYY-MM-DD), date, or datetime.
+                          If None, defaults to today.
 
         Returns:
             Self for method chaining.
@@ -176,6 +182,7 @@ class Portfolio(TechnicalMixin):
             >>> p.add("GARAN", shares=200)  # Stock at current price
             >>> p.add("gram-altin", shares=5, asset_type="fx")  # Metal
             >>> p.add("YAY", shares=500, asset_type="fund")  # Mutual fund
+            >>> p.add("ASELS", shares=50, cost=120, purchase_date="2024-01-15")
         """
         symbol = symbol.upper() if asset_type != "fx" else symbol
 
@@ -190,11 +197,24 @@ class Portfolio(TechnicalMixin):
             asset = self._get_or_create_asset(symbol, detected_type)
             cost = self._get_current_price(asset)
 
+        # Parse purchase_date
+        parsed_date: date | None = None
+        if purchase_date is not None:
+            if isinstance(purchase_date, str):
+                parsed_date = datetime.strptime(purchase_date, "%Y-%m-%d").date()
+            elif isinstance(purchase_date, datetime):
+                parsed_date = purchase_date.date()
+            elif isinstance(purchase_date, date):
+                parsed_date = purchase_date
+        else:
+            parsed_date = date.today()
+
         self._holdings[symbol] = Holding(
             symbol=symbol,
             shares=shares,
             cost_per_share=cost,
             asset_type=detected_type,
+            purchase_date=parsed_date,
         )
 
         return self
@@ -293,17 +313,21 @@ class Portfolio(TechnicalMixin):
             - pnl: Profit/loss (TL)
             - pnl_pct: Profit/loss (%)
             - asset_type: Asset type
+            - purchase_date: Date when asset was purchased
+            - holding_days: Number of days since purchase
         """
         if not self._holdings:
             return pd.DataFrame(
                 columns=[
                     "symbol", "shares", "cost", "current_price",
-                    "value", "weight", "pnl", "pnl_pct", "asset_type"
+                    "value", "weight", "pnl", "pnl_pct", "asset_type",
+                    "purchase_date", "holding_days"
                 ]
             )
 
         rows = []
         total_value = self.value
+        today = date.today()
 
         for symbol, holding in self._holdings.items():
             asset = self._get_or_create_asset(symbol, holding.asset_type)
@@ -313,6 +337,11 @@ class Portfolio(TechnicalMixin):
             pnl = value - cost_basis if cost_basis else 0
             pnl_pct = (pnl / cost_basis * 100) if cost_basis else 0
             weight = (value / total_value * 100) if total_value else 0
+
+            # Calculate holding days
+            holding_days = None
+            if holding.purchase_date:
+                holding_days = (today - holding.purchase_date).days
 
             rows.append({
                 "symbol": symbol,
@@ -324,6 +353,8 @@ class Portfolio(TechnicalMixin):
                 "pnl": round(pnl, 2),
                 "pnl_pct": round(pnl_pct, 2),
                 "asset_type": holding.asset_type,
+                "purchase_date": holding.purchase_date,
+                "holding_days": holding_days,
             })
 
         return pd.DataFrame(rows)
@@ -387,6 +418,8 @@ class Portfolio(TechnicalMixin):
         Get historical portfolio value based on current holdings.
 
         Note: Uses current share counts - does not track historical trades.
+        When purchase_date is set for a holding, only data from that date
+        onwards is included in the portfolio value calculation.
 
         Args:
             period: Period for historical data (1d, 5d, 1mo, 3mo, 6mo, 1y).
@@ -405,6 +438,18 @@ class Portfolio(TechnicalMixin):
                 hist = asset.history(period=period)
                 if hist.empty:
                     continue
+
+                # Filter by purchase_date if set
+                if holding.purchase_date:
+                    # Handle both timezone-aware and timezone-naive indices
+                    if hasattr(hist.index, 'tz') and hist.index.tz is not None:
+                        hist = hist[hist.index.date >= holding.purchase_date]
+                    else:
+                        hist = hist[hist.index >= pd.Timestamp(holding.purchase_date)]
+
+                if hist.empty:
+                    continue
+
                 # Use Close for stocks/index, Price for funds
                 price_col = "Close" if "Close" in hist.columns else "Price"
                 all_prices[symbol] = hist[price_col] * holding.shares
@@ -661,6 +706,7 @@ class Portfolio(TechnicalMixin):
                     "shares": h.shares,
                     "cost_per_share": h.cost_per_share,
                     "asset_type": h.asset_type,
+                    "purchase_date": h.purchase_date.isoformat() if h.purchase_date else None,
                 }
                 for h in self._holdings.values()
             ],
@@ -679,11 +725,17 @@ class Portfolio(TechnicalMixin):
         """
         portfolio = cls(benchmark=data.get("benchmark", "XU100"))
         for h in data.get("holdings", []):
+            # Parse purchase_date from ISO string
+            purchase_date = None
+            if h.get("purchase_date"):
+                purchase_date = date.fromisoformat(h["purchase_date"])
+
             portfolio.add(
                 symbol=h["symbol"],
                 shares=h["shares"],
                 cost=h.get("cost_per_share"),
                 asset_type=h.get("asset_type"),
+                purchase_date=purchase_date,
             )
         return portfolio
 

@@ -1,5 +1,7 @@
 """Tests for Portfolio management."""
 
+from datetime import date, datetime, timedelta
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -307,6 +309,169 @@ class TestHolding:
         """Test Holding with None cost."""
         h = Holding("THYAO", 100, None, "stock")
         assert h.cost_per_share is None
+
+    def test_holding_with_purchase_date(self):
+        """Test Holding with purchase_date."""
+        h = Holding("THYAO", 100, 280.0, "stock", purchase_date=date(2024, 1, 15))
+        assert h.purchase_date == date(2024, 1, 15)
+
+    def test_holding_default_purchase_date_none(self):
+        """Test Holding default purchase_date is None."""
+        h = Holding("THYAO", 100, 280.0, "stock")
+        assert h.purchase_date is None
+
+
+# =============================================================================
+# Purchase Date Tests
+# =============================================================================
+
+
+class TestPurchaseDate:
+    """Tests for purchase_date feature."""
+
+    def test_add_with_date_string(self, empty_portfolio):
+        """Test adding holding with date as string."""
+        empty_portfolio.add("THYAO", shares=100, cost=280.0, purchase_date="2024-01-15")
+        h = empty_portfolio._holdings["THYAO"]
+        assert h.purchase_date == date(2024, 1, 15)
+
+    def test_add_with_date_object(self, empty_portfolio):
+        """Test adding holding with date as date object."""
+        empty_portfolio.add("THYAO", shares=100, cost=280.0, purchase_date=date(2024, 6, 1))
+        h = empty_portfolio._holdings["THYAO"]
+        assert h.purchase_date == date(2024, 6, 1)
+
+    def test_add_with_datetime_object(self, empty_portfolio):
+        """Test adding holding with date as datetime object."""
+        dt = datetime(2024, 3, 15, 10, 30, 0)
+        empty_portfolio.add("THYAO", shares=100, cost=280.0, purchase_date=dt)
+        h = empty_portfolio._holdings["THYAO"]
+        assert h.purchase_date == date(2024, 3, 15)
+
+    def test_add_without_date_defaults_to_today(self, empty_portfolio):
+        """Test adding holding without date defaults to today."""
+        empty_portfolio.add("THYAO", shares=100, cost=280.0)
+        h = empty_portfolio._holdings["THYAO"]
+        assert h.purchase_date == date.today()
+
+    def test_holdings_has_purchase_date_column(self, empty_portfolio):
+        """Test holdings DataFrame has purchase_date column."""
+        empty_portfolio.add("THYAO", shares=100, cost=280.0, purchase_date="2024-01-15")
+        df = empty_portfolio.holdings
+        assert "purchase_date" in df.columns
+        assert df.iloc[0]["purchase_date"] == date(2024, 1, 15)
+
+    def test_holdings_has_holding_days_column(self, empty_portfolio):
+        """Test holdings DataFrame has holding_days column."""
+        # Set purchase date to 30 days ago
+        purchase = date.today() - timedelta(days=30)
+        empty_portfolio.add("THYAO", shares=100, cost=280.0, purchase_date=purchase)
+        df = empty_portfolio.holdings
+        assert "holding_days" in df.columns
+        assert df.iloc[0]["holding_days"] == 30
+
+    def test_holdings_columns_empty_portfolio(self, empty_portfolio):
+        """Test empty portfolio has purchase_date and holding_days columns."""
+        df = empty_portfolio.holdings
+        assert "purchase_date" in df.columns
+        assert "holding_days" in df.columns
+
+    def test_to_dict_includes_purchase_date(self, empty_portfolio):
+        """Test to_dict() includes purchase_date."""
+        empty_portfolio.add("THYAO", shares=100, cost=280.0, purchase_date="2024-01-15")
+        data = empty_portfolio.to_dict()
+        assert data["holdings"][0]["purchase_date"] == "2024-01-15"
+
+    def test_to_dict_null_purchase_date(self):
+        """Test to_dict() handles None purchase_date (legacy holdings)."""
+        p = Portfolio()
+        # Manually create holding without purchase_date
+        p._holdings["THYAO"] = Holding("THYAO", 100, 280.0, "stock", purchase_date=None)
+        data = p.to_dict()
+        assert data["holdings"][0]["purchase_date"] is None
+
+    def test_from_dict_restores_purchase_date(self):
+        """Test from_dict() restores purchase_date."""
+        data = {
+            "benchmark": "XU100",
+            "holdings": [
+                {
+                    "symbol": "THYAO",
+                    "shares": 100,
+                    "cost_per_share": 280.0,
+                    "asset_type": "stock",
+                    "purchase_date": "2024-01-15",
+                }
+            ],
+        }
+        p = Portfolio.from_dict(data)
+        h = p._holdings["THYAO"]
+        assert h.purchase_date == date(2024, 1, 15)
+
+    def test_from_dict_handles_missing_purchase_date(self):
+        """Test from_dict() handles legacy data without purchase_date."""
+        data = {
+            "benchmark": "XU100",
+            "holdings": [
+                {
+                    "symbol": "THYAO",
+                    "shares": 100,
+                    "cost_per_share": 280.0,
+                    "asset_type": "stock",
+                }
+            ],
+        }
+        p = Portfolio.from_dict(data)
+        h = p._holdings["THYAO"]
+        # Should default to today when not specified
+        assert h.purchase_date == date.today()
+
+    def test_from_dict_handles_null_purchase_date(self):
+        """Test from_dict() handles explicit null purchase_date."""
+        data = {
+            "benchmark": "XU100",
+            "holdings": [
+                {
+                    "symbol": "THYAO",
+                    "shares": 100,
+                    "cost_per_share": 280.0,
+                    "asset_type": "stock",
+                    "purchase_date": None,
+                }
+            ],
+        }
+        p = Portfolio.from_dict(data)
+        h = p._holdings["THYAO"]
+        # Should be today when explicitly None
+        assert h.purchase_date == date.today()
+
+    def test_roundtrip_with_purchase_date(self, empty_portfolio):
+        """Test export and re-import preserves purchase_date."""
+        empty_portfolio.add("THYAO", shares=100, cost=280.0, purchase_date="2024-01-15")
+        empty_portfolio.add("GARAN", shares=200, cost=50.0, purchase_date="2024-06-01")
+
+        data = empty_portfolio.to_dict()
+        restored = Portfolio.from_dict(data)
+
+        assert restored._holdings["THYAO"].purchase_date == date(2024, 1, 15)
+        assert restored._holdings["GARAN"].purchase_date == date(2024, 6, 1)
+
+    def test_multiple_holdings_different_dates(self, empty_portfolio):
+        """Test portfolio with holdings from different dates."""
+        empty_portfolio.add("THYAO", shares=100, cost=280.0, purchase_date="2024-01-15")
+        empty_portfolio.add("GARAN", shares=200, cost=50.0, purchase_date="2024-06-01")
+        empty_portfolio.add("ASELS", shares=50, cost=120.0)  # Today
+
+        df = empty_portfolio.holdings
+        assert len(df) == 3
+
+        thyao_row = df[df["symbol"] == "THYAO"].iloc[0]
+        garan_row = df[df["symbol"] == "GARAN"].iloc[0]
+        asels_row = df[df["symbol"] == "ASELS"].iloc[0]
+
+        assert thyao_row["purchase_date"] == date(2024, 1, 15)
+        assert garan_row["purchase_date"] == date(2024, 6, 1)
+        assert asels_row["purchase_date"] == date.today()
 
 
 # =============================================================================

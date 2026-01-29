@@ -642,6 +642,7 @@ fon.history(period="max")  # Tüm veri (5 yıla kadar)
 
 ```python
 import borsapy as bp
+from datetime import date
 
 # Portföy oluşturma
 portfolio = bp.Portfolio()
@@ -654,17 +655,56 @@ portfolio.add("USD", shares=1000, asset_type="fx")       # Döviz
 portfolio.add("BTCTRY", shares=0.5)                      # Kripto (auto-detect)
 portfolio.add("YAY", shares=1000, asset_type="fund")     # Yatırım Fonu
 
+# Alım tarihi ile ekleme (getiri hesaplamaları için)
+portfolio.add("ASELS", shares=50, cost=120.0, purchase_date="2024-01-15")  # String format
+portfolio.add("BIMAS", shares=30, cost=150.0, purchase_date=date(2024, 6, 1))  # date objesi
+
 # Benchmark ayarlama (Index karşılaştırması için)
 portfolio.set_benchmark("XU100")                         # XU030, XK030 da olabilir
 
 # Portföy durumu
-print(portfolio.holdings)     # DataFrame: symbol, shares, cost, current_price, value, weight, pnl, pnl_pct
+print(portfolio.holdings)     # DataFrame: symbol, shares, cost, value, weight, pnl, purchase_date, holding_days
 print(portfolio.value)        # Toplam değer (TL)
 print(portfolio.cost)         # Toplam maliyet
 print(portfolio.pnl)          # Kar/zarar (TL)
 print(portfolio.pnl_pct)      # Kar/zarar (%)
 print(portfolio.weights)      # {'THYAO': 0.45, 'GARAN': 0.35, ...}
 ```
+
+### Alım Tarihi (purchase_date)
+
+Holdinglere alım tarihi eklenerek daha isabetli getiri hesaplamaları yapılabilir:
+
+```python
+import borsapy as bp
+from datetime import date
+
+portfolio = bp.Portfolio()
+
+# Farklı tarihlerde alınmış hisseler
+portfolio.add("THYAO", shares=100, cost=280.0, purchase_date="2024-01-15")
+portfolio.add("GARAN", shares=200, cost=45.0, purchase_date=date(2024, 6, 1))
+portfolio.add("ASELS", shares=50, cost=120.0)  # Tarih verilmezse bugün
+
+# Holdings DataFrame'de purchase_date ve holding_days sütunları
+print(portfolio.holdings[['symbol', 'cost', 'purchase_date', 'holding_days']])
+#   symbol  cost purchase_date  holding_days
+# 0  THYAO   280    2024-01-15           380
+# 1  GARAN    45    2024-06-01           242
+# 2  ASELS   120    2026-01-29             0
+
+# Risk metrikleri artık holding bazlı tarih kullanır
+# Her holding için sadece purchase_date sonrası veriler dahil edilir
+metrics = portfolio.risk_metrics(period="1y")
+```
+
+**Desteklenen Tarih Formatları:**
+| Format | Örnek | Açıklama |
+|--------|-------|----------|
+| `str` | `"2024-01-15"` | ISO format (YYYY-MM-DD) |
+| `date` | `date(2024, 1, 15)` | Python date objesi |
+| `datetime` | `datetime(2024, 1, 15)` | Sadece tarih kısmı kullanılır |
+| `None` | - | Bugünün tarihi varsayılan |
 
 ### Desteklenen Varlık Tipleri
 
@@ -748,11 +788,12 @@ portfolio.add("THYAO", shares=100, cost=280).add("GARAN", shares=200, cost=50).s
 data = portfolio.to_dict()
 print(data)
 # {'benchmark': 'XU100', 'holdings': [
-#     {'symbol': 'THYAO', 'shares': 100, 'cost_per_share': 280.0, 'asset_type': 'stock'},
+#     {'symbol': 'THYAO', 'shares': 100, 'cost_per_share': 280.0,
+#      'asset_type': 'stock', 'purchase_date': '2024-01-15'},
 #     ...
 # ]}
 
-# Dict'ten import
+# Dict'ten import (purchase_date korunur)
 portfolio2 = bp.Portfolio.from_dict(data)
 
 # JSON'a kaydetme
