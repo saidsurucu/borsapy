@@ -9,9 +9,10 @@ import pandas as pd
 from borsapy._providers.tefas import get_tefas_provider
 from borsapy.exceptions import DataNotAvailableError
 from borsapy.technical import TechnicalMixin
+from borsapy.twitter import TwitterMixin, _build_fund_query
 
 
-class Fund(TechnicalMixin):
+class Fund(TechnicalMixin, TwitterMixin):
     """
     A yfinance-like interface for mutual fund data from TEFAS.
 
@@ -49,6 +50,14 @@ class Fund(TechnicalMixin):
         self._provider = get_tefas_provider()
         self._info_cache: dict[str, Any] | None = None
         self._detected_fund_type: str | None = None
+
+    def _get_tweet_query(self) -> str:
+        name = None
+        try:
+            name = self.info.get("name")
+        except Exception:
+            pass
+        return _build_fund_query(self._fund_code, name)
 
     @property
     def fund_code(self) -> str:

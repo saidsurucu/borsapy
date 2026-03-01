@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "borsapy"
-version = "0.7.5"
+version = "0.8.0"
 description = "Turkish financial markets data library - yfinance-like API for BIST stocks, forex, crypto, and more"
 readme = "README.md"
 license = { text = "Apache-2.0" }
@@ -54,6 +54,9 @@ dev = [
     "pytest>=7.0.0",
     "pytest-cov>=4.0.0",
     "ruff>=0.1.0",
+]
+twitter = [
+    "Scweet>=4.0.0",
 ]
 
 [project.scripts]

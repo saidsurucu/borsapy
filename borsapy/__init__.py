@@ -123,6 +123,13 @@ from borsapy._providers.tradingview import (
     get_tradingview_auth,
     set_tradingview_auth,
 )
+
+# Twitter/X authentication (optional, requires borsapy[twitter])
+from borsapy._providers.twitter import (
+    clear_twitter_auth,
+    get_twitter_auth,
+    set_twitter_auth,
+)
 from borsapy.backtest import Backtest, BacktestResult, Trade, backtest
 from borsapy.bond import Bond, bonds, risk_free_rate
 from borsapy.calendar import EconomicCalendar, economic_calendar
@@ -187,9 +194,10 @@ from borsapy.technical import (
     calculate_wma,
 )
 from borsapy.ticker import Ticker
+from borsapy.twitter import search_tweets
 from borsapy.viop import VIOP
 
-__version__ = "0.7.5"
+__version__ = "0.8.0"
 __author__ = "Said Surucu"
 
 __all__ = [
@@ -301,4 +309,9 @@ __all__ = [
     # Tax
     "withholding_tax_rate",
     "withholding_tax_table",
+    # Twitter/X (optional, requires borsapy[twitter])
+    "set_twitter_auth",
+    "get_twitter_auth",
+    "clear_twitter_auth",
+    "search_tweets",
 ]

@@ -75,6 +75,7 @@ class TTL:
     FUND_DATA = 3600  # 1 hour
     INFLATION_DATA = 86400  # 24 hours
     VIOP = 300  # 5 minutes (delayed data)
+    SOCIAL_DATA = 300  # 5 minutes (tweets change fast)
 
 
 # Global cache instance

@@ -20,6 +20,9 @@ Türk finansal piyasaları için Python veri kütüphanesi. BIST hisseleri, döv
 
 ```bash
 pip install borsapy
+
+# Twitter/X tweet arama için (optional)
+pip install borsapy[twitter]
 ```
 
 ## Hızlı Başlangıç
@@ -2427,6 +2430,105 @@ print(bullish[['symbol', 'supertrend', 'supertrend_direction', 'close']])
 
 ---
 
+## Twitter/X Tweet Arama
+
+Hisse, fon, döviz ve kripto ile ilgili tweet arama. Twitter/X GraphQL API üzerinden [Scweet](https://github.com/Altimis/Scweet) kütüphanesi ile çalışır.
+
+> **Optional Dependency:** `pip install borsapy[twitter]` ile yüklenir. Core borsapy kurulumunu etkilemez.
+
+### Kurulum ve Kimlik Doğrulama
+
+```python
+# Ek bağımlılık yükle
+# pip install borsapy[twitter]
+
+import borsapy as bp
+
+# Twitter cookie auth (browser DevTools > Application > Cookies > x.com)
+bp.set_twitter_auth(auth_token="abc123...", ct0="xyz789...")
+
+# Alternatif: cookies dict
+bp.set_twitter_auth(cookies={"auth_token": "abc123", "ct0": "xyz789"})
+
+# Alternatif: cookies dosyası
+bp.set_twitter_auth(cookies_file="cookies.json")
+
+# Auth temizle
+bp.clear_twitter_auth()
+```
+
+### Standalone Tweet Arama
+
+```python
+import borsapy as bp
+
+# Temel arama
+df = bp.search_tweets("$THYAO", period="7d")
+print(df[['text', 'author_handle', 'likes', 'retweets']])
+
+# Türkçe tweetler, son 1 gün
+df = bp.search_tweets("dolar kur", period="1d", lang="tr", limit=50)
+
+# Tarih aralığı ile
+df = bp.search_tweets("enflasyon", since="2025-01-01", until="2025-02-01")
+```
+
+### Asset Entegrasyonu
+
+Her varlık sınıfı için otomatik sorgu oluşturma:
+
+```python
+import borsapy as bp
+
+# Hisse — $THYAO OR #THYAO OR THYAO OR "TURK HAVA YOLLARI"
+bp.Ticker("THYAO").tweets(period="7d")
+
+# Fon — #AAK OR AAK OR "AK PORTFOY KISA VADELI BONO"
+bp.Fund("AAK").tweets(period="7d")
+
+# Döviz — $USDTRY OR dolar kur OR dolar TL
+bp.FX("USD").tweets(period="7d")
+
+# Kripto — $BTC OR #Bitcoin
+bp.Crypto("BTCTRY").tweets(period="7d")
+
+# Custom sorgu override
+bp.Ticker("THYAO").tweets(query="THY uçak grev")
+```
+
+### DataFrame Sütunları
+
+| Sütun | Tip | Açıklama |
+|-------|-----|----------|
+| `tweet_id` | str | Tweet ID |
+| `created_at` | datetime | Tarih |
+| `text` | str | Tweet metni |
+| `author_handle` | str | @kullanıcı |
+| `author_name` | str | Görünen isim |
+| `likes` | int | Beğeni |
+| `retweets` | int | Retweet |
+| `replies` | int | Yanıt |
+| `views` | int | Görüntülenme |
+| `quotes` | int | Alıntı |
+| `bookmarks` | int | Yer imi |
+| `author_followers` | int | Takipçi sayısı |
+| `author_verified` | bool | Doğrulanmış mı |
+| `lang` | str | Dil kodu |
+| `url` | str | Tweet linki |
+
+### Desteklenen Periodlar
+
+| Period | Süre |
+|--------|------|
+| `1d` | 1 gün |
+| `3d` | 3 gün |
+| `7d` / `1w` | 7 gün |
+| `2w` | 14 gün |
+| `1mo` | 30 gün |
+| `3mo` | 90 gün |
+
+---
+
 ## Şirket Listesi
 
 BIST şirketlerini listeleme ve arama.
@@ -2464,6 +2566,7 @@ print(sonuc)
 | TradingViewStream | TradingView WebSocket | Gerçek zamanlı fiyat, OHLCV, Pine Script göstergeleri |
 | Search | TradingView | Sembol arama (hisse, döviz, kripto, endeks, vadeli) |
 | Backtest | Yerel | Strateji backtesting engine |
+| Twitter/X | Scweet (optional) | Tweet arama (Twitter GraphQL API, cookie auth) |
 
 ---
 
@@ -2496,6 +2599,7 @@ print(sonuc)
 - **EconomicCalendar**: Ekonomik takvim - 7 ülke desteği (doviz.com)
 - **Screener**: Hisse tarama - 50+ kriter, sektör/endeks filtreleme (İş Yatırım)
 - **Teknik Analiz**: 12+ gösterge (SMA, EMA, RSI, MACD, Bollinger, ATR, Stochastic, OBV, VWAP, ADX, Supertrend, Tilson T3, Heikin Ashi)
+- **Twitter/X**: Tweet arama — hisse, fon, döviz, kripto entegrasyonu (Scweet, optional dep)
 - **KAP Entegrasyonu**: Resmi bildirimler ve takvim
 
 ---
@@ -2520,6 +2624,7 @@ Bu kütüphane aracılığıyla erişilen veriler, ilgili veri kaynaklarına ait
 - **Ziraat Bankası** (ziraatbank.com.tr): Eurobond verileri
 - **hedeffiyat.com.tr**: Analist hedef fiyatları
 - **isinturkiye.com.tr**: ISIN kodları
+- **Twitter/X** (x.com): Tweet verileri (Scweet kütüphanesi aracılığıyla, optional dependency)
 
 Kütüphane yalnızca kişisel kullanım amacıyla hazırlanmıştır ve veriler ticari amaçlarla kullanılamaz.
 

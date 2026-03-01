@@ -10,6 +10,7 @@ import pandas as pd
 from borsapy._providers.kap import get_kap_provider
 from borsapy._providers.tradingview import get_tradingview_provider
 from borsapy.technical import TechnicalMixin
+from borsapy.twitter import TwitterMixin, _build_stock_query
 
 
 class FastInfo:
@@ -464,7 +465,7 @@ class EnrichedInfo:
         return result
 
 
-class Ticker(TechnicalMixin):
+class Ticker(TechnicalMixin, TwitterMixin):
     """
     A yfinance-like interface for Turkish stock data.
 
@@ -495,6 +496,9 @@ class Ticker(TechnicalMixin):
         self._isin_provider = None  # Lazy load for ISIN lookup
         self._hedeffiyat = None  # Lazy load for analyst price targets
         self._etf_provider = None  # Lazy load for ETF holders
+
+    def _get_tweet_query(self) -> str:
+        return _build_stock_query(self._symbol)
 
     def _get_isyatirim(self):
         """Lazy load İş Yatırım provider for financial statements."""

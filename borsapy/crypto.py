@@ -7,9 +7,10 @@ import pandas as pd
 
 from borsapy._providers.btcturk import get_btcturk_provider
 from borsapy.technical import TechnicalMixin
+from borsapy.twitter import TwitterMixin, _build_crypto_query
 
 
-class Crypto(TechnicalMixin):
+class Crypto(TechnicalMixin, TwitterMixin):
     """
     A yfinance-like interface for cryptocurrency data from BtcTurk.
 
@@ -40,6 +41,9 @@ class Crypto(TechnicalMixin):
         self._pair = pair.upper()
         self._provider = get_btcturk_provider()
         self._current_cache: dict[str, Any] | None = None
+
+    def _get_tweet_query(self) -> str:
+        return _build_crypto_query(self._pair)
 
     @property
     def pair(self) -> str:

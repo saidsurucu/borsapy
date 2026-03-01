@@ -9,6 +9,7 @@ from borsapy._providers.canlidoviz import get_canlidoviz_provider
 from borsapy._providers.dovizcom import get_dovizcom_provider
 from borsapy._providers.tradingview import get_tradingview_provider
 from borsapy.technical import TechnicalMixin
+from borsapy.twitter import TwitterMixin, _build_fx_query
 
 # TradingView symbol mapping for currencies (asset -> (exchange, symbol))
 # Note: Only pairs that are verified to work on TradingView free tier
@@ -69,7 +70,7 @@ def metal_institutions() -> list[str]:
     return get_dovizcom_provider().get_metal_institutions()
 
 
-class FX(TechnicalMixin):
+class FX(TechnicalMixin, TwitterMixin):
     """
     A yfinance-like interface for forex and commodity data.
 
@@ -106,6 +107,9 @@ class FX(TechnicalMixin):
         self._dovizcom = get_dovizcom_provider()
         self._tradingview = get_tradingview_provider()
         self._current_cache: dict[str, Any] | None = None
+
+    def _get_tweet_query(self) -> str:
+        return _build_fx_query(self._asset)
 
     def _use_canlidoviz(self) -> bool:
         """Check if canlidoviz should be used for this asset."""
