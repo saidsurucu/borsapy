@@ -155,6 +155,11 @@ print(hisse.quarterly_cashflow)
 print(hisse.ttm_income_stmt)
 print(hisse.ttm_cashflow)
 
+# Daha fazla dönem çek (last_n parametresi)
+print(hisse.get_income_stmt(last_n=10))                  # 10 yıllık gelir tablosu
+print(hisse.get_balance_sheet(quarterly=True, last_n=20)) # 20 çeyreklik bilanço
+print(hisse.get_cashflow(last_n="all"))                   # Tüm mevcut dönemler
+
 # Bankalar için (UFRS formatı)
 banka = bp.Ticker("AKBNK")
 print(banka.get_balance_sheet(financial_group="UFRS"))
@@ -171,6 +176,8 @@ print(banka.get_ttm_cashflow(financial_group="UFRS"))
 ```
 
 > **Not**: Sınai şirketler varsayılan olarak `XI_29` formatını kullanır. Bankalar için `financial_group="UFRS"` parametresi gereklidir.
+>
+> `last_n` parametresi: `None` (varsayılan 5 dönem), `int` (tam sayı kadar dönem), `"all"` (tüm mevcut dönemler). 5'ten fazla dönem istendiğinde otomatik olarak birden fazla API çağrısı yapılır.
 
 ### Temettü ve Sermaye Artırımları
 

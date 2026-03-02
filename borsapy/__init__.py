@@ -197,7 +197,7 @@ from borsapy.ticker import Ticker
 from borsapy.twitter import search_tweets
 from borsapy.viop import VIOP
 
-__version__ = "0.8.0"
+__version__ = "0.8.1"
 __author__ = "Said Surucu"
 
 __all__ = [

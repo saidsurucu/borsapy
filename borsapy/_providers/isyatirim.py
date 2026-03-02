@@ -545,12 +545,16 @@ class IsYatirimProvider(BaseProvider):
             "update_time": update_time,
         }
 
+    # Maximum periods per API call (İş Yatırım limit)
+    _MAX_PERIODS_PER_CALL = 5
+
     def get_financial_statements(
         self,
         symbol: str,
         statement_type: str = "balance_sheet",
         quarterly: bool = False,
         financial_group: str | None = None,
+        last_n: int | str | None = None,
     ) -> pd.DataFrame:
         """
         Get financial statements for a company.
@@ -560,13 +564,21 @@ class IsYatirimProvider(BaseProvider):
             statement_type: Type of statement ("balance_sheet", "income_stmt", "cashflow").
             quarterly: If True, return quarterly data. If False, return annual data.
             financial_group: Financial group code (XI_29 for industrial, UFRS for banks).
+            last_n: Number of periods to fetch. None for default (5), int for exact count,
+                    "all" for maximum available (~15 annual, ~40 quarterly).
 
         Returns:
             DataFrame with financial data.
+
+        Raises:
+            ValueError: If last_n is invalid (0, negative, or unsupported string).
         """
         symbol = symbol.upper().replace(".IS", "").replace(".E", "")
 
-        cache_key = f"isyatirim:financial:{symbol}:{statement_type}:{quarterly}"
+        # Resolve count
+        count = self._resolve_last_n(last_n, quarterly)
+
+        cache_key = f"isyatirim:financial:{symbol}:{statement_type}:{quarterly}:{count}"
         cached = self._cache_get(cache_key)
         if cached is not None:
             return cached
@@ -584,23 +596,42 @@ class IsYatirimProvider(BaseProvider):
 
         tables = table_map.get(statement_type, ["BILANCO_AKTIF", "BILANCO_PASIF"])
 
-        # Get last 5 years/quarters
+        # Generate all periods needed
         current_year = datetime.now().year
-        periods = self._get_periods(current_year, quarterly, count=5)
+        periods = self._get_periods(current_year, quarterly, count=count)
+
+        # Split into batches of 5 (API limit)
+        batches = [
+            periods[i : i + self._MAX_PERIODS_PER_CALL]
+            for i in range(0, len(periods), self._MAX_PERIODS_PER_CALL)
+        ]
 
         all_data = []
         for table_name in tables:
-            try:
-                df = self._fetch_financial_table(
-                    symbol=symbol,
-                    table_name=table_name,
-                    financial_group=financial_group,
-                    periods=periods,
-                )
-                if not df.empty:
-                    all_data.append(df)
-            except Exception:
-                continue
+            table_dfs = []
+            for batch_periods in batches:
+                try:
+                    df = self._fetch_financial_table(
+                        symbol=symbol,
+                        table_name=table_name,
+                        financial_group=financial_group,
+                        periods=batch_periods,
+                        quarterly=quarterly,
+                    )
+                    if not df.empty:
+                        table_dfs.append(df)
+                except Exception:
+                    continue
+
+            if table_dfs:
+                # Merge batches horizontally (same rows, different period columns)
+                merged = table_dfs[0]
+                for extra_df in table_dfs[1:]:
+                    # Only add columns that don't already exist
+                    new_cols = [c for c in extra_df.columns if c not in merged.columns]
+                    if new_cols:
+                        merged = merged.join(extra_df[new_cols], how="outer")
+                all_data.append(merged)
 
         if not all_data:
             raise DataNotAvailableError(f"No financial data available for {symbol}")
@@ -608,9 +639,39 @@ class IsYatirimProvider(BaseProvider):
         result = pd.concat(all_data, axis=0) if len(all_data) > 1 else all_data[0]
         result = result.drop_duplicates()
 
+        # Sort columns: most recent first
+        result = result[sorted(result.columns, key=self._period_sort_key, reverse=True)]
+
         self._cache_set(cache_key, result, TTL.FINANCIAL_STATEMENTS)
 
         return result
+
+    @staticmethod
+    def _resolve_last_n(last_n: int | str | None, quarterly: bool) -> int:
+        """Resolve last_n parameter to an integer count."""
+        if last_n is None:
+            return 5
+        if isinstance(last_n, str):
+            if last_n.lower() == "all":
+                return 40 if quarterly else 15
+            raise ValueError(f"Invalid last_n value: {last_n!r}. Use an integer or 'all'.")
+        if not isinstance(last_n, int) or last_n < 1:
+            raise ValueError(f"last_n must be a positive integer or 'all', got {last_n!r}")
+        return last_n
+
+    @staticmethod
+    def _period_sort_key(col_name: str) -> tuple[int, int]:
+        """Sort key for period column names. Returns (year, quarter) tuple.
+
+        Handles both annual ('2024') and quarterly ('2024Q3') formats.
+        """
+        try:
+            if "Q" in col_name:
+                year_str, q_str = col_name.split("Q")
+                return (int(year_str), int(q_str))
+            return (int(col_name), 0)
+        except (ValueError, IndexError):
+            return (0, 0)
 
     def _get_periods(
         self,
@@ -623,6 +684,8 @@ class IsYatirimProvider(BaseProvider):
         For quarterly data, starts from the last completed quarter.
         For annual data, starts from the previous year (current year data
         typically not available until Q1 of next year).
+
+        Returns exactly ``count`` tuples.
         """
         periods = []
         if quarterly:
@@ -644,32 +707,26 @@ class IsYatirimProvider(BaseProvider):
             #   Dec: Q3 of current year is latest
             #
             if current_month <= 2:
-                # Jan-Feb: Q3 of previous year is latest available
                 start_year = current_year - 1
                 start_period = 9
             elif current_month <= 5:
-                # Mar-May: Q4 of previous year is latest
                 start_year = current_year - 1
                 start_period = 12
             elif current_month <= 8:
-                # Jun-Aug: Q1 of current year is latest
                 start_year = current_year
                 start_period = 3
             elif current_month <= 11:
-                # Sep-Nov: Q2 of current year is latest
                 start_year = current_year
                 start_period = 6
             else:
-                # Dec: Q3 of current year is latest
                 start_year = current_year
                 start_period = 9
 
-            # Generate quarters going backward from start
+            # Generate exactly `count` quarters going backward
             year = start_year
             period = start_period
-            for _ in range(count * 4):
+            for _ in range(count):
                 periods.append((year, period))
-                # Move to previous quarter
                 period -= 3
                 if period <= 0:
                     period = 12
@@ -686,8 +743,9 @@ class IsYatirimProvider(BaseProvider):
         table_name: str,
         financial_group: str,
         periods: list[tuple[int, int]],
+        quarterly: bool = False,
     ) -> pd.DataFrame:
-        """Fetch a specific financial table."""
+        """Fetch a specific financial table for up to 5 periods."""
         url = f"{self.BASE_URL}/Data.aspx/MaliTablo"
 
         # Build params with multiple year/period pairs
@@ -707,14 +765,23 @@ class IsYatirimProvider(BaseProvider):
         except Exception as e:
             raise APIError(f"Failed to fetch financial data for {symbol}: {e}") from e
 
-        return self._parse_financial_response(data, periods)
+        return self._parse_financial_response(data, periods, quarterly=quarterly)
 
     def _parse_financial_response(
         self,
         data: Any,
         periods: list[tuple[int, int]],
+        quarterly: bool = False,
     ) -> pd.DataFrame:
-        """Parse MaliTablo API response into DataFrame."""
+        """Parse MaliTablo API response into DataFrame.
+
+        Args:
+            data: Raw API response dict.
+            periods: List of (year, period) tuples sent in this batch.
+            quarterly: Whether these are quarterly periods. Passed explicitly
+                       to avoid misdetection when a single-quarter batch has
+                       period=12 (which looks like annual).
+        """
         if not data or not isinstance(data, dict):
             return pd.DataFrame()
 
@@ -723,16 +790,13 @@ class IsYatirimProvider(BaseProvider):
         if not items:
             return pd.DataFrame()
 
-        # Detect quarterly vs annual: annual has all periods = 12
-        is_quarterly = len({p[1] for p in periods}) > 1
-
         records = []
         for item in items:
             row_name = item.get("itemDescTr", item.get("itemDescEng", "Unknown"))
             row_data = {"Item": row_name}
 
             for i, (year, period) in enumerate(periods[:5], 1):
-                if is_quarterly:
+                if quarterly:
                     col_name = f"{year}Q{period // 3}"
                 else:
                     col_name = str(year)
