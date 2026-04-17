@@ -21,12 +21,41 @@ Examples:
     >>> bp.eurobonds(currency="EUR")  # Only EUR bonds
 """
 
-from datetime import datetime
+from datetime import date as date_type
+from datetime import datetime, timedelta
 
 import pandas as pd
 
 from borsapy._providers.ziraat_eurobond import get_eurobond_provider
 from borsapy.exceptions import DataNotAvailableError
+
+
+_PERIOD_DAYS = {
+    "1mo": 30,
+    "3mo": 90,
+    "6mo": 180,
+    "1y": 365,
+    "2y": 365 * 2,
+    "3y": 365 * 3,
+    "5y": 365 * 5,
+    "10y": 365 * 10,
+    "ytd": None,  # handled separately
+    "max": 365 * 15,
+}
+
+
+def _parse_date_arg(value: str | datetime | date_type) -> date_type:
+    """Parse start/end argument (accepts str YYYY-MM-DD, datetime, or date)."""
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date_type):
+        return value
+    for fmt in ("%Y-%m-%d", "%Y/%m/%d", "%d-%m-%Y", "%d/%m/%Y", "%d.%m.%Y"):
+        try:
+            return datetime.strptime(value, fmt).date()
+        except ValueError:
+            continue
+    raise ValueError(f"Could not parse date: {value!r}")
 
 
 class Eurobond:
@@ -124,6 +153,78 @@ class Eurobond:
             Dict with all bond attributes.
         """
         return self._data.copy()
+
+    def history(
+        self,
+        period: str | None = None,
+        start: str | datetime | date_type | None = None,
+        end: str | datetime | date_type | None = None,
+        skip_weekends: bool = True,
+    ) -> pd.DataFrame:
+        """Fetch daily historical bid/ask prices and yields.
+
+        Args:
+            period: Lookback window ending today. One of 1mo, 3mo, 6mo, 1y,
+                2y, 3y, 5y, 10y, ytd, max. Ignored if ``start`` is given.
+            start: Start date (str "YYYY-MM-DD", datetime, or date).
+            end: End date, defaults to today.
+            skip_weekends: Skip Sat/Sun (API returns zeros on weekends).
+
+        Returns:
+            DataFrame indexed by Date with columns: bid_price, bid_yield,
+            ask_price, ask_yield, days_to_maturity. Holidays and suspended
+            trading days (bid_price == 0) are dropped.
+
+        Examples:
+            >>> bond = bp.Eurobond("US900123DG28")
+            >>> bond.history(period="1y")
+            >>> bond.history(start="2021-08-16", end="2026-03-11")
+
+        Note:
+            Long ranges perform one HTTP request per business day against the
+            Ziraat Bank API — expect ~30 seconds per year of data on a cold
+            cache. Subsequent calls hit the per-date cache.
+        """
+        today = datetime.now().date()
+
+        # Resolve end
+        end_d = _parse_date_arg(end) if end else today
+
+        # Resolve start
+        if start:
+            start_d = _parse_date_arg(start)
+        elif period:
+            if period == "ytd":
+                start_d = date_type(today.year, 1, 1)
+            elif period in _PERIOD_DAYS:
+                start_d = end_d - timedelta(days=_PERIOD_DAYS[period])
+            else:
+                raise ValueError(
+                    f"Unknown period {period!r}. Use start= or one of: "
+                    f"{', '.join(sorted(_PERIOD_DAYS))}"
+                )
+        else:
+            # Default to 1 month
+            start_d = end_d - timedelta(days=30)
+
+        rows = self._provider.get_history(
+            self._isin, start_d, end_d, skip_weekends=skip_weekends
+        )
+
+        columns = [
+            "bid_price",
+            "bid_yield",
+            "ask_price",
+            "ask_yield",
+            "days_to_maturity",
+        ]
+        if not rows:
+            return pd.DataFrame(columns=columns, index=pd.DatetimeIndex([], name="Date"))
+
+        df = pd.DataFrame(rows)
+        df["Date"] = pd.to_datetime(df["date"])
+        df = df.drop(columns=["date"]).set_index("Date")
+        return df[columns]
 
     def __repr__(self) -> str:
         """String representation."""

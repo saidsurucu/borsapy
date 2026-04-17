@@ -508,6 +508,9 @@
                         <li>
                                 <a class="variable" href="#Eurobond.info">info</a>
                         </li>
+                        <li>
+                                <a class="function" href="#Eurobond.history">history</a>
+                        </li>
                 </ul>
 
             </li>
@@ -1714,7 +1717,7 @@ borsapy    </h1>
 </span><span id="L-197"><a href="#L-197"><span class="linenos">197</span></a><span class="kn">from</span><span class="w"> </span><span class="nn">borsapy.twitter</span><span class="w"> </span><span class="kn">import</span> <span class="n">search_tweets</span>
 </span><span id="L-198"><a href="#L-198"><span class="linenos">198</span></a><span class="kn">from</span><span class="w"> </span><span class="nn">borsapy.viop</span><span class="w"> </span><span class="kn">import</span> <span class="n">VIOP</span>
 </span><span id="L-199"><a href="#L-199"><span class="linenos">199</span></a>
-</span><span id="L-200"><a href="#L-200"><span class="linenos">200</span></a><span class="n">__version__</span> <span class="o">=</span> <span class="s2">&quot;0.8.6&quot;</span>
+</span><span id="L-200"><a href="#L-200"><span class="linenos">200</span></a><span class="n">__version__</span> <span class="o">=</span> <span class="s2">&quot;0.8.7&quot;</span>
 </span><span id="L-201"><a href="#L-201"><span class="linenos">201</span></a><span class="n">__author__</span> <span class="o">=</span> <span class="s2">&quot;Said Surucu&quot;</span>
 </span><span id="L-202"><a href="#L-202"><span class="linenos">202</span></a>
 </span><span id="L-203"><a href="#L-203"><span class="linenos">203</span></a><span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span>
@@ -12524,109 +12527,181 @@ Note: Data is delayed by ~15 minutes</p>
 
     </div>
     <a class="headerlink" href="#Eurobond"></a>
-            <div class="pdoc-code codehilite"><pre><span></span><span id="Eurobond-33"><a href="#Eurobond-33"><span class="linenos"> 33</span></a><span class="k">class</span><span class="w"> </span><span class="nc">Eurobond</span><span class="p">:</span>
-</span><span id="Eurobond-34"><a href="#Eurobond-34"><span class="linenos"> 34</span></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Single Turkish sovereign Eurobond interface.</span>
-</span><span id="Eurobond-35"><a href="#Eurobond-35"><span class="linenos"> 35</span></a>
-</span><span id="Eurobond-36"><a href="#Eurobond-36"><span class="linenos"> 36</span></a><span class="sd">    Provides access to bond data including prices, yields,</span>
-</span><span id="Eurobond-37"><a href="#Eurobond-37"><span class="linenos"> 37</span></a><span class="sd">    maturity, and other characteristics.</span>
-</span><span id="Eurobond-38"><a href="#Eurobond-38"><span class="linenos"> 38</span></a>
-</span><span id="Eurobond-39"><a href="#Eurobond-39"><span class="linenos"> 39</span></a><span class="sd">    Attributes:</span>
-</span><span id="Eurobond-40"><a href="#Eurobond-40"><span class="linenos"> 40</span></a><span class="sd">        isin: ISIN code of the bond.</span>
-</span><span id="Eurobond-41"><a href="#Eurobond-41"><span class="linenos"> 41</span></a><span class="sd">        maturity: Maturity date.</span>
-</span><span id="Eurobond-42"><a href="#Eurobond-42"><span class="linenos"> 42</span></a><span class="sd">        days_to_maturity: Days until maturity.</span>
-</span><span id="Eurobond-43"><a href="#Eurobond-43"><span class="linenos"> 43</span></a><span class="sd">        currency: Bond currency (USD or EUR).</span>
-</span><span id="Eurobond-44"><a href="#Eurobond-44"><span class="linenos"> 44</span></a><span class="sd">        bid_price: Bid price (buying price).</span>
-</span><span id="Eurobond-45"><a href="#Eurobond-45"><span class="linenos"> 45</span></a><span class="sd">        bid_yield: Bid yield (buying yield).</span>
-</span><span id="Eurobond-46"><a href="#Eurobond-46"><span class="linenos"> 46</span></a><span class="sd">        ask_price: Ask price (selling price).</span>
-</span><span id="Eurobond-47"><a href="#Eurobond-47"><span class="linenos"> 47</span></a><span class="sd">        ask_yield: Ask yield (selling yield).</span>
-</span><span id="Eurobond-48"><a href="#Eurobond-48"><span class="linenos"> 48</span></a><span class="sd">        info: All bond data as dictionary.</span>
-</span><span id="Eurobond-49"><a href="#Eurobond-49"><span class="linenos"> 49</span></a>
-</span><span id="Eurobond-50"><a href="#Eurobond-50"><span class="linenos"> 50</span></a><span class="sd">    Examples:</span>
-</span><span id="Eurobond-51"><a href="#Eurobond-51"><span class="linenos"> 51</span></a><span class="sd">        &gt;&gt;&gt; bond = Eurobond(&quot;US900123DG28&quot;)</span>
-</span><span id="Eurobond-52"><a href="#Eurobond-52"><span class="linenos"> 52</span></a><span class="sd">        &gt;&gt;&gt; bond.bid_yield</span>
-</span><span id="Eurobond-53"><a href="#Eurobond-53"><span class="linenos"> 53</span></a><span class="sd">        6.55</span>
-</span><span id="Eurobond-54"><a href="#Eurobond-54"><span class="linenos"> 54</span></a><span class="sd">        &gt;&gt;&gt; bond.currency</span>
-</span><span id="Eurobond-55"><a href="#Eurobond-55"><span class="linenos"> 55</span></a><span class="sd">        &#39;USD&#39;</span>
-</span><span id="Eurobond-56"><a href="#Eurobond-56"><span class="linenos"> 56</span></a><span class="sd">    &quot;&quot;&quot;</span>
-</span><span id="Eurobond-57"><a href="#Eurobond-57"><span class="linenos"> 57</span></a>
-</span><span id="Eurobond-58"><a href="#Eurobond-58"><span class="linenos"> 58</span></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">isin</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
-</span><span id="Eurobond-59"><a href="#Eurobond-59"><span class="linenos"> 59</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize Eurobond by ISIN.</span>
-</span><span id="Eurobond-60"><a href="#Eurobond-60"><span class="linenos"> 60</span></a>
-</span><span id="Eurobond-61"><a href="#Eurobond-61"><span class="linenos"> 61</span></a><span class="sd">        Args:</span>
-</span><span id="Eurobond-62"><a href="#Eurobond-62"><span class="linenos"> 62</span></a><span class="sd">            isin: ISIN code (e.g., &quot;US900123DG28&quot;).</span>
-</span><span id="Eurobond-63"><a href="#Eurobond-63"><span class="linenos"> 63</span></a>
-</span><span id="Eurobond-64"><a href="#Eurobond-64"><span class="linenos"> 64</span></a><span class="sd">        Raises:</span>
-</span><span id="Eurobond-65"><a href="#Eurobond-65"><span class="linenos"> 65</span></a><span class="sd">            DataNotAvailableError: If bond not found.</span>
-</span><span id="Eurobond-66"><a href="#Eurobond-66"><span class="linenos"> 66</span></a><span class="sd">        &quot;&quot;&quot;</span>
-</span><span id="Eurobond-67"><a href="#Eurobond-67"><span class="linenos"> 67</span></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_isin</span> <span class="o">=</span> <span class="n">isin</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span>
-</span><span id="Eurobond-68"><a href="#Eurobond-68"><span class="linenos"> 68</span></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_provider</span> <span class="o">=</span> <span class="n">get_eurobond_provider</span><span class="p">()</span>
-</span><span id="Eurobond-69"><a href="#Eurobond-69"><span class="linenos"> 69</span></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_data_cache</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
-</span><span id="Eurobond-70"><a href="#Eurobond-70"><span class="linenos"> 70</span></a>
-</span><span id="Eurobond-71"><a href="#Eurobond-71"><span class="linenos"> 71</span></a>    <span class="nd">@property</span>
-</span><span id="Eurobond-72"><a href="#Eurobond-72"><span class="linenos"> 72</span></a>    <span class="k">def</span><span class="w"> </span><span class="nf">_data</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
-</span><span id="Eurobond-73"><a href="#Eurobond-73"><span class="linenos"> 73</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Lazy-loaded bond data.&quot;&quot;&quot;</span>
-</span><span id="Eurobond-74"><a href="#Eurobond-74"><span class="linenos"> 74</span></a>        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_data_cache</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="Eurobond-75"><a href="#Eurobond-75"><span class="linenos"> 75</span></a>            <span class="bp">self</span><span class="o">.</span><span class="n">_data_cache</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_provider</span><span class="o">.</span><span class="n">get_eurobond</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_isin</span><span class="p">)</span>
-</span><span id="Eurobond-76"><a href="#Eurobond-76"><span class="linenos"> 76</span></a>            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_data_cache</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="Eurobond-77"><a href="#Eurobond-77"><span class="linenos"> 77</span></a>                <span class="k">raise</span> <span class="n">DataNotAvailableError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Eurobond not found: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_isin</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-</span><span id="Eurobond-78"><a href="#Eurobond-78"><span class="linenos"> 78</span></a>        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_data_cache</span>
-</span><span id="Eurobond-79"><a href="#Eurobond-79"><span class="linenos"> 79</span></a>
-</span><span id="Eurobond-80"><a href="#Eurobond-80"><span class="linenos"> 80</span></a>    <span class="nd">@property</span>
-</span><span id="Eurobond-81"><a href="#Eurobond-81"><span class="linenos"> 81</span></a>    <span class="k">def</span><span class="w"> </span><span class="nf">isin</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-</span><span id="Eurobond-82"><a href="#Eurobond-82"><span class="linenos"> 82</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;ISIN code of the bond.&quot;&quot;&quot;</span>
-</span><span id="Eurobond-83"><a href="#Eurobond-83"><span class="linenos"> 83</span></a>        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_data</span><span class="p">[</span><span class="s2">&quot;isin&quot;</span><span class="p">]</span>
-</span><span id="Eurobond-84"><a href="#Eurobond-84"><span class="linenos"> 84</span></a>
-</span><span id="Eurobond-85"><a href="#Eurobond-85"><span class="linenos"> 85</span></a>    <span class="nd">@property</span>
-</span><span id="Eurobond-86"><a href="#Eurobond-86"><span class="linenos"> 86</span></a>    <span class="k">def</span><span class="w"> </span><span class="nf">maturity</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">datetime</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="Eurobond-87"><a href="#Eurobond-87"><span class="linenos"> 87</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Maturity date of the bond.&quot;&quot;&quot;</span>
-</span><span id="Eurobond-88"><a href="#Eurobond-88"><span class="linenos"> 88</span></a>        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;maturity&quot;</span><span class="p">)</span>
+            <div class="pdoc-code codehilite"><pre><span></span><span id="Eurobond-62"><a href="#Eurobond-62"><span class="linenos"> 62</span></a><span class="k">class</span><span class="w"> </span><span class="nc">Eurobond</span><span class="p">:</span>
+</span><span id="Eurobond-63"><a href="#Eurobond-63"><span class="linenos"> 63</span></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Single Turkish sovereign Eurobond interface.</span>
+</span><span id="Eurobond-64"><a href="#Eurobond-64"><span class="linenos"> 64</span></a>
+</span><span id="Eurobond-65"><a href="#Eurobond-65"><span class="linenos"> 65</span></a><span class="sd">    Provides access to bond data including prices, yields,</span>
+</span><span id="Eurobond-66"><a href="#Eurobond-66"><span class="linenos"> 66</span></a><span class="sd">    maturity, and other characteristics.</span>
+</span><span id="Eurobond-67"><a href="#Eurobond-67"><span class="linenos"> 67</span></a>
+</span><span id="Eurobond-68"><a href="#Eurobond-68"><span class="linenos"> 68</span></a><span class="sd">    Attributes:</span>
+</span><span id="Eurobond-69"><a href="#Eurobond-69"><span class="linenos"> 69</span></a><span class="sd">        isin: ISIN code of the bond.</span>
+</span><span id="Eurobond-70"><a href="#Eurobond-70"><span class="linenos"> 70</span></a><span class="sd">        maturity: Maturity date.</span>
+</span><span id="Eurobond-71"><a href="#Eurobond-71"><span class="linenos"> 71</span></a><span class="sd">        days_to_maturity: Days until maturity.</span>
+</span><span id="Eurobond-72"><a href="#Eurobond-72"><span class="linenos"> 72</span></a><span class="sd">        currency: Bond currency (USD or EUR).</span>
+</span><span id="Eurobond-73"><a href="#Eurobond-73"><span class="linenos"> 73</span></a><span class="sd">        bid_price: Bid price (buying price).</span>
+</span><span id="Eurobond-74"><a href="#Eurobond-74"><span class="linenos"> 74</span></a><span class="sd">        bid_yield: Bid yield (buying yield).</span>
+</span><span id="Eurobond-75"><a href="#Eurobond-75"><span class="linenos"> 75</span></a><span class="sd">        ask_price: Ask price (selling price).</span>
+</span><span id="Eurobond-76"><a href="#Eurobond-76"><span class="linenos"> 76</span></a><span class="sd">        ask_yield: Ask yield (selling yield).</span>
+</span><span id="Eurobond-77"><a href="#Eurobond-77"><span class="linenos"> 77</span></a><span class="sd">        info: All bond data as dictionary.</span>
+</span><span id="Eurobond-78"><a href="#Eurobond-78"><span class="linenos"> 78</span></a>
+</span><span id="Eurobond-79"><a href="#Eurobond-79"><span class="linenos"> 79</span></a><span class="sd">    Examples:</span>
+</span><span id="Eurobond-80"><a href="#Eurobond-80"><span class="linenos"> 80</span></a><span class="sd">        &gt;&gt;&gt; bond = Eurobond(&quot;US900123DG28&quot;)</span>
+</span><span id="Eurobond-81"><a href="#Eurobond-81"><span class="linenos"> 81</span></a><span class="sd">        &gt;&gt;&gt; bond.bid_yield</span>
+</span><span id="Eurobond-82"><a href="#Eurobond-82"><span class="linenos"> 82</span></a><span class="sd">        6.55</span>
+</span><span id="Eurobond-83"><a href="#Eurobond-83"><span class="linenos"> 83</span></a><span class="sd">        &gt;&gt;&gt; bond.currency</span>
+</span><span id="Eurobond-84"><a href="#Eurobond-84"><span class="linenos"> 84</span></a><span class="sd">        &#39;USD&#39;</span>
+</span><span id="Eurobond-85"><a href="#Eurobond-85"><span class="linenos"> 85</span></a><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="Eurobond-86"><a href="#Eurobond-86"><span class="linenos"> 86</span></a>
+</span><span id="Eurobond-87"><a href="#Eurobond-87"><span class="linenos"> 87</span></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">isin</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+</span><span id="Eurobond-88"><a href="#Eurobond-88"><span class="linenos"> 88</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize Eurobond by ISIN.</span>
 </span><span id="Eurobond-89"><a href="#Eurobond-89"><span class="linenos"> 89</span></a>
-</span><span id="Eurobond-90"><a href="#Eurobond-90"><span class="linenos"> 90</span></a>    <span class="nd">@property</span>
-</span><span id="Eurobond-91"><a href="#Eurobond-91"><span class="linenos"> 91</span></a>    <span class="k">def</span><span class="w"> </span><span class="nf">days_to_maturity</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
-</span><span id="Eurobond-92"><a href="#Eurobond-92"><span class="linenos"> 92</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Number of days until maturity.&quot;&quot;&quot;</span>
-</span><span id="Eurobond-93"><a href="#Eurobond-93"><span class="linenos"> 93</span></a>        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;days_to_maturity&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
-</span><span id="Eurobond-94"><a href="#Eurobond-94"><span class="linenos"> 94</span></a>
-</span><span id="Eurobond-95"><a href="#Eurobond-95"><span class="linenos"> 95</span></a>    <span class="nd">@property</span>
-</span><span id="Eurobond-96"><a href="#Eurobond-96"><span class="linenos"> 96</span></a>    <span class="k">def</span><span class="w"> </span><span class="nf">currency</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-</span><span id="Eurobond-97"><a href="#Eurobond-97"><span class="linenos"> 97</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Bond currency (USD or EUR).&quot;&quot;&quot;</span>
-</span><span id="Eurobond-98"><a href="#Eurobond-98"><span class="linenos"> 98</span></a>        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;currency&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
+</span><span id="Eurobond-90"><a href="#Eurobond-90"><span class="linenos"> 90</span></a><span class="sd">        Args:</span>
+</span><span id="Eurobond-91"><a href="#Eurobond-91"><span class="linenos"> 91</span></a><span class="sd">            isin: ISIN code (e.g., &quot;US900123DG28&quot;).</span>
+</span><span id="Eurobond-92"><a href="#Eurobond-92"><span class="linenos"> 92</span></a>
+</span><span id="Eurobond-93"><a href="#Eurobond-93"><span class="linenos"> 93</span></a><span class="sd">        Raises:</span>
+</span><span id="Eurobond-94"><a href="#Eurobond-94"><span class="linenos"> 94</span></a><span class="sd">            DataNotAvailableError: If bond not found.</span>
+</span><span id="Eurobond-95"><a href="#Eurobond-95"><span class="linenos"> 95</span></a><span class="sd">        &quot;&quot;&quot;</span>
+</span><span id="Eurobond-96"><a href="#Eurobond-96"><span class="linenos"> 96</span></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_isin</span> <span class="o">=</span> <span class="n">isin</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span>
+</span><span id="Eurobond-97"><a href="#Eurobond-97"><span class="linenos"> 97</span></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_provider</span> <span class="o">=</span> <span class="n">get_eurobond_provider</span><span class="p">()</span>
+</span><span id="Eurobond-98"><a href="#Eurobond-98"><span class="linenos"> 98</span></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_data_cache</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
 </span><span id="Eurobond-99"><a href="#Eurobond-99"><span class="linenos"> 99</span></a>
 </span><span id="Eurobond-100"><a href="#Eurobond-100"><span class="linenos">100</span></a>    <span class="nd">@property</span>
-</span><span id="Eurobond-101"><a href="#Eurobond-101"><span class="linenos">101</span></a>    <span class="k">def</span><span class="w"> </span><span class="nf">bid_price</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="Eurobond-102"><a href="#Eurobond-102"><span class="linenos">102</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Bid price (buying price).&quot;&quot;&quot;</span>
-</span><span id="Eurobond-103"><a href="#Eurobond-103"><span class="linenos">103</span></a>        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;bid_price&quot;</span><span class="p">)</span>
-</span><span id="Eurobond-104"><a href="#Eurobond-104"><span class="linenos">104</span></a>
-</span><span id="Eurobond-105"><a href="#Eurobond-105"><span class="linenos">105</span></a>    <span class="nd">@property</span>
-</span><span id="Eurobond-106"><a href="#Eurobond-106"><span class="linenos">106</span></a>    <span class="k">def</span><span class="w"> </span><span class="nf">bid_yield</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="Eurobond-107"><a href="#Eurobond-107"><span class="linenos">107</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Bid yield (buying yield) as percentage.&quot;&quot;&quot;</span>
-</span><span id="Eurobond-108"><a href="#Eurobond-108"><span class="linenos">108</span></a>        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;bid_yield&quot;</span><span class="p">)</span>
-</span><span id="Eurobond-109"><a href="#Eurobond-109"><span class="linenos">109</span></a>
-</span><span id="Eurobond-110"><a href="#Eurobond-110"><span class="linenos">110</span></a>    <span class="nd">@property</span>
-</span><span id="Eurobond-111"><a href="#Eurobond-111"><span class="linenos">111</span></a>    <span class="k">def</span><span class="w"> </span><span class="nf">ask_price</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="Eurobond-112"><a href="#Eurobond-112"><span class="linenos">112</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Ask price (selling price).&quot;&quot;&quot;</span>
-</span><span id="Eurobond-113"><a href="#Eurobond-113"><span class="linenos">113</span></a>        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;ask_price&quot;</span><span class="p">)</span>
-</span><span id="Eurobond-114"><a href="#Eurobond-114"><span class="linenos">114</span></a>
-</span><span id="Eurobond-115"><a href="#Eurobond-115"><span class="linenos">115</span></a>    <span class="nd">@property</span>
-</span><span id="Eurobond-116"><a href="#Eurobond-116"><span class="linenos">116</span></a>    <span class="k">def</span><span class="w"> </span><span class="nf">ask_yield</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="Eurobond-117"><a href="#Eurobond-117"><span class="linenos">117</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Ask yield (selling yield) as percentage.&quot;&quot;&quot;</span>
-</span><span id="Eurobond-118"><a href="#Eurobond-118"><span class="linenos">118</span></a>        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;ask_yield&quot;</span><span class="p">)</span>
-</span><span id="Eurobond-119"><a href="#Eurobond-119"><span class="linenos">119</span></a>
-</span><span id="Eurobond-120"><a href="#Eurobond-120"><span class="linenos">120</span></a>    <span class="nd">@property</span>
-</span><span id="Eurobond-121"><a href="#Eurobond-121"><span class="linenos">121</span></a>    <span class="k">def</span><span class="w"> </span><span class="nf">info</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
-</span><span id="Eurobond-122"><a href="#Eurobond-122"><span class="linenos">122</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;All bond data as dictionary.</span>
+</span><span id="Eurobond-101"><a href="#Eurobond-101"><span class="linenos">101</span></a>    <span class="k">def</span><span class="w"> </span><span class="nf">_data</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+</span><span id="Eurobond-102"><a href="#Eurobond-102"><span class="linenos">102</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Lazy-loaded bond data.&quot;&quot;&quot;</span>
+</span><span id="Eurobond-103"><a href="#Eurobond-103"><span class="linenos">103</span></a>        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_data_cache</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="Eurobond-104"><a href="#Eurobond-104"><span class="linenos">104</span></a>            <span class="bp">self</span><span class="o">.</span><span class="n">_data_cache</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_provider</span><span class="o">.</span><span class="n">get_eurobond</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_isin</span><span class="p">)</span>
+</span><span id="Eurobond-105"><a href="#Eurobond-105"><span class="linenos">105</span></a>            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_data_cache</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="Eurobond-106"><a href="#Eurobond-106"><span class="linenos">106</span></a>                <span class="k">raise</span> <span class="n">DataNotAvailableError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Eurobond not found: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_isin</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</span><span id="Eurobond-107"><a href="#Eurobond-107"><span class="linenos">107</span></a>        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_data_cache</span>
+</span><span id="Eurobond-108"><a href="#Eurobond-108"><span class="linenos">108</span></a>
+</span><span id="Eurobond-109"><a href="#Eurobond-109"><span class="linenos">109</span></a>    <span class="nd">@property</span>
+</span><span id="Eurobond-110"><a href="#Eurobond-110"><span class="linenos">110</span></a>    <span class="k">def</span><span class="w"> </span><span class="nf">isin</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+</span><span id="Eurobond-111"><a href="#Eurobond-111"><span class="linenos">111</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;ISIN code of the bond.&quot;&quot;&quot;</span>
+</span><span id="Eurobond-112"><a href="#Eurobond-112"><span class="linenos">112</span></a>        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_data</span><span class="p">[</span><span class="s2">&quot;isin&quot;</span><span class="p">]</span>
+</span><span id="Eurobond-113"><a href="#Eurobond-113"><span class="linenos">113</span></a>
+</span><span id="Eurobond-114"><a href="#Eurobond-114"><span class="linenos">114</span></a>    <span class="nd">@property</span>
+</span><span id="Eurobond-115"><a href="#Eurobond-115"><span class="linenos">115</span></a>    <span class="k">def</span><span class="w"> </span><span class="nf">maturity</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">datetime</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="Eurobond-116"><a href="#Eurobond-116"><span class="linenos">116</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Maturity date of the bond.&quot;&quot;&quot;</span>
+</span><span id="Eurobond-117"><a href="#Eurobond-117"><span class="linenos">117</span></a>        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;maturity&quot;</span><span class="p">)</span>
+</span><span id="Eurobond-118"><a href="#Eurobond-118"><span class="linenos">118</span></a>
+</span><span id="Eurobond-119"><a href="#Eurobond-119"><span class="linenos">119</span></a>    <span class="nd">@property</span>
+</span><span id="Eurobond-120"><a href="#Eurobond-120"><span class="linenos">120</span></a>    <span class="k">def</span><span class="w"> </span><span class="nf">days_to_maturity</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+</span><span id="Eurobond-121"><a href="#Eurobond-121"><span class="linenos">121</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Number of days until maturity.&quot;&quot;&quot;</span>
+</span><span id="Eurobond-122"><a href="#Eurobond-122"><span class="linenos">122</span></a>        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;days_to_maturity&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
 </span><span id="Eurobond-123"><a href="#Eurobond-123"><span class="linenos">123</span></a>
-</span><span id="Eurobond-124"><a href="#Eurobond-124"><span class="linenos">124</span></a><span class="sd">        Returns:</span>
-</span><span id="Eurobond-125"><a href="#Eurobond-125"><span class="linenos">125</span></a><span class="sd">            Dict with all bond attributes.</span>
-</span><span id="Eurobond-126"><a href="#Eurobond-126"><span class="linenos">126</span></a><span class="sd">        &quot;&quot;&quot;</span>
-</span><span id="Eurobond-127"><a href="#Eurobond-127"><span class="linenos">127</span></a>        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_data</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+</span><span id="Eurobond-124"><a href="#Eurobond-124"><span class="linenos">124</span></a>    <span class="nd">@property</span>
+</span><span id="Eurobond-125"><a href="#Eurobond-125"><span class="linenos">125</span></a>    <span class="k">def</span><span class="w"> </span><span class="nf">currency</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+</span><span id="Eurobond-126"><a href="#Eurobond-126"><span class="linenos">126</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Bond currency (USD or EUR).&quot;&quot;&quot;</span>
+</span><span id="Eurobond-127"><a href="#Eurobond-127"><span class="linenos">127</span></a>        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;currency&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
 </span><span id="Eurobond-128"><a href="#Eurobond-128"><span class="linenos">128</span></a>
-</span><span id="Eurobond-129"><a href="#Eurobond-129"><span class="linenos">129</span></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-</span><span id="Eurobond-130"><a href="#Eurobond-130"><span class="linenos">130</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;String representation.&quot;&quot;&quot;</span>
-</span><span id="Eurobond-131"><a href="#Eurobond-131"><span class="linenos">131</span></a>        <span class="k">try</span><span class="p">:</span>
-</span><span id="Eurobond-132"><a href="#Eurobond-132"><span class="linenos">132</span></a>            <span class="n">maturity_year</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">maturity</span><span class="o">.</span><span class="n">year</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">maturity</span> <span class="k">else</span> <span class="s2">&quot;?&quot;</span>
-</span><span id="Eurobond-133"><a href="#Eurobond-133"><span class="linenos">133</span></a>            <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;Eurobond(</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_isin</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">currency</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="n">maturity_year</span><span class="si">}</span><span class="s2">, yield=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">bid_yield</span><span class="si">}</span><span class="s2">%)&quot;</span>
-</span><span id="Eurobond-134"><a href="#Eurobond-134"><span class="linenos">134</span></a>        <span class="k">except</span> <span class="n">DataNotAvailableError</span><span class="p">:</span>
-</span><span id="Eurobond-135"><a href="#Eurobond-135"><span class="linenos">135</span></a>            <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;Eurobond(</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_isin</span><span class="si">}</span><span class="s2">)&quot;</span>
+</span><span id="Eurobond-129"><a href="#Eurobond-129"><span class="linenos">129</span></a>    <span class="nd">@property</span>
+</span><span id="Eurobond-130"><a href="#Eurobond-130"><span class="linenos">130</span></a>    <span class="k">def</span><span class="w"> </span><span class="nf">bid_price</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="Eurobond-131"><a href="#Eurobond-131"><span class="linenos">131</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Bid price (buying price).&quot;&quot;&quot;</span>
+</span><span id="Eurobond-132"><a href="#Eurobond-132"><span class="linenos">132</span></a>        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;bid_price&quot;</span><span class="p">)</span>
+</span><span id="Eurobond-133"><a href="#Eurobond-133"><span class="linenos">133</span></a>
+</span><span id="Eurobond-134"><a href="#Eurobond-134"><span class="linenos">134</span></a>    <span class="nd">@property</span>
+</span><span id="Eurobond-135"><a href="#Eurobond-135"><span class="linenos">135</span></a>    <span class="k">def</span><span class="w"> </span><span class="nf">bid_yield</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="Eurobond-136"><a href="#Eurobond-136"><span class="linenos">136</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Bid yield (buying yield) as percentage.&quot;&quot;&quot;</span>
+</span><span id="Eurobond-137"><a href="#Eurobond-137"><span class="linenos">137</span></a>        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;bid_yield&quot;</span><span class="p">)</span>
+</span><span id="Eurobond-138"><a href="#Eurobond-138"><span class="linenos">138</span></a>
+</span><span id="Eurobond-139"><a href="#Eurobond-139"><span class="linenos">139</span></a>    <span class="nd">@property</span>
+</span><span id="Eurobond-140"><a href="#Eurobond-140"><span class="linenos">140</span></a>    <span class="k">def</span><span class="w"> </span><span class="nf">ask_price</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="Eurobond-141"><a href="#Eurobond-141"><span class="linenos">141</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Ask price (selling price).&quot;&quot;&quot;</span>
+</span><span id="Eurobond-142"><a href="#Eurobond-142"><span class="linenos">142</span></a>        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;ask_price&quot;</span><span class="p">)</span>
+</span><span id="Eurobond-143"><a href="#Eurobond-143"><span class="linenos">143</span></a>
+</span><span id="Eurobond-144"><a href="#Eurobond-144"><span class="linenos">144</span></a>    <span class="nd">@property</span>
+</span><span id="Eurobond-145"><a href="#Eurobond-145"><span class="linenos">145</span></a>    <span class="k">def</span><span class="w"> </span><span class="nf">ask_yield</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="Eurobond-146"><a href="#Eurobond-146"><span class="linenos">146</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Ask yield (selling yield) as percentage.&quot;&quot;&quot;</span>
+</span><span id="Eurobond-147"><a href="#Eurobond-147"><span class="linenos">147</span></a>        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;ask_yield&quot;</span><span class="p">)</span>
+</span><span id="Eurobond-148"><a href="#Eurobond-148"><span class="linenos">148</span></a>
+</span><span id="Eurobond-149"><a href="#Eurobond-149"><span class="linenos">149</span></a>    <span class="nd">@property</span>
+</span><span id="Eurobond-150"><a href="#Eurobond-150"><span class="linenos">150</span></a>    <span class="k">def</span><span class="w"> </span><span class="nf">info</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+</span><span id="Eurobond-151"><a href="#Eurobond-151"><span class="linenos">151</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;All bond data as dictionary.</span>
+</span><span id="Eurobond-152"><a href="#Eurobond-152"><span class="linenos">152</span></a>
+</span><span id="Eurobond-153"><a href="#Eurobond-153"><span class="linenos">153</span></a><span class="sd">        Returns:</span>
+</span><span id="Eurobond-154"><a href="#Eurobond-154"><span class="linenos">154</span></a><span class="sd">            Dict with all bond attributes.</span>
+</span><span id="Eurobond-155"><a href="#Eurobond-155"><span class="linenos">155</span></a><span class="sd">        &quot;&quot;&quot;</span>
+</span><span id="Eurobond-156"><a href="#Eurobond-156"><span class="linenos">156</span></a>        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_data</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+</span><span id="Eurobond-157"><a href="#Eurobond-157"><span class="linenos">157</span></a>
+</span><span id="Eurobond-158"><a href="#Eurobond-158"><span class="linenos">158</span></a>    <span class="k">def</span><span class="w"> </span><span class="nf">history</span><span class="p">(</span>
+</span><span id="Eurobond-159"><a href="#Eurobond-159"><span class="linenos">159</span></a>        <span class="bp">self</span><span class="p">,</span>
+</span><span id="Eurobond-160"><a href="#Eurobond-160"><span class="linenos">160</span></a>        <span class="n">period</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="Eurobond-161"><a href="#Eurobond-161"><span class="linenos">161</span></a>        <span class="n">start</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">datetime</span> <span class="o">|</span> <span class="n">date_type</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="Eurobond-162"><a href="#Eurobond-162"><span class="linenos">162</span></a>        <span class="n">end</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">datetime</span> <span class="o">|</span> <span class="n">date_type</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="Eurobond-163"><a href="#Eurobond-163"><span class="linenos">163</span></a>        <span class="n">skip_weekends</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+</span><span id="Eurobond-164"><a href="#Eurobond-164"><span class="linenos">164</span></a>    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+</span><span id="Eurobond-165"><a href="#Eurobond-165"><span class="linenos">165</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Fetch daily historical bid/ask prices and yields.</span>
+</span><span id="Eurobond-166"><a href="#Eurobond-166"><span class="linenos">166</span></a>
+</span><span id="Eurobond-167"><a href="#Eurobond-167"><span class="linenos">167</span></a><span class="sd">        Args:</span>
+</span><span id="Eurobond-168"><a href="#Eurobond-168"><span class="linenos">168</span></a><span class="sd">            period: Lookback window ending today. One of 1mo, 3mo, 6mo, 1y,</span>
+</span><span id="Eurobond-169"><a href="#Eurobond-169"><span class="linenos">169</span></a><span class="sd">                2y, 3y, 5y, 10y, ytd, max. Ignored if ``start`` is given.</span>
+</span><span id="Eurobond-170"><a href="#Eurobond-170"><span class="linenos">170</span></a><span class="sd">            start: Start date (str &quot;YYYY-MM-DD&quot;, datetime, or date).</span>
+</span><span id="Eurobond-171"><a href="#Eurobond-171"><span class="linenos">171</span></a><span class="sd">            end: End date, defaults to today.</span>
+</span><span id="Eurobond-172"><a href="#Eurobond-172"><span class="linenos">172</span></a><span class="sd">            skip_weekends: Skip Sat/Sun (API returns zeros on weekends).</span>
+</span><span id="Eurobond-173"><a href="#Eurobond-173"><span class="linenos">173</span></a>
+</span><span id="Eurobond-174"><a href="#Eurobond-174"><span class="linenos">174</span></a><span class="sd">        Returns:</span>
+</span><span id="Eurobond-175"><a href="#Eurobond-175"><span class="linenos">175</span></a><span class="sd">            DataFrame indexed by Date with columns: bid_price, bid_yield,</span>
+</span><span id="Eurobond-176"><a href="#Eurobond-176"><span class="linenos">176</span></a><span class="sd">            ask_price, ask_yield, days_to_maturity. Holidays and suspended</span>
+</span><span id="Eurobond-177"><a href="#Eurobond-177"><span class="linenos">177</span></a><span class="sd">            trading days (bid_price == 0) are dropped.</span>
+</span><span id="Eurobond-178"><a href="#Eurobond-178"><span class="linenos">178</span></a>
+</span><span id="Eurobond-179"><a href="#Eurobond-179"><span class="linenos">179</span></a><span class="sd">        Examples:</span>
+</span><span id="Eurobond-180"><a href="#Eurobond-180"><span class="linenos">180</span></a><span class="sd">            &gt;&gt;&gt; bond = bp.Eurobond(&quot;US900123DG28&quot;)</span>
+</span><span id="Eurobond-181"><a href="#Eurobond-181"><span class="linenos">181</span></a><span class="sd">            &gt;&gt;&gt; bond.history(period=&quot;1y&quot;)</span>
+</span><span id="Eurobond-182"><a href="#Eurobond-182"><span class="linenos">182</span></a><span class="sd">            &gt;&gt;&gt; bond.history(start=&quot;2021-08-16&quot;, end=&quot;2026-03-11&quot;)</span>
+</span><span id="Eurobond-183"><a href="#Eurobond-183"><span class="linenos">183</span></a>
+</span><span id="Eurobond-184"><a href="#Eurobond-184"><span class="linenos">184</span></a><span class="sd">        Note:</span>
+</span><span id="Eurobond-185"><a href="#Eurobond-185"><span class="linenos">185</span></a><span class="sd">            Long ranges perform one HTTP request per business day against the</span>
+</span><span id="Eurobond-186"><a href="#Eurobond-186"><span class="linenos">186</span></a><span class="sd">            Ziraat Bank API — expect ~30 seconds per year of data on a cold</span>
+</span><span id="Eurobond-187"><a href="#Eurobond-187"><span class="linenos">187</span></a><span class="sd">            cache. Subsequent calls hit the per-date cache.</span>
+</span><span id="Eurobond-188"><a href="#Eurobond-188"><span class="linenos">188</span></a><span class="sd">        &quot;&quot;&quot;</span>
+</span><span id="Eurobond-189"><a href="#Eurobond-189"><span class="linenos">189</span></a>        <span class="n">today</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">()</span><span class="o">.</span><span class="n">date</span><span class="p">()</span>
+</span><span id="Eurobond-190"><a href="#Eurobond-190"><span class="linenos">190</span></a>
+</span><span id="Eurobond-191"><a href="#Eurobond-191"><span class="linenos">191</span></a>        <span class="c1"># Resolve end</span>
+</span><span id="Eurobond-192"><a href="#Eurobond-192"><span class="linenos">192</span></a>        <span class="n">end_d</span> <span class="o">=</span> <span class="n">_parse_date_arg</span><span class="p">(</span><span class="n">end</span><span class="p">)</span> <span class="k">if</span> <span class="n">end</span> <span class="k">else</span> <span class="n">today</span>
+</span><span id="Eurobond-193"><a href="#Eurobond-193"><span class="linenos">193</span></a>
+</span><span id="Eurobond-194"><a href="#Eurobond-194"><span class="linenos">194</span></a>        <span class="c1"># Resolve start</span>
+</span><span id="Eurobond-195"><a href="#Eurobond-195"><span class="linenos">195</span></a>        <span class="k">if</span> <span class="n">start</span><span class="p">:</span>
+</span><span id="Eurobond-196"><a href="#Eurobond-196"><span class="linenos">196</span></a>            <span class="n">start_d</span> <span class="o">=</span> <span class="n">_parse_date_arg</span><span class="p">(</span><span class="n">start</span><span class="p">)</span>
+</span><span id="Eurobond-197"><a href="#Eurobond-197"><span class="linenos">197</span></a>        <span class="k">elif</span> <span class="n">period</span><span class="p">:</span>
+</span><span id="Eurobond-198"><a href="#Eurobond-198"><span class="linenos">198</span></a>            <span class="k">if</span> <span class="n">period</span> <span class="o">==</span> <span class="s2">&quot;ytd&quot;</span><span class="p">:</span>
+</span><span id="Eurobond-199"><a href="#Eurobond-199"><span class="linenos">199</span></a>                <span class="n">start_d</span> <span class="o">=</span> <span class="n">date_type</span><span class="p">(</span><span class="n">today</span><span class="o">.</span><span class="n">year</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+</span><span id="Eurobond-200"><a href="#Eurobond-200"><span class="linenos">200</span></a>            <span class="k">elif</span> <span class="n">period</span> <span class="ow">in</span> <span class="n">_PERIOD_DAYS</span><span class="p">:</span>
+</span><span id="Eurobond-201"><a href="#Eurobond-201"><span class="linenos">201</span></a>                <span class="n">start_d</span> <span class="o">=</span> <span class="n">end_d</span> <span class="o">-</span> <span class="n">timedelta</span><span class="p">(</span><span class="n">days</span><span class="o">=</span><span class="n">_PERIOD_DAYS</span><span class="p">[</span><span class="n">period</span><span class="p">])</span>
+</span><span id="Eurobond-202"><a href="#Eurobond-202"><span class="linenos">202</span></a>            <span class="k">else</span><span class="p">:</span>
+</span><span id="Eurobond-203"><a href="#Eurobond-203"><span class="linenos">203</span></a>                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+</span><span id="Eurobond-204"><a href="#Eurobond-204"><span class="linenos">204</span></a>                    <span class="sa">f</span><span class="s2">&quot;Unknown period </span><span class="si">{</span><span class="n">period</span><span class="si">!r}</span><span class="s2">. Use start= or one of: &quot;</span>
+</span><span id="Eurobond-205"><a href="#Eurobond-205"><span class="linenos">205</span></a>                    <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="s1">&#39;, &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">sorted</span><span class="p">(</span><span class="n">_PERIOD_DAYS</span><span class="p">))</span><span class="si">}</span><span class="s2">&quot;</span>
+</span><span id="Eurobond-206"><a href="#Eurobond-206"><span class="linenos">206</span></a>                <span class="p">)</span>
+</span><span id="Eurobond-207"><a href="#Eurobond-207"><span class="linenos">207</span></a>        <span class="k">else</span><span class="p">:</span>
+</span><span id="Eurobond-208"><a href="#Eurobond-208"><span class="linenos">208</span></a>            <span class="c1"># Default to 1 month</span>
+</span><span id="Eurobond-209"><a href="#Eurobond-209"><span class="linenos">209</span></a>            <span class="n">start_d</span> <span class="o">=</span> <span class="n">end_d</span> <span class="o">-</span> <span class="n">timedelta</span><span class="p">(</span><span class="n">days</span><span class="o">=</span><span class="mi">30</span><span class="p">)</span>
+</span><span id="Eurobond-210"><a href="#Eurobond-210"><span class="linenos">210</span></a>
+</span><span id="Eurobond-211"><a href="#Eurobond-211"><span class="linenos">211</span></a>        <span class="n">rows</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_provider</span><span class="o">.</span><span class="n">get_history</span><span class="p">(</span>
+</span><span id="Eurobond-212"><a href="#Eurobond-212"><span class="linenos">212</span></a>            <span class="bp">self</span><span class="o">.</span><span class="n">_isin</span><span class="p">,</span> <span class="n">start_d</span><span class="p">,</span> <span class="n">end_d</span><span class="p">,</span> <span class="n">skip_weekends</span><span class="o">=</span><span class="n">skip_weekends</span>
+</span><span id="Eurobond-213"><a href="#Eurobond-213"><span class="linenos">213</span></a>        <span class="p">)</span>
+</span><span id="Eurobond-214"><a href="#Eurobond-214"><span class="linenos">214</span></a>
+</span><span id="Eurobond-215"><a href="#Eurobond-215"><span class="linenos">215</span></a>        <span class="n">columns</span> <span class="o">=</span> <span class="p">[</span>
+</span><span id="Eurobond-216"><a href="#Eurobond-216"><span class="linenos">216</span></a>            <span class="s2">&quot;bid_price&quot;</span><span class="p">,</span>
+</span><span id="Eurobond-217"><a href="#Eurobond-217"><span class="linenos">217</span></a>            <span class="s2">&quot;bid_yield&quot;</span><span class="p">,</span>
+</span><span id="Eurobond-218"><a href="#Eurobond-218"><span class="linenos">218</span></a>            <span class="s2">&quot;ask_price&quot;</span><span class="p">,</span>
+</span><span id="Eurobond-219"><a href="#Eurobond-219"><span class="linenos">219</span></a>            <span class="s2">&quot;ask_yield&quot;</span><span class="p">,</span>
+</span><span id="Eurobond-220"><a href="#Eurobond-220"><span class="linenos">220</span></a>            <span class="s2">&quot;days_to_maturity&quot;</span><span class="p">,</span>
+</span><span id="Eurobond-221"><a href="#Eurobond-221"><span class="linenos">221</span></a>        <span class="p">]</span>
+</span><span id="Eurobond-222"><a href="#Eurobond-222"><span class="linenos">222</span></a>        <span class="k">if</span> <span class="ow">not</span> <span class="n">rows</span><span class="p">:</span>
+</span><span id="Eurobond-223"><a href="#Eurobond-223"><span class="linenos">223</span></a>            <span class="k">return</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="n">columns</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="n">pd</span><span class="o">.</span><span class="n">DatetimeIndex</span><span class="p">([],</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Date&quot;</span><span class="p">))</span>
+</span><span id="Eurobond-224"><a href="#Eurobond-224"><span class="linenos">224</span></a>
+</span><span id="Eurobond-225"><a href="#Eurobond-225"><span class="linenos">225</span></a>        <span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">rows</span><span class="p">)</span>
+</span><span id="Eurobond-226"><a href="#Eurobond-226"><span class="linenos">226</span></a>        <span class="n">df</span><span class="p">[</span><span class="s2">&quot;Date&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">to_datetime</span><span class="p">(</span><span class="n">df</span><span class="p">[</span><span class="s2">&quot;date&quot;</span><span class="p">])</span>
+</span><span id="Eurobond-227"><a href="#Eurobond-227"><span class="linenos">227</span></a>        <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;date&quot;</span><span class="p">])</span><span class="o">.</span><span class="n">set_index</span><span class="p">(</span><span class="s2">&quot;Date&quot;</span><span class="p">)</span>
+</span><span id="Eurobond-228"><a href="#Eurobond-228"><span class="linenos">228</span></a>        <span class="k">return</span> <span class="n">df</span><span class="p">[</span><span class="n">columns</span><span class="p">]</span>
+</span><span id="Eurobond-229"><a href="#Eurobond-229"><span class="linenos">229</span></a>
+</span><span id="Eurobond-230"><a href="#Eurobond-230"><span class="linenos">230</span></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+</span><span id="Eurobond-231"><a href="#Eurobond-231"><span class="linenos">231</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;String representation.&quot;&quot;&quot;</span>
+</span><span id="Eurobond-232"><a href="#Eurobond-232"><span class="linenos">232</span></a>        <span class="k">try</span><span class="p">:</span>
+</span><span id="Eurobond-233"><a href="#Eurobond-233"><span class="linenos">233</span></a>            <span class="n">maturity_year</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">maturity</span><span class="o">.</span><span class="n">year</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">maturity</span> <span class="k">else</span> <span class="s2">&quot;?&quot;</span>
+</span><span id="Eurobond-234"><a href="#Eurobond-234"><span class="linenos">234</span></a>            <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;Eurobond(</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_isin</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">currency</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="n">maturity_year</span><span class="si">}</span><span class="s2">, yield=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">bid_yield</span><span class="si">}</span><span class="s2">%)&quot;</span>
+</span><span id="Eurobond-235"><a href="#Eurobond-235"><span class="linenos">235</span></a>        <span class="k">except</span> <span class="n">DataNotAvailableError</span><span class="p">:</span>
+</span><span id="Eurobond-236"><a href="#Eurobond-236"><span class="linenos">236</span></a>            <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;Eurobond(</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_isin</span><span class="si">}</span><span class="s2">)&quot;</span>
 </span></pre></div>
 
 
@@ -12672,18 +12747,18 @@ maturity, and other characteristics.</p>
 
     </div>
     <a class="headerlink" href="#Eurobond.__init__"></a>
-            <div class="pdoc-code codehilite"><pre><span></span><span id="Eurobond.__init__-58"><a href="#Eurobond.__init__-58"><span class="linenos">58</span></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">isin</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
-</span><span id="Eurobond.__init__-59"><a href="#Eurobond.__init__-59"><span class="linenos">59</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize Eurobond by ISIN.</span>
-</span><span id="Eurobond.__init__-60"><a href="#Eurobond.__init__-60"><span class="linenos">60</span></a>
-</span><span id="Eurobond.__init__-61"><a href="#Eurobond.__init__-61"><span class="linenos">61</span></a><span class="sd">        Args:</span>
-</span><span id="Eurobond.__init__-62"><a href="#Eurobond.__init__-62"><span class="linenos">62</span></a><span class="sd">            isin: ISIN code (e.g., &quot;US900123DG28&quot;).</span>
-</span><span id="Eurobond.__init__-63"><a href="#Eurobond.__init__-63"><span class="linenos">63</span></a>
-</span><span id="Eurobond.__init__-64"><a href="#Eurobond.__init__-64"><span class="linenos">64</span></a><span class="sd">        Raises:</span>
-</span><span id="Eurobond.__init__-65"><a href="#Eurobond.__init__-65"><span class="linenos">65</span></a><span class="sd">            DataNotAvailableError: If bond not found.</span>
-</span><span id="Eurobond.__init__-66"><a href="#Eurobond.__init__-66"><span class="linenos">66</span></a><span class="sd">        &quot;&quot;&quot;</span>
-</span><span id="Eurobond.__init__-67"><a href="#Eurobond.__init__-67"><span class="linenos">67</span></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_isin</span> <span class="o">=</span> <span class="n">isin</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span>
-</span><span id="Eurobond.__init__-68"><a href="#Eurobond.__init__-68"><span class="linenos">68</span></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_provider</span> <span class="o">=</span> <span class="n">get_eurobond_provider</span><span class="p">()</span>
-</span><span id="Eurobond.__init__-69"><a href="#Eurobond.__init__-69"><span class="linenos">69</span></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_data_cache</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+            <div class="pdoc-code codehilite"><pre><span></span><span id="Eurobond.__init__-87"><a href="#Eurobond.__init__-87"><span class="linenos">87</span></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">isin</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+</span><span id="Eurobond.__init__-88"><a href="#Eurobond.__init__-88"><span class="linenos">88</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize Eurobond by ISIN.</span>
+</span><span id="Eurobond.__init__-89"><a href="#Eurobond.__init__-89"><span class="linenos">89</span></a>
+</span><span id="Eurobond.__init__-90"><a href="#Eurobond.__init__-90"><span class="linenos">90</span></a><span class="sd">        Args:</span>
+</span><span id="Eurobond.__init__-91"><a href="#Eurobond.__init__-91"><span class="linenos">91</span></a><span class="sd">            isin: ISIN code (e.g., &quot;US900123DG28&quot;).</span>
+</span><span id="Eurobond.__init__-92"><a href="#Eurobond.__init__-92"><span class="linenos">92</span></a>
+</span><span id="Eurobond.__init__-93"><a href="#Eurobond.__init__-93"><span class="linenos">93</span></a><span class="sd">        Raises:</span>
+</span><span id="Eurobond.__init__-94"><a href="#Eurobond.__init__-94"><span class="linenos">94</span></a><span class="sd">            DataNotAvailableError: If bond not found.</span>
+</span><span id="Eurobond.__init__-95"><a href="#Eurobond.__init__-95"><span class="linenos">95</span></a><span class="sd">        &quot;&quot;&quot;</span>
+</span><span id="Eurobond.__init__-96"><a href="#Eurobond.__init__-96"><span class="linenos">96</span></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_isin</span> <span class="o">=</span> <span class="n">isin</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span>
+</span><span id="Eurobond.__init__-97"><a href="#Eurobond.__init__-97"><span class="linenos">97</span></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_provider</span> <span class="o">=</span> <span class="n">get_eurobond_provider</span><span class="p">()</span>
+</span><span id="Eurobond.__init__-98"><a href="#Eurobond.__init__-98"><span class="linenos">98</span></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_data_cache</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
 </span></pre></div>
 
 
@@ -12707,10 +12782,10 @@ maturity, and other characteristics.</p>
 
     </div>
     <a class="headerlink" href="#Eurobond.isin"></a>
-            <div class="pdoc-code codehilite"><pre><span></span><span id="Eurobond.isin-80"><a href="#Eurobond.isin-80"><span class="linenos">80</span></a>    <span class="nd">@property</span>
-</span><span id="Eurobond.isin-81"><a href="#Eurobond.isin-81"><span class="linenos">81</span></a>    <span class="k">def</span><span class="w"> </span><span class="nf">isin</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-</span><span id="Eurobond.isin-82"><a href="#Eurobond.isin-82"><span class="linenos">82</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;ISIN code of the bond.&quot;&quot;&quot;</span>
-</span><span id="Eurobond.isin-83"><a href="#Eurobond.isin-83"><span class="linenos">83</span></a>        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_data</span><span class="p">[</span><span class="s2">&quot;isin&quot;</span><span class="p">]</span>
+            <div class="pdoc-code codehilite"><pre><span></span><span id="Eurobond.isin-109"><a href="#Eurobond.isin-109"><span class="linenos">109</span></a>    <span class="nd">@property</span>
+</span><span id="Eurobond.isin-110"><a href="#Eurobond.isin-110"><span class="linenos">110</span></a>    <span class="k">def</span><span class="w"> </span><span class="nf">isin</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+</span><span id="Eurobond.isin-111"><a href="#Eurobond.isin-111"><span class="linenos">111</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;ISIN code of the bond.&quot;&quot;&quot;</span>
+</span><span id="Eurobond.isin-112"><a href="#Eurobond.isin-112"><span class="linenos">112</span></a>        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_data</span><span class="p">[</span><span class="s2">&quot;isin&quot;</span><span class="p">]</span>
 </span></pre></div>
 
 
@@ -12728,10 +12803,10 @@ maturity, and other characteristics.</p>
 
     </div>
     <a class="headerlink" href="#Eurobond.maturity"></a>
-            <div class="pdoc-code codehilite"><pre><span></span><span id="Eurobond.maturity-85"><a href="#Eurobond.maturity-85"><span class="linenos">85</span></a>    <span class="nd">@property</span>
-</span><span id="Eurobond.maturity-86"><a href="#Eurobond.maturity-86"><span class="linenos">86</span></a>    <span class="k">def</span><span class="w"> </span><span class="nf">maturity</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">datetime</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="Eurobond.maturity-87"><a href="#Eurobond.maturity-87"><span class="linenos">87</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Maturity date of the bond.&quot;&quot;&quot;</span>
-</span><span id="Eurobond.maturity-88"><a href="#Eurobond.maturity-88"><span class="linenos">88</span></a>        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;maturity&quot;</span><span class="p">)</span>
+            <div class="pdoc-code codehilite"><pre><span></span><span id="Eurobond.maturity-114"><a href="#Eurobond.maturity-114"><span class="linenos">114</span></a>    <span class="nd">@property</span>
+</span><span id="Eurobond.maturity-115"><a href="#Eurobond.maturity-115"><span class="linenos">115</span></a>    <span class="k">def</span><span class="w"> </span><span class="nf">maturity</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">datetime</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="Eurobond.maturity-116"><a href="#Eurobond.maturity-116"><span class="linenos">116</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Maturity date of the bond.&quot;&quot;&quot;</span>
+</span><span id="Eurobond.maturity-117"><a href="#Eurobond.maturity-117"><span class="linenos">117</span></a>        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;maturity&quot;</span><span class="p">)</span>
 </span></pre></div>
 
 
@@ -12749,10 +12824,10 @@ maturity, and other characteristics.</p>
 
     </div>
     <a class="headerlink" href="#Eurobond.days_to_maturity"></a>
-            <div class="pdoc-code codehilite"><pre><span></span><span id="Eurobond.days_to_maturity-90"><a href="#Eurobond.days_to_maturity-90"><span class="linenos">90</span></a>    <span class="nd">@property</span>
-</span><span id="Eurobond.days_to_maturity-91"><a href="#Eurobond.days_to_maturity-91"><span class="linenos">91</span></a>    <span class="k">def</span><span class="w"> </span><span class="nf">days_to_maturity</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
-</span><span id="Eurobond.days_to_maturity-92"><a href="#Eurobond.days_to_maturity-92"><span class="linenos">92</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Number of days until maturity.&quot;&quot;&quot;</span>
-</span><span id="Eurobond.days_to_maturity-93"><a href="#Eurobond.days_to_maturity-93"><span class="linenos">93</span></a>        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;days_to_maturity&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+            <div class="pdoc-code codehilite"><pre><span></span><span id="Eurobond.days_to_maturity-119"><a href="#Eurobond.days_to_maturity-119"><span class="linenos">119</span></a>    <span class="nd">@property</span>
+</span><span id="Eurobond.days_to_maturity-120"><a href="#Eurobond.days_to_maturity-120"><span class="linenos">120</span></a>    <span class="k">def</span><span class="w"> </span><span class="nf">days_to_maturity</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+</span><span id="Eurobond.days_to_maturity-121"><a href="#Eurobond.days_to_maturity-121"><span class="linenos">121</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Number of days until maturity.&quot;&quot;&quot;</span>
+</span><span id="Eurobond.days_to_maturity-122"><a href="#Eurobond.days_to_maturity-122"><span class="linenos">122</span></a>        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;days_to_maturity&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
 </span></pre></div>
 
 
@@ -12770,10 +12845,10 @@ maturity, and other characteristics.</p>
 
     </div>
     <a class="headerlink" href="#Eurobond.currency"></a>
-            <div class="pdoc-code codehilite"><pre><span></span><span id="Eurobond.currency-95"><a href="#Eurobond.currency-95"><span class="linenos">95</span></a>    <span class="nd">@property</span>
-</span><span id="Eurobond.currency-96"><a href="#Eurobond.currency-96"><span class="linenos">96</span></a>    <span class="k">def</span><span class="w"> </span><span class="nf">currency</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-</span><span id="Eurobond.currency-97"><a href="#Eurobond.currency-97"><span class="linenos">97</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Bond currency (USD or EUR).&quot;&quot;&quot;</span>
-</span><span id="Eurobond.currency-98"><a href="#Eurobond.currency-98"><span class="linenos">98</span></a>        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;currency&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
+            <div class="pdoc-code codehilite"><pre><span></span><span id="Eurobond.currency-124"><a href="#Eurobond.currency-124"><span class="linenos">124</span></a>    <span class="nd">@property</span>
+</span><span id="Eurobond.currency-125"><a href="#Eurobond.currency-125"><span class="linenos">125</span></a>    <span class="k">def</span><span class="w"> </span><span class="nf">currency</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+</span><span id="Eurobond.currency-126"><a href="#Eurobond.currency-126"><span class="linenos">126</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Bond currency (USD or EUR).&quot;&quot;&quot;</span>
+</span><span id="Eurobond.currency-127"><a href="#Eurobond.currency-127"><span class="linenos">127</span></a>        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;currency&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
 </span></pre></div>
 
 
@@ -12791,10 +12866,10 @@ maturity, and other characteristics.</p>
 
     </div>
     <a class="headerlink" href="#Eurobond.bid_price"></a>
-            <div class="pdoc-code codehilite"><pre><span></span><span id="Eurobond.bid_price-100"><a href="#Eurobond.bid_price-100"><span class="linenos">100</span></a>    <span class="nd">@property</span>
-</span><span id="Eurobond.bid_price-101"><a href="#Eurobond.bid_price-101"><span class="linenos">101</span></a>    <span class="k">def</span><span class="w"> </span><span class="nf">bid_price</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="Eurobond.bid_price-102"><a href="#Eurobond.bid_price-102"><span class="linenos">102</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Bid price (buying price).&quot;&quot;&quot;</span>
-</span><span id="Eurobond.bid_price-103"><a href="#Eurobond.bid_price-103"><span class="linenos">103</span></a>        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;bid_price&quot;</span><span class="p">)</span>
+            <div class="pdoc-code codehilite"><pre><span></span><span id="Eurobond.bid_price-129"><a href="#Eurobond.bid_price-129"><span class="linenos">129</span></a>    <span class="nd">@property</span>
+</span><span id="Eurobond.bid_price-130"><a href="#Eurobond.bid_price-130"><span class="linenos">130</span></a>    <span class="k">def</span><span class="w"> </span><span class="nf">bid_price</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="Eurobond.bid_price-131"><a href="#Eurobond.bid_price-131"><span class="linenos">131</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Bid price (buying price).&quot;&quot;&quot;</span>
+</span><span id="Eurobond.bid_price-132"><a href="#Eurobond.bid_price-132"><span class="linenos">132</span></a>        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;bid_price&quot;</span><span class="p">)</span>
 </span></pre></div>
 
 
@@ -12812,10 +12887,10 @@ maturity, and other characteristics.</p>
 
     </div>
     <a class="headerlink" href="#Eurobond.bid_yield"></a>
-            <div class="pdoc-code codehilite"><pre><span></span><span id="Eurobond.bid_yield-105"><a href="#Eurobond.bid_yield-105"><span class="linenos">105</span></a>    <span class="nd">@property</span>
-</span><span id="Eurobond.bid_yield-106"><a href="#Eurobond.bid_yield-106"><span class="linenos">106</span></a>    <span class="k">def</span><span class="w"> </span><span class="nf">bid_yield</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="Eurobond.bid_yield-107"><a href="#Eurobond.bid_yield-107"><span class="linenos">107</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Bid yield (buying yield) as percentage.&quot;&quot;&quot;</span>
-</span><span id="Eurobond.bid_yield-108"><a href="#Eurobond.bid_yield-108"><span class="linenos">108</span></a>        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;bid_yield&quot;</span><span class="p">)</span>
+            <div class="pdoc-code codehilite"><pre><span></span><span id="Eurobond.bid_yield-134"><a href="#Eurobond.bid_yield-134"><span class="linenos">134</span></a>    <span class="nd">@property</span>
+</span><span id="Eurobond.bid_yield-135"><a href="#Eurobond.bid_yield-135"><span class="linenos">135</span></a>    <span class="k">def</span><span class="w"> </span><span class="nf">bid_yield</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="Eurobond.bid_yield-136"><a href="#Eurobond.bid_yield-136"><span class="linenos">136</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Bid yield (buying yield) as percentage.&quot;&quot;&quot;</span>
+</span><span id="Eurobond.bid_yield-137"><a href="#Eurobond.bid_yield-137"><span class="linenos">137</span></a>        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;bid_yield&quot;</span><span class="p">)</span>
 </span></pre></div>
 
 
@@ -12833,10 +12908,10 @@ maturity, and other characteristics.</p>
 
     </div>
     <a class="headerlink" href="#Eurobond.ask_price"></a>
-            <div class="pdoc-code codehilite"><pre><span></span><span id="Eurobond.ask_price-110"><a href="#Eurobond.ask_price-110"><span class="linenos">110</span></a>    <span class="nd">@property</span>
-</span><span id="Eurobond.ask_price-111"><a href="#Eurobond.ask_price-111"><span class="linenos">111</span></a>    <span class="k">def</span><span class="w"> </span><span class="nf">ask_price</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="Eurobond.ask_price-112"><a href="#Eurobond.ask_price-112"><span class="linenos">112</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Ask price (selling price).&quot;&quot;&quot;</span>
-</span><span id="Eurobond.ask_price-113"><a href="#Eurobond.ask_price-113"><span class="linenos">113</span></a>        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;ask_price&quot;</span><span class="p">)</span>
+            <div class="pdoc-code codehilite"><pre><span></span><span id="Eurobond.ask_price-139"><a href="#Eurobond.ask_price-139"><span class="linenos">139</span></a>    <span class="nd">@property</span>
+</span><span id="Eurobond.ask_price-140"><a href="#Eurobond.ask_price-140"><span class="linenos">140</span></a>    <span class="k">def</span><span class="w"> </span><span class="nf">ask_price</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="Eurobond.ask_price-141"><a href="#Eurobond.ask_price-141"><span class="linenos">141</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Ask price (selling price).&quot;&quot;&quot;</span>
+</span><span id="Eurobond.ask_price-142"><a href="#Eurobond.ask_price-142"><span class="linenos">142</span></a>        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;ask_price&quot;</span><span class="p">)</span>
 </span></pre></div>
 
 
@@ -12854,10 +12929,10 @@ maturity, and other characteristics.</p>
 
     </div>
     <a class="headerlink" href="#Eurobond.ask_yield"></a>
-            <div class="pdoc-code codehilite"><pre><span></span><span id="Eurobond.ask_yield-115"><a href="#Eurobond.ask_yield-115"><span class="linenos">115</span></a>    <span class="nd">@property</span>
-</span><span id="Eurobond.ask_yield-116"><a href="#Eurobond.ask_yield-116"><span class="linenos">116</span></a>    <span class="k">def</span><span class="w"> </span><span class="nf">ask_yield</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="Eurobond.ask_yield-117"><a href="#Eurobond.ask_yield-117"><span class="linenos">117</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Ask yield (selling yield) as percentage.&quot;&quot;&quot;</span>
-</span><span id="Eurobond.ask_yield-118"><a href="#Eurobond.ask_yield-118"><span class="linenos">118</span></a>        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;ask_yield&quot;</span><span class="p">)</span>
+            <div class="pdoc-code codehilite"><pre><span></span><span id="Eurobond.ask_yield-144"><a href="#Eurobond.ask_yield-144"><span class="linenos">144</span></a>    <span class="nd">@property</span>
+</span><span id="Eurobond.ask_yield-145"><a href="#Eurobond.ask_yield-145"><span class="linenos">145</span></a>    <span class="k">def</span><span class="w"> </span><span class="nf">ask_yield</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="Eurobond.ask_yield-146"><a href="#Eurobond.ask_yield-146"><span class="linenos">146</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Ask yield (selling yield) as percentage.&quot;&quot;&quot;</span>
+</span><span id="Eurobond.ask_yield-147"><a href="#Eurobond.ask_yield-147"><span class="linenos">147</span></a>        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;ask_yield&quot;</span><span class="p">)</span>
 </span></pre></div>
 
 
@@ -12875,14 +12950,14 @@ maturity, and other characteristics.</p>
 
     </div>
     <a class="headerlink" href="#Eurobond.info"></a>
-            <div class="pdoc-code codehilite"><pre><span></span><span id="Eurobond.info-120"><a href="#Eurobond.info-120"><span class="linenos">120</span></a>    <span class="nd">@property</span>
-</span><span id="Eurobond.info-121"><a href="#Eurobond.info-121"><span class="linenos">121</span></a>    <span class="k">def</span><span class="w"> </span><span class="nf">info</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
-</span><span id="Eurobond.info-122"><a href="#Eurobond.info-122"><span class="linenos">122</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;All bond data as dictionary.</span>
-</span><span id="Eurobond.info-123"><a href="#Eurobond.info-123"><span class="linenos">123</span></a>
-</span><span id="Eurobond.info-124"><a href="#Eurobond.info-124"><span class="linenos">124</span></a><span class="sd">        Returns:</span>
-</span><span id="Eurobond.info-125"><a href="#Eurobond.info-125"><span class="linenos">125</span></a><span class="sd">            Dict with all bond attributes.</span>
-</span><span id="Eurobond.info-126"><a href="#Eurobond.info-126"><span class="linenos">126</span></a><span class="sd">        &quot;&quot;&quot;</span>
-</span><span id="Eurobond.info-127"><a href="#Eurobond.info-127"><span class="linenos">127</span></a>        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_data</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+            <div class="pdoc-code codehilite"><pre><span></span><span id="Eurobond.info-149"><a href="#Eurobond.info-149"><span class="linenos">149</span></a>    <span class="nd">@property</span>
+</span><span id="Eurobond.info-150"><a href="#Eurobond.info-150"><span class="linenos">150</span></a>    <span class="k">def</span><span class="w"> </span><span class="nf">info</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+</span><span id="Eurobond.info-151"><a href="#Eurobond.info-151"><span class="linenos">151</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;All bond data as dictionary.</span>
+</span><span id="Eurobond.info-152"><a href="#Eurobond.info-152"><span class="linenos">152</span></a>
+</span><span id="Eurobond.info-153"><a href="#Eurobond.info-153"><span class="linenos">153</span></a><span class="sd">        Returns:</span>
+</span><span id="Eurobond.info-154"><a href="#Eurobond.info-154"><span class="linenos">154</span></a><span class="sd">            Dict with all bond attributes.</span>
+</span><span id="Eurobond.info-155"><a href="#Eurobond.info-155"><span class="linenos">155</span></a><span class="sd">        &quot;&quot;&quot;</span>
+</span><span id="Eurobond.info-156"><a href="#Eurobond.info-156"><span class="linenos">156</span></a>        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_data</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
 </span></pre></div>
 
 
@@ -12890,6 +12965,125 @@ maturity, and other characteristics.</p>
 
 <p>Returns:
     Dict with all bond attributes.</p>
+</div>
+
+
+                            </div>
+                            <div id="Eurobond.history" class="classattr">
+                                        <input id="Eurobond.history-view-source" class="view-source-toggle-state" type="checkbox" aria-hidden="true" tabindex="-1">
+<div class="attr function">
+            
+        <span class="def">def</span>
+        <span class="name">history</span><span class="signature pdoc-code multiline">(<span class="param">	<span class="bp">self</span>,</span><span class="param">	<span class="n">period</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>,</span><span class="param">	<span class="n">start</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span> <span class="o">|</span> <span class="n">datetime</span><span class="o">.</span><span class="n">date</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>,</span><span class="param">	<span class="n">end</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span> <span class="o">|</span> <span class="n">datetime</span><span class="o">.</span><span class="n">date</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>,</span><span class="param">	<span class="n">skip_weekends</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span></span><span class="return-annotation">) -> <span class="n">pandas</span><span class="o">.</span><span class="n">core</span><span class="o">.</span><span class="n">frame</span><span class="o">.</span><span class="n">DataFrame</span>:</span></span>
+
+                <label class="view-source-button" for="Eurobond.history-view-source"><span>View Source</span></label>
+
+    </div>
+    <a class="headerlink" href="#Eurobond.history"></a>
+            <div class="pdoc-code codehilite"><pre><span></span><span id="Eurobond.history-158"><a href="#Eurobond.history-158"><span class="linenos">158</span></a>    <span class="k">def</span><span class="w"> </span><span class="nf">history</span><span class="p">(</span>
+</span><span id="Eurobond.history-159"><a href="#Eurobond.history-159"><span class="linenos">159</span></a>        <span class="bp">self</span><span class="p">,</span>
+</span><span id="Eurobond.history-160"><a href="#Eurobond.history-160"><span class="linenos">160</span></a>        <span class="n">period</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="Eurobond.history-161"><a href="#Eurobond.history-161"><span class="linenos">161</span></a>        <span class="n">start</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">datetime</span> <span class="o">|</span> <span class="n">date_type</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="Eurobond.history-162"><a href="#Eurobond.history-162"><span class="linenos">162</span></a>        <span class="n">end</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">datetime</span> <span class="o">|</span> <span class="n">date_type</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="Eurobond.history-163"><a href="#Eurobond.history-163"><span class="linenos">163</span></a>        <span class="n">skip_weekends</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+</span><span id="Eurobond.history-164"><a href="#Eurobond.history-164"><span class="linenos">164</span></a>    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+</span><span id="Eurobond.history-165"><a href="#Eurobond.history-165"><span class="linenos">165</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Fetch daily historical bid/ask prices and yields.</span>
+</span><span id="Eurobond.history-166"><a href="#Eurobond.history-166"><span class="linenos">166</span></a>
+</span><span id="Eurobond.history-167"><a href="#Eurobond.history-167"><span class="linenos">167</span></a><span class="sd">        Args:</span>
+</span><span id="Eurobond.history-168"><a href="#Eurobond.history-168"><span class="linenos">168</span></a><span class="sd">            period: Lookback window ending today. One of 1mo, 3mo, 6mo, 1y,</span>
+</span><span id="Eurobond.history-169"><a href="#Eurobond.history-169"><span class="linenos">169</span></a><span class="sd">                2y, 3y, 5y, 10y, ytd, max. Ignored if ``start`` is given.</span>
+</span><span id="Eurobond.history-170"><a href="#Eurobond.history-170"><span class="linenos">170</span></a><span class="sd">            start: Start date (str &quot;YYYY-MM-DD&quot;, datetime, or date).</span>
+</span><span id="Eurobond.history-171"><a href="#Eurobond.history-171"><span class="linenos">171</span></a><span class="sd">            end: End date, defaults to today.</span>
+</span><span id="Eurobond.history-172"><a href="#Eurobond.history-172"><span class="linenos">172</span></a><span class="sd">            skip_weekends: Skip Sat/Sun (API returns zeros on weekends).</span>
+</span><span id="Eurobond.history-173"><a href="#Eurobond.history-173"><span class="linenos">173</span></a>
+</span><span id="Eurobond.history-174"><a href="#Eurobond.history-174"><span class="linenos">174</span></a><span class="sd">        Returns:</span>
+</span><span id="Eurobond.history-175"><a href="#Eurobond.history-175"><span class="linenos">175</span></a><span class="sd">            DataFrame indexed by Date with columns: bid_price, bid_yield,</span>
+</span><span id="Eurobond.history-176"><a href="#Eurobond.history-176"><span class="linenos">176</span></a><span class="sd">            ask_price, ask_yield, days_to_maturity. Holidays and suspended</span>
+</span><span id="Eurobond.history-177"><a href="#Eurobond.history-177"><span class="linenos">177</span></a><span class="sd">            trading days (bid_price == 0) are dropped.</span>
+</span><span id="Eurobond.history-178"><a href="#Eurobond.history-178"><span class="linenos">178</span></a>
+</span><span id="Eurobond.history-179"><a href="#Eurobond.history-179"><span class="linenos">179</span></a><span class="sd">        Examples:</span>
+</span><span id="Eurobond.history-180"><a href="#Eurobond.history-180"><span class="linenos">180</span></a><span class="sd">            &gt;&gt;&gt; bond = bp.Eurobond(&quot;US900123DG28&quot;)</span>
+</span><span id="Eurobond.history-181"><a href="#Eurobond.history-181"><span class="linenos">181</span></a><span class="sd">            &gt;&gt;&gt; bond.history(period=&quot;1y&quot;)</span>
+</span><span id="Eurobond.history-182"><a href="#Eurobond.history-182"><span class="linenos">182</span></a><span class="sd">            &gt;&gt;&gt; bond.history(start=&quot;2021-08-16&quot;, end=&quot;2026-03-11&quot;)</span>
+</span><span id="Eurobond.history-183"><a href="#Eurobond.history-183"><span class="linenos">183</span></a>
+</span><span id="Eurobond.history-184"><a href="#Eurobond.history-184"><span class="linenos">184</span></a><span class="sd">        Note:</span>
+</span><span id="Eurobond.history-185"><a href="#Eurobond.history-185"><span class="linenos">185</span></a><span class="sd">            Long ranges perform one HTTP request per business day against the</span>
+</span><span id="Eurobond.history-186"><a href="#Eurobond.history-186"><span class="linenos">186</span></a><span class="sd">            Ziraat Bank API — expect ~30 seconds per year of data on a cold</span>
+</span><span id="Eurobond.history-187"><a href="#Eurobond.history-187"><span class="linenos">187</span></a><span class="sd">            cache. Subsequent calls hit the per-date cache.</span>
+</span><span id="Eurobond.history-188"><a href="#Eurobond.history-188"><span class="linenos">188</span></a><span class="sd">        &quot;&quot;&quot;</span>
+</span><span id="Eurobond.history-189"><a href="#Eurobond.history-189"><span class="linenos">189</span></a>        <span class="n">today</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">()</span><span class="o">.</span><span class="n">date</span><span class="p">()</span>
+</span><span id="Eurobond.history-190"><a href="#Eurobond.history-190"><span class="linenos">190</span></a>
+</span><span id="Eurobond.history-191"><a href="#Eurobond.history-191"><span class="linenos">191</span></a>        <span class="c1"># Resolve end</span>
+</span><span id="Eurobond.history-192"><a href="#Eurobond.history-192"><span class="linenos">192</span></a>        <span class="n">end_d</span> <span class="o">=</span> <span class="n">_parse_date_arg</span><span class="p">(</span><span class="n">end</span><span class="p">)</span> <span class="k">if</span> <span class="n">end</span> <span class="k">else</span> <span class="n">today</span>
+</span><span id="Eurobond.history-193"><a href="#Eurobond.history-193"><span class="linenos">193</span></a>
+</span><span id="Eurobond.history-194"><a href="#Eurobond.history-194"><span class="linenos">194</span></a>        <span class="c1"># Resolve start</span>
+</span><span id="Eurobond.history-195"><a href="#Eurobond.history-195"><span class="linenos">195</span></a>        <span class="k">if</span> <span class="n">start</span><span class="p">:</span>
+</span><span id="Eurobond.history-196"><a href="#Eurobond.history-196"><span class="linenos">196</span></a>            <span class="n">start_d</span> <span class="o">=</span> <span class="n">_parse_date_arg</span><span class="p">(</span><span class="n">start</span><span class="p">)</span>
+</span><span id="Eurobond.history-197"><a href="#Eurobond.history-197"><span class="linenos">197</span></a>        <span class="k">elif</span> <span class="n">period</span><span class="p">:</span>
+</span><span id="Eurobond.history-198"><a href="#Eurobond.history-198"><span class="linenos">198</span></a>            <span class="k">if</span> <span class="n">period</span> <span class="o">==</span> <span class="s2">&quot;ytd&quot;</span><span class="p">:</span>
+</span><span id="Eurobond.history-199"><a href="#Eurobond.history-199"><span class="linenos">199</span></a>                <span class="n">start_d</span> <span class="o">=</span> <span class="n">date_type</span><span class="p">(</span><span class="n">today</span><span class="o">.</span><span class="n">year</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+</span><span id="Eurobond.history-200"><a href="#Eurobond.history-200"><span class="linenos">200</span></a>            <span class="k">elif</span> <span class="n">period</span> <span class="ow">in</span> <span class="n">_PERIOD_DAYS</span><span class="p">:</span>
+</span><span id="Eurobond.history-201"><a href="#Eurobond.history-201"><span class="linenos">201</span></a>                <span class="n">start_d</span> <span class="o">=</span> <span class="n">end_d</span> <span class="o">-</span> <span class="n">timedelta</span><span class="p">(</span><span class="n">days</span><span class="o">=</span><span class="n">_PERIOD_DAYS</span><span class="p">[</span><span class="n">period</span><span class="p">])</span>
+</span><span id="Eurobond.history-202"><a href="#Eurobond.history-202"><span class="linenos">202</span></a>            <span class="k">else</span><span class="p">:</span>
+</span><span id="Eurobond.history-203"><a href="#Eurobond.history-203"><span class="linenos">203</span></a>                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+</span><span id="Eurobond.history-204"><a href="#Eurobond.history-204"><span class="linenos">204</span></a>                    <span class="sa">f</span><span class="s2">&quot;Unknown period </span><span class="si">{</span><span class="n">period</span><span class="si">!r}</span><span class="s2">. Use start= or one of: &quot;</span>
+</span><span id="Eurobond.history-205"><a href="#Eurobond.history-205"><span class="linenos">205</span></a>                    <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="s1">&#39;, &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">sorted</span><span class="p">(</span><span class="n">_PERIOD_DAYS</span><span class="p">))</span><span class="si">}</span><span class="s2">&quot;</span>
+</span><span id="Eurobond.history-206"><a href="#Eurobond.history-206"><span class="linenos">206</span></a>                <span class="p">)</span>
+</span><span id="Eurobond.history-207"><a href="#Eurobond.history-207"><span class="linenos">207</span></a>        <span class="k">else</span><span class="p">:</span>
+</span><span id="Eurobond.history-208"><a href="#Eurobond.history-208"><span class="linenos">208</span></a>            <span class="c1"># Default to 1 month</span>
+</span><span id="Eurobond.history-209"><a href="#Eurobond.history-209"><span class="linenos">209</span></a>            <span class="n">start_d</span> <span class="o">=</span> <span class="n">end_d</span> <span class="o">-</span> <span class="n">timedelta</span><span class="p">(</span><span class="n">days</span><span class="o">=</span><span class="mi">30</span><span class="p">)</span>
+</span><span id="Eurobond.history-210"><a href="#Eurobond.history-210"><span class="linenos">210</span></a>
+</span><span id="Eurobond.history-211"><a href="#Eurobond.history-211"><span class="linenos">211</span></a>        <span class="n">rows</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_provider</span><span class="o">.</span><span class="n">get_history</span><span class="p">(</span>
+</span><span id="Eurobond.history-212"><a href="#Eurobond.history-212"><span class="linenos">212</span></a>            <span class="bp">self</span><span class="o">.</span><span class="n">_isin</span><span class="p">,</span> <span class="n">start_d</span><span class="p">,</span> <span class="n">end_d</span><span class="p">,</span> <span class="n">skip_weekends</span><span class="o">=</span><span class="n">skip_weekends</span>
+</span><span id="Eurobond.history-213"><a href="#Eurobond.history-213"><span class="linenos">213</span></a>        <span class="p">)</span>
+</span><span id="Eurobond.history-214"><a href="#Eurobond.history-214"><span class="linenos">214</span></a>
+</span><span id="Eurobond.history-215"><a href="#Eurobond.history-215"><span class="linenos">215</span></a>        <span class="n">columns</span> <span class="o">=</span> <span class="p">[</span>
+</span><span id="Eurobond.history-216"><a href="#Eurobond.history-216"><span class="linenos">216</span></a>            <span class="s2">&quot;bid_price&quot;</span><span class="p">,</span>
+</span><span id="Eurobond.history-217"><a href="#Eurobond.history-217"><span class="linenos">217</span></a>            <span class="s2">&quot;bid_yield&quot;</span><span class="p">,</span>
+</span><span id="Eurobond.history-218"><a href="#Eurobond.history-218"><span class="linenos">218</span></a>            <span class="s2">&quot;ask_price&quot;</span><span class="p">,</span>
+</span><span id="Eurobond.history-219"><a href="#Eurobond.history-219"><span class="linenos">219</span></a>            <span class="s2">&quot;ask_yield&quot;</span><span class="p">,</span>
+</span><span id="Eurobond.history-220"><a href="#Eurobond.history-220"><span class="linenos">220</span></a>            <span class="s2">&quot;days_to_maturity&quot;</span><span class="p">,</span>
+</span><span id="Eurobond.history-221"><a href="#Eurobond.history-221"><span class="linenos">221</span></a>        <span class="p">]</span>
+</span><span id="Eurobond.history-222"><a href="#Eurobond.history-222"><span class="linenos">222</span></a>        <span class="k">if</span> <span class="ow">not</span> <span class="n">rows</span><span class="p">:</span>
+</span><span id="Eurobond.history-223"><a href="#Eurobond.history-223"><span class="linenos">223</span></a>            <span class="k">return</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="n">columns</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="n">pd</span><span class="o">.</span><span class="n">DatetimeIndex</span><span class="p">([],</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Date&quot;</span><span class="p">))</span>
+</span><span id="Eurobond.history-224"><a href="#Eurobond.history-224"><span class="linenos">224</span></a>
+</span><span id="Eurobond.history-225"><a href="#Eurobond.history-225"><span class="linenos">225</span></a>        <span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">rows</span><span class="p">)</span>
+</span><span id="Eurobond.history-226"><a href="#Eurobond.history-226"><span class="linenos">226</span></a>        <span class="n">df</span><span class="p">[</span><span class="s2">&quot;Date&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">to_datetime</span><span class="p">(</span><span class="n">df</span><span class="p">[</span><span class="s2">&quot;date&quot;</span><span class="p">])</span>
+</span><span id="Eurobond.history-227"><a href="#Eurobond.history-227"><span class="linenos">227</span></a>        <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;date&quot;</span><span class="p">])</span><span class="o">.</span><span class="n">set_index</span><span class="p">(</span><span class="s2">&quot;Date&quot;</span><span class="p">)</span>
+</span><span id="Eurobond.history-228"><a href="#Eurobond.history-228"><span class="linenos">228</span></a>        <span class="k">return</span> <span class="n">df</span><span class="p">[</span><span class="n">columns</span><span class="p">]</span>
+</span></pre></div>
+
+
+            <div class="docstring"><p>Fetch daily historical bid/ask prices and yields.</p>
+
+<p>Args:
+    period: Lookback window ending today. One of 1mo, 3mo, 6mo, 1y,
+        2y, 3y, 5y, 10y, ytd, max. Ignored if <code>start</code> is given.
+    start: Start date (str "YYYY-MM-DD", datetime, or date).
+    end: End date, defaults to today.
+    skip_weekends: Skip Sat/Sun (API returns zeros on weekends).</p>
+
+<p>Returns:
+    DataFrame indexed by Date with columns: bid_price, bid_yield,
+    ask_price, ask_yield, days_to_maturity. Holidays and suspended
+    trading days (bid_price == 0) are dropped.</p>
+
+<p>Examples:</p>
+
+<blockquote>
+  <blockquote>
+    <blockquote>
+      <p>bond = bp.Eurobond("US900123DG28")
+      bond.history(period="1y")
+      bond.history(start="2021-08-16", end="2026-03-11")</p>
+    </blockquote>
+  </blockquote>
+</blockquote>
+
+<p>Note:
+    Long ranges perform one HTTP request per business day against the
+    Ziraat Bank API — expect ~30 seconds per year of data on a cold
+    cache. Subsequent calls hit the per-date cache.</p>
 </div>
 
 
@@ -20708,42 +20902,42 @@ not just the commonly used ones in indices().</p>
 
     </div>
     <a class="headerlink" href="#eurobonds"></a>
-            <div class="pdoc-code codehilite"><pre><span></span><span id="eurobonds-138"><a href="#eurobonds-138"><span class="linenos">138</span></a><span class="k">def</span><span class="w"> </span><span class="nf">eurobonds</span><span class="p">(</span><span class="n">currency</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
-</span><span id="eurobonds-139"><a href="#eurobonds-139"><span class="linenos">139</span></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Get all Turkish sovereign Eurobonds as DataFrame.</span>
-</span><span id="eurobonds-140"><a href="#eurobonds-140"><span class="linenos">140</span></a>
-</span><span id="eurobonds-141"><a href="#eurobonds-141"><span class="linenos">141</span></a><span class="sd">    Args:</span>
-</span><span id="eurobonds-142"><a href="#eurobonds-142"><span class="linenos">142</span></a><span class="sd">        currency: Optional filter by currency (&quot;USD&quot; or &quot;EUR&quot;).</span>
-</span><span id="eurobonds-143"><a href="#eurobonds-143"><span class="linenos">143</span></a>
-</span><span id="eurobonds-144"><a href="#eurobonds-144"><span class="linenos">144</span></a><span class="sd">    Returns:</span>
-</span><span id="eurobonds-145"><a href="#eurobonds-145"><span class="linenos">145</span></a><span class="sd">        DataFrame with columns: isin, maturity, days_to_maturity,</span>
-</span><span id="eurobonds-146"><a href="#eurobonds-146"><span class="linenos">146</span></a><span class="sd">        currency, bid_price, bid_yield, ask_price, ask_yield.</span>
-</span><span id="eurobonds-147"><a href="#eurobonds-147"><span class="linenos">147</span></a>
-</span><span id="eurobonds-148"><a href="#eurobonds-148"><span class="linenos">148</span></a><span class="sd">    Examples:</span>
-</span><span id="eurobonds-149"><a href="#eurobonds-149"><span class="linenos">149</span></a><span class="sd">        &gt;&gt;&gt; import borsapy as bp</span>
-</span><span id="eurobonds-150"><a href="#eurobonds-150"><span class="linenos">150</span></a><span class="sd">        &gt;&gt;&gt; bp.eurobonds()                # All Eurobonds</span>
-</span><span id="eurobonds-151"><a href="#eurobonds-151"><span class="linenos">151</span></a><span class="sd">        &gt;&gt;&gt; bp.eurobonds(currency=&quot;USD&quot;)  # USD bonds only</span>
-</span><span id="eurobonds-152"><a href="#eurobonds-152"><span class="linenos">152</span></a><span class="sd">        &gt;&gt;&gt; bp.eurobonds(currency=&quot;EUR&quot;)  # EUR bonds only</span>
-</span><span id="eurobonds-153"><a href="#eurobonds-153"><span class="linenos">153</span></a><span class="sd">    &quot;&quot;&quot;</span>
-</span><span id="eurobonds-154"><a href="#eurobonds-154"><span class="linenos">154</span></a>    <span class="n">provider</span> <span class="o">=</span> <span class="n">get_eurobond_provider</span><span class="p">()</span>
-</span><span id="eurobonds-155"><a href="#eurobonds-155"><span class="linenos">155</span></a>    <span class="n">data</span> <span class="o">=</span> <span class="n">provider</span><span class="o">.</span><span class="n">get_eurobonds</span><span class="p">(</span><span class="n">currency</span><span class="o">=</span><span class="n">currency</span><span class="p">)</span>
-</span><span id="eurobonds-156"><a href="#eurobonds-156"><span class="linenos">156</span></a>
-</span><span id="eurobonds-157"><a href="#eurobonds-157"><span class="linenos">157</span></a>    <span class="k">if</span> <span class="ow">not</span> <span class="n">data</span><span class="p">:</span>
-</span><span id="eurobonds-158"><a href="#eurobonds-158"><span class="linenos">158</span></a>        <span class="k">return</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span>
-</span><span id="eurobonds-159"><a href="#eurobonds-159"><span class="linenos">159</span></a>            <span class="n">columns</span><span class="o">=</span><span class="p">[</span>
-</span><span id="eurobonds-160"><a href="#eurobonds-160"><span class="linenos">160</span></a>                <span class="s2">&quot;isin&quot;</span><span class="p">,</span>
-</span><span id="eurobonds-161"><a href="#eurobonds-161"><span class="linenos">161</span></a>                <span class="s2">&quot;maturity&quot;</span><span class="p">,</span>
-</span><span id="eurobonds-162"><a href="#eurobonds-162"><span class="linenos">162</span></a>                <span class="s2">&quot;days_to_maturity&quot;</span><span class="p">,</span>
-</span><span id="eurobonds-163"><a href="#eurobonds-163"><span class="linenos">163</span></a>                <span class="s2">&quot;currency&quot;</span><span class="p">,</span>
-</span><span id="eurobonds-164"><a href="#eurobonds-164"><span class="linenos">164</span></a>                <span class="s2">&quot;bid_price&quot;</span><span class="p">,</span>
-</span><span id="eurobonds-165"><a href="#eurobonds-165"><span class="linenos">165</span></a>                <span class="s2">&quot;bid_yield&quot;</span><span class="p">,</span>
-</span><span id="eurobonds-166"><a href="#eurobonds-166"><span class="linenos">166</span></a>                <span class="s2">&quot;ask_price&quot;</span><span class="p">,</span>
-</span><span id="eurobonds-167"><a href="#eurobonds-167"><span class="linenos">167</span></a>                <span class="s2">&quot;ask_yield&quot;</span><span class="p">,</span>
-</span><span id="eurobonds-168"><a href="#eurobonds-168"><span class="linenos">168</span></a>            <span class="p">]</span>
-</span><span id="eurobonds-169"><a href="#eurobonds-169"><span class="linenos">169</span></a>        <span class="p">)</span>
-</span><span id="eurobonds-170"><a href="#eurobonds-170"><span class="linenos">170</span></a>
-</span><span id="eurobonds-171"><a href="#eurobonds-171"><span class="linenos">171</span></a>    <span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
-</span><span id="eurobonds-172"><a href="#eurobonds-172"><span class="linenos">172</span></a>    <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">sort_values</span><span class="p">(</span><span class="s2">&quot;maturity&quot;</span><span class="p">)</span>
-</span><span id="eurobonds-173"><a href="#eurobonds-173"><span class="linenos">173</span></a>    <span class="k">return</span> <span class="n">df</span>
+            <div class="pdoc-code codehilite"><pre><span></span><span id="eurobonds-239"><a href="#eurobonds-239"><span class="linenos">239</span></a><span class="k">def</span><span class="w"> </span><span class="nf">eurobonds</span><span class="p">(</span><span class="n">currency</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+</span><span id="eurobonds-240"><a href="#eurobonds-240"><span class="linenos">240</span></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Get all Turkish sovereign Eurobonds as DataFrame.</span>
+</span><span id="eurobonds-241"><a href="#eurobonds-241"><span class="linenos">241</span></a>
+</span><span id="eurobonds-242"><a href="#eurobonds-242"><span class="linenos">242</span></a><span class="sd">    Args:</span>
+</span><span id="eurobonds-243"><a href="#eurobonds-243"><span class="linenos">243</span></a><span class="sd">        currency: Optional filter by currency (&quot;USD&quot; or &quot;EUR&quot;).</span>
+</span><span id="eurobonds-244"><a href="#eurobonds-244"><span class="linenos">244</span></a>
+</span><span id="eurobonds-245"><a href="#eurobonds-245"><span class="linenos">245</span></a><span class="sd">    Returns:</span>
+</span><span id="eurobonds-246"><a href="#eurobonds-246"><span class="linenos">246</span></a><span class="sd">        DataFrame with columns: isin, maturity, days_to_maturity,</span>
+</span><span id="eurobonds-247"><a href="#eurobonds-247"><span class="linenos">247</span></a><span class="sd">        currency, bid_price, bid_yield, ask_price, ask_yield.</span>
+</span><span id="eurobonds-248"><a href="#eurobonds-248"><span class="linenos">248</span></a>
+</span><span id="eurobonds-249"><a href="#eurobonds-249"><span class="linenos">249</span></a><span class="sd">    Examples:</span>
+</span><span id="eurobonds-250"><a href="#eurobonds-250"><span class="linenos">250</span></a><span class="sd">        &gt;&gt;&gt; import borsapy as bp</span>
+</span><span id="eurobonds-251"><a href="#eurobonds-251"><span class="linenos">251</span></a><span class="sd">        &gt;&gt;&gt; bp.eurobonds()                # All Eurobonds</span>
+</span><span id="eurobonds-252"><a href="#eurobonds-252"><span class="linenos">252</span></a><span class="sd">        &gt;&gt;&gt; bp.eurobonds(currency=&quot;USD&quot;)  # USD bonds only</span>
+</span><span id="eurobonds-253"><a href="#eurobonds-253"><span class="linenos">253</span></a><span class="sd">        &gt;&gt;&gt; bp.eurobonds(currency=&quot;EUR&quot;)  # EUR bonds only</span>
+</span><span id="eurobonds-254"><a href="#eurobonds-254"><span class="linenos">254</span></a><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="eurobonds-255"><a href="#eurobonds-255"><span class="linenos">255</span></a>    <span class="n">provider</span> <span class="o">=</span> <span class="n">get_eurobond_provider</span><span class="p">()</span>
+</span><span id="eurobonds-256"><a href="#eurobonds-256"><span class="linenos">256</span></a>    <span class="n">data</span> <span class="o">=</span> <span class="n">provider</span><span class="o">.</span><span class="n">get_eurobonds</span><span class="p">(</span><span class="n">currency</span><span class="o">=</span><span class="n">currency</span><span class="p">)</span>
+</span><span id="eurobonds-257"><a href="#eurobonds-257"><span class="linenos">257</span></a>
+</span><span id="eurobonds-258"><a href="#eurobonds-258"><span class="linenos">258</span></a>    <span class="k">if</span> <span class="ow">not</span> <span class="n">data</span><span class="p">:</span>
+</span><span id="eurobonds-259"><a href="#eurobonds-259"><span class="linenos">259</span></a>        <span class="k">return</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span>
+</span><span id="eurobonds-260"><a href="#eurobonds-260"><span class="linenos">260</span></a>            <span class="n">columns</span><span class="o">=</span><span class="p">[</span>
+</span><span id="eurobonds-261"><a href="#eurobonds-261"><span class="linenos">261</span></a>                <span class="s2">&quot;isin&quot;</span><span class="p">,</span>
+</span><span id="eurobonds-262"><a href="#eurobonds-262"><span class="linenos">262</span></a>                <span class="s2">&quot;maturity&quot;</span><span class="p">,</span>
+</span><span id="eurobonds-263"><a href="#eurobonds-263"><span class="linenos">263</span></a>                <span class="s2">&quot;days_to_maturity&quot;</span><span class="p">,</span>
+</span><span id="eurobonds-264"><a href="#eurobonds-264"><span class="linenos">264</span></a>                <span class="s2">&quot;currency&quot;</span><span class="p">,</span>
+</span><span id="eurobonds-265"><a href="#eurobonds-265"><span class="linenos">265</span></a>                <span class="s2">&quot;bid_price&quot;</span><span class="p">,</span>
+</span><span id="eurobonds-266"><a href="#eurobonds-266"><span class="linenos">266</span></a>                <span class="s2">&quot;bid_yield&quot;</span><span class="p">,</span>
+</span><span id="eurobonds-267"><a href="#eurobonds-267"><span class="linenos">267</span></a>                <span class="s2">&quot;ask_price&quot;</span><span class="p">,</span>
+</span><span id="eurobonds-268"><a href="#eurobonds-268"><span class="linenos">268</span></a>                <span class="s2">&quot;ask_yield&quot;</span><span class="p">,</span>
+</span><span id="eurobonds-269"><a href="#eurobonds-269"><span class="linenos">269</span></a>            <span class="p">]</span>
+</span><span id="eurobonds-270"><a href="#eurobonds-270"><span class="linenos">270</span></a>        <span class="p">)</span>
+</span><span id="eurobonds-271"><a href="#eurobonds-271"><span class="linenos">271</span></a>
+</span><span id="eurobonds-272"><a href="#eurobonds-272"><span class="linenos">272</span></a>    <span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+</span><span id="eurobonds-273"><a href="#eurobonds-273"><span class="linenos">273</span></a>    <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">sort_values</span><span class="p">(</span><span class="s2">&quot;maturity&quot;</span><span class="p">)</span>
+</span><span id="eurobonds-274"><a href="#eurobonds-274"><span class="linenos">274</span></a>    <span class="k">return</span> <span class="n">df</span>
 </span></pre></div>
 
 

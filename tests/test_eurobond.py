@@ -1,11 +1,13 @@
 """Tests for Turkish Eurobond data."""
 
-from datetime import datetime
+from datetime import date, datetime
+from unittest.mock import Mock
 
 import pandas as pd
 import pytest
 
-from borsapy.eurobond import Eurobond, eurobonds
+from borsapy._providers.ziraat_eurobond import ZiraatEurobondProvider
+from borsapy.eurobond import Eurobond, _parse_date_arg, eurobonds
 from borsapy.exceptions import DataNotAvailableError
 
 # =============================================================================
@@ -187,3 +189,198 @@ class TestEurobondIntegration:
             # Filter out any with 0 (could be data issues)
             valid = df[df["days_to_maturity"] > 0]
             assert len(valid) > 0, "Expected bonds with positive days to maturity"
+
+
+# =============================================================================
+# history() — pure logic (no network)
+# =============================================================================
+
+
+class TestParseDateArg:
+    """_parse_date_arg accepts multiple formats."""
+
+    def test_iso_string(self):
+        assert _parse_date_arg("2024-05-10") == date(2024, 5, 10)
+
+    def test_datetime_object(self):
+        assert _parse_date_arg(datetime(2024, 5, 10, 15, 30)) == date(2024, 5, 10)
+
+    def test_date_object(self):
+        d = date(2024, 5, 10)
+        assert _parse_date_arg(d) == d
+
+    def test_slash_format(self):
+        assert _parse_date_arg("2024/05/10") == date(2024, 5, 10)
+
+    def test_turkish_dotted_format(self):
+        assert _parse_date_arg("10.05.2024") == date(2024, 5, 10)
+
+    def test_dash_format(self):
+        assert _parse_date_arg("10-05-2024") == date(2024, 5, 10)
+
+    def test_invalid_raises(self):
+        with pytest.raises(ValueError, match="Could not parse"):
+            _parse_date_arg("not a date")
+
+
+class TestIterBusinessDates:
+    """ZiraatEurobondProvider._iter_business_dates enumerates correctly."""
+
+    def test_single_day(self):
+        d = date(2024, 5, 10)  # Friday
+        out = ZiraatEurobondProvider._iter_business_dates(d, d)
+        assert out == [d]
+
+    def test_skips_weekends(self):
+        # Fri 2024-05-10 → Mon 2024-05-13
+        out = ZiraatEurobondProvider._iter_business_dates(
+            date(2024, 5, 10), date(2024, 5, 13)
+        )
+        assert out == [date(2024, 5, 10), date(2024, 5, 13)]
+
+    def test_includes_weekends_when_flagged(self):
+        out = ZiraatEurobondProvider._iter_business_dates(
+            date(2024, 5, 10), date(2024, 5, 13), skip_weekends=False
+        )
+        assert len(out) == 4
+
+    def test_end_before_start_returns_empty(self):
+        out = ZiraatEurobondProvider._iter_business_dates(
+            date(2024, 5, 10), date(2024, 5, 5)
+        )
+        assert out == []
+
+    def test_full_week(self):
+        # Mon-Fri 2024-05-06 to 2024-05-10
+        out = ZiraatEurobondProvider._iter_business_dates(
+            date(2024, 5, 6), date(2024, 5, 10)
+        )
+        assert len(out) == 5
+        assert all(d.weekday() < 5 for d in out)
+
+
+class TestGetHistoryWithMockProvider:
+    """Provider.get_history filters, sorts, and drops invalid rows."""
+
+    def _make_provider(self, by_date: dict[str, list[dict]]):
+        """Build a provider whose _fetch_bonds_for_date_cached is mocked."""
+        provider = ZiraatEurobondProvider.__new__(ZiraatEurobondProvider)
+
+        def fake_fetch(date_str: str) -> list[dict]:
+            return by_date.get(date_str, [])
+
+        provider._fetch_bonds_for_date_cached = fake_fetch
+        return provider
+
+    def test_filters_to_requested_isin(self):
+        by_date = {
+            "2024-05-06": [
+                {"isin": "TARGET", "bid_price": 100.0, "bid_yield": 5.0, "ask_price": 101.0, "ask_yield": 4.9, "days_to_maturity": 1000},
+                {"isin": "OTHER", "bid_price": 50.0, "bid_yield": 8.0, "ask_price": 51.0, "ask_yield": 7.8, "days_to_maturity": 500},
+            ],
+        }
+        p = self._make_provider(by_date)
+        rows = p.get_history("TARGET", date(2024, 5, 6), date(2024, 5, 6))
+        assert len(rows) == 1
+        assert rows[0]["bid_price"] == 100.0
+
+    def test_drops_zero_price_rows(self):
+        by_date = {
+            "2024-05-06": [{"isin": "X", "bid_price": 100.0, "bid_yield": 5.0, "ask_price": 101.0, "ask_yield": 4.9, "days_to_maturity": 1000}],
+            "2024-05-07": [{"isin": "X", "bid_price": 0.0, "bid_yield": 0.0, "ask_price": 0.0, "ask_yield": 0.0, "days_to_maturity": 999}],
+            "2024-05-08": [{"isin": "X", "bid_price": None, "bid_yield": None, "ask_price": None, "ask_yield": None, "days_to_maturity": 998}],
+            "2024-05-09": [{"isin": "X", "bid_price": 102.0, "bid_yield": 5.1, "ask_price": 103.0, "ask_yield": 5.0, "days_to_maturity": 997}],
+        }
+        p = self._make_provider(by_date)
+        rows = p.get_history("X", date(2024, 5, 6), date(2024, 5, 9))
+        dates = [r["date"] for r in rows]
+        assert dates == [date(2024, 5, 6), date(2024, 5, 9)]
+
+    def test_missing_isin_yields_no_row(self):
+        by_date = {
+            "2024-05-06": [{"isin": "OTHER", "bid_price": 100.0, "bid_yield": 5.0, "ask_price": 101.0, "ask_yield": 4.9, "days_to_maturity": 1000}],
+        }
+        p = self._make_provider(by_date)
+        rows = p.get_history("MISSING", date(2024, 5, 6), date(2024, 5, 6))
+        assert rows == []
+
+    def test_results_sorted_by_date(self):
+        # Even though concurrent fetching may return out-of-order, output is sorted.
+        by_date = {
+            "2024-05-06": [{"isin": "X", "bid_price": 100.0, "bid_yield": 5.0, "ask_price": 101.0, "ask_yield": 4.9, "days_to_maturity": 1000}],
+            "2024-05-07": [{"isin": "X", "bid_price": 101.0, "bid_yield": 5.1, "ask_price": 102.0, "ask_yield": 5.0, "days_to_maturity": 999}],
+            "2024-05-08": [{"isin": "X", "bid_price": 102.0, "bid_yield": 5.2, "ask_price": 103.0, "ask_yield": 5.1, "days_to_maturity": 998}],
+        }
+        p = self._make_provider(by_date)
+        rows = p.get_history("X", date(2024, 5, 6), date(2024, 5, 8))
+        dates = [r["date"] for r in rows]
+        assert dates == sorted(dates)
+
+    def test_isin_normalized_to_upper(self):
+        by_date = {
+            "2024-05-06": [{"isin": "US900123DG28", "bid_price": 100.0, "bid_yield": 5.0, "ask_price": 101.0, "ask_yield": 4.9, "days_to_maturity": 1000}],
+        }
+        p = self._make_provider(by_date)
+        rows = p.get_history("us900123dg28", date(2024, 5, 6), date(2024, 5, 6))
+        assert len(rows) == 1
+
+    def test_empty_range_returns_empty(self):
+        p = self._make_provider({})
+        rows = p.get_history("X", date(2024, 5, 10), date(2024, 5, 5))
+        assert rows == []
+
+
+class TestEurobondHistoryMocked:
+    """Eurobond.history() integrates period/start/end resolution."""
+
+    def _make_bond(self, rows: list[dict]) -> Eurobond:
+        """Build Eurobond with mocked provider returning given rows."""
+        bond = Eurobond.__new__(Eurobond)
+        bond._isin = "TEST"
+        bond._data_cache = {"isin": "TEST"}
+        bond._provider = Mock()
+        bond._provider.get_history = Mock(return_value=rows)
+        return bond
+
+    def test_returns_dataframe_with_expected_columns(self):
+        rows = [
+            {"date": date(2024, 5, 6), "bid_price": 100.0, "bid_yield": 5.0, "ask_price": 101.0, "ask_yield": 4.9, "days_to_maturity": 1000},
+            {"date": date(2024, 5, 7), "bid_price": 101.0, "bid_yield": 5.1, "ask_price": 102.0, "ask_yield": 5.0, "days_to_maturity": 999},
+        ]
+        bond = self._make_bond(rows)
+        df = bond.history(start="2024-05-06", end="2024-05-07")
+        assert list(df.columns) == ["bid_price", "bid_yield", "ask_price", "ask_yield", "days_to_maturity"]
+        assert df.index.name == "Date"
+        assert len(df) == 2
+
+    def test_empty_range_returns_empty_frame(self):
+        bond = self._make_bond([])
+        df = bond.history(start="2024-05-06", end="2024-05-05")
+        assert df.empty
+        assert list(df.columns) == ["bid_price", "bid_yield", "ask_price", "ask_yield", "days_to_maturity"]
+
+    def test_period_resolves_to_start_date(self):
+        bond = self._make_bond([])
+        bond.history(period="1y")
+        # Provider called once; start should be ~365 days before today
+        call_args = bond._provider.get_history.call_args
+        _, start_arg, end_arg = call_args.args[:3]
+        assert (end_arg - start_arg).days == 365
+
+    def test_ytd_resolves_to_jan_1(self):
+        bond = self._make_bond([])
+        bond.history(period="ytd")
+        _, start_arg, _ = bond._provider.get_history.call_args.args[:3]
+        assert start_arg.month == 1 and start_arg.day == 1
+
+    def test_unknown_period_raises(self):
+        bond = self._make_bond([])
+        with pytest.raises(ValueError, match="Unknown period"):
+            bond.history(period="999y")
+
+    def test_start_string_parsed(self):
+        bond = self._make_bond([])
+        bond.history(start="2020-01-15", end="2020-12-31")
+        _, start_arg, end_arg = bond._provider.get_history.call_args.args[:3]
+        assert start_arg == date(2020, 1, 15)
+        assert end_arg == date(2020, 12, 31)

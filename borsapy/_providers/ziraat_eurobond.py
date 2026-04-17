@@ -4,6 +4,8 @@ Fetches Turkish sovereign Eurobond data from Ziraat Bank's API.
 Includes USD and EUR denominated bonds with bid/ask prices and yields.
 """
 
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import date as date_type
 from datetime import datetime, timedelta
 
 from bs4 import BeautifulSoup
@@ -192,6 +194,100 @@ class ZiraatEurobondProvider(BaseProvider):
                 return bond
 
         return None
+
+    def _fetch_bonds_for_date_cached(self, date_str: str) -> list[dict]:
+        """Cached wrapper around :meth:`_fetch_bonds_for_date`.
+
+        Historical daily data doesn't change, so it's safe to cache aggressively.
+        """
+        cache_key = f"ziraat_eurobonds:{date_str}"
+        cached = self._cache_get(cache_key)
+        if cached is not None:
+            return cached
+
+        bonds = self._fetch_bonds_for_date(date_str)
+        self._cache_set(cache_key, bonds, TTL.OHLCV_HISTORY)
+        return bonds
+
+    @staticmethod
+    def _iter_business_dates(
+        start: date_type, end: date_type, skip_weekends: bool = True
+    ) -> list[date_type]:
+        """Enumerate dates between ``start`` and ``end`` inclusive.
+
+        Weekdays only if ``skip_weekends`` is True. Turkish public holidays
+        still appear (we'd need a holiday calendar to drop them); zero-price
+        rows from the API are filtered downstream.
+        """
+        if end < start:
+            return []
+        dates: list[date_type] = []
+        current = start
+        while current <= end:
+            if not skip_weekends or current.weekday() < 5:
+                dates.append(current)
+            current += timedelta(days=1)
+        return dates
+
+    def get_history(
+        self,
+        isin: str,
+        start: datetime | date_type,
+        end: datetime | date_type,
+        skip_weekends: bool = True,
+        max_workers: int = 5,
+    ) -> list[dict]:
+        """Fetch daily bond data for a single ISIN across a date range.
+
+        Args:
+            isin: ISIN code (e.g., "US900123DG28").
+            start: Start date (inclusive).
+            end: End date (inclusive).
+            skip_weekends: Skip Saturdays/Sundays (API returns zeros).
+            max_workers: Concurrent request workers.
+
+        Returns:
+            List of dicts sorted by date ascending. Each dict includes the
+            date plus bid/ask price/yield and days_to_maturity. Rows where
+            bid_price is 0 or None (holidays, suspensions) are dropped.
+        """
+        isin = isin.upper()
+        start_d = start.date() if isinstance(start, datetime) else start
+        end_d = end.date() if isinstance(end, datetime) else end
+        dates = self._iter_business_dates(start_d, end_d, skip_weekends)
+        if not dates:
+            return []
+
+        def _fetch_one(d: date_type) -> dict | None:
+            date_str = d.strftime("%Y-%m-%d")
+            bonds = self._fetch_bonds_for_date_cached(date_str)
+            for b in bonds:
+                if b.get("isin") == isin:
+                    price = b.get("bid_price")
+                    if price is None or price == 0:
+                        return None
+                    return {
+                        "date": d,
+                        "bid_price": b.get("bid_price"),
+                        "bid_yield": b.get("bid_yield"),
+                        "ask_price": b.get("ask_price"),
+                        "ask_yield": b.get("ask_yield"),
+                        "days_to_maturity": b.get("days_to_maturity", 0),
+                    }
+            return None
+
+        # Concurrent fetch with bounded worker count
+        workers = max(1, min(max_workers, len(dates)))
+        results: list[dict] = []
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            futures = {pool.submit(_fetch_one, d): d for d in dates}
+            for fut in as_completed(futures):
+                row = fut.result()
+                if row is not None:
+                    results.append(row)
+
+        results.sort(key=lambda r: r["date"])
+        return results
 
 
 # Singleton instance
