@@ -13,6 +13,60 @@ from borsapy.technical import TechnicalMixin
 from borsapy.twitter import TwitterMixin, _build_stock_query
 
 
+def _compute_adj_close(
+    close: pd.Series, dividends: pd.DataFrame
+) -> pd.Series:
+    """Compute backward dividend-adjusted close prices (yfinance "Adj Close").
+
+    Assumes ``close`` is already split-adjusted (TradingView default). For each
+    ex-dividend date ``t`` with close ``C_t`` and amount ``D``, all prices
+    strictly before ``t`` are multiplied by ``(C_t - D) / C_t``. This yields a
+    total-return price series: what you'd have if every dividend were
+    reinvested on its ex-date.
+
+    Args:
+        close: Split-adjusted close prices indexed by date.
+        dividends: DataFrame with an ``Amount`` column indexed by ex-date.
+            Empty or missing ``Amount`` yields ``close`` unchanged.
+
+    Returns:
+        Adjusted close series with the same index as ``close``.
+    """
+    if close.empty or dividends is None or dividends.empty:
+        return close.copy()
+    if "Amount" not in dividends.columns:
+        return close.copy()
+
+    factor = pd.Series(1.0, index=close.index)
+
+    # Iterate ex-div dates oldest → newest so compounding is correct
+    div_rows = dividends.sort_index()
+    for div_date, row in div_rows.iterrows():
+        amount = row.get("Amount")
+        if amount is None or amount <= 0:
+            continue
+
+        # Match by calendar date (handles tz-aware vs tz-naive mismatches)
+        div_date_only = pd.Timestamp(div_date).date()
+        match_mask = pd.Series(
+            [pd.Timestamp(idx).date() == div_date_only for idx in close.index],
+            index=close.index,
+        )
+        if not match_mask.any():
+            continue
+
+        match_idx = close.index[match_mask][0]
+        close_on_ex = close.loc[match_idx]
+        if close_on_ex <= 0:
+            continue
+
+        adj = (close_on_ex - amount) / close_on_ex
+        before_mask = close.index < match_idx
+        factor.loc[before_mask] *= adj
+
+    return close * factor
+
+
 class FastInfo:
     """
     Fast access to common ticker information.
@@ -627,6 +681,7 @@ class Ticker(TechnicalMixin, TwitterMixin):
         end: datetime | str | None = None,
         actions: bool = False,
         adjust: bool = True,
+        auto_adjust: bool = False,
     ) -> pd.DataFrame:
         """
         Get historical OHLCV data.
@@ -643,10 +698,14 @@ class Ticker(TechnicalMixin, TwitterMixin):
                      Defaults to False.
             adjust: If True (default), return split-adjusted prices.
                     If False, return unadjusted (raw) prices.
+            auto_adjust: If True, include an ``Adj Close`` column
+                         (split + dividend adjusted, yfinance-style).
+                         Defaults to False.
 
         Returns:
             DataFrame with columns: Open, High, Low, Close, Volume.
             If actions=True, also includes Dividends and Stock Splits columns.
+            If auto_adjust=True, also includes an Adj Close column.
             Index is the Date.
 
         Examples:
@@ -656,6 +715,7 @@ class Ticker(TechnicalMixin, TwitterMixin):
             >>> stock.history(start="2024-01-01", end="2024-06-30")  # Date range
             >>> stock.history(period="1y", actions=True)  # With dividends/splits
             >>> stock.history(period="max", adjust=False)  # Raw unadjusted prices
+            >>> stock.history(period="5y", auto_adjust=True)  # With Adj Close
         """
         # Parse dates if strings
         start_dt = self._parse_date(start) if start else None
@@ -674,6 +734,14 @@ class Ticker(TechnicalMixin, TwitterMixin):
 
         if actions and not df.empty:
             df = self._add_actions_to_history(df)
+
+        if auto_adjust and not df.empty and "Close" in df.columns:
+            try:
+                divs = self.dividends
+            except Exception:
+                divs = pd.DataFrame()
+            df = df.copy()
+            df["Adj Close"] = _compute_adj_close(df["Close"], divs)
 
         return df
 
