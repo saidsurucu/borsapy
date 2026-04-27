@@ -601,11 +601,9 @@ print(fon.allocation_history(period="3ay"))  # Son 3 ay (max ~100 gün)
 # 1 2024-01-15      Ters-Repo  Reverse Repo   30.1
 # ...
 
-# info içinde de mevcut (ekstra API çağrısı yok)
-print(fon.info['allocation'])
-print(fon.info['isin'])             # ISIN kodu
+# Not: Yeni TEFAS API'sinde info içerisinde allocation, isin ve weekly_return verileri bulunmamaktadır (None döner).
+# Portföy dağılımı için fon.allocation veya fon.allocation_history() kullanılmalıdır.
 print(fon.info['daily_return'])     # Günlük getiri
-print(fon.info['weekly_return'])    # Haftalık getiri
 print(fon.info['category_rank'])    # Kategori sırası (örn: 20/181)
 ```
 

@@ -144,7 +144,7 @@ class Fund(TechnicalMixin, TwitterMixin):
             - daily_return: Daily return
         """
         if self._info_cache is None:
-            # GetAllFundAnalyzeData works for both YAT and EMK without fontip
+            # fonBilgiGetir works for both YAT and EMK without fontip
             self._info_cache = self._provider.get_fund_detail(self._fund_code)
 
             # If fund_type not explicitly set, we need to detect it for history/allocation

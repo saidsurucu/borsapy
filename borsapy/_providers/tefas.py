@@ -72,7 +72,7 @@ ASSET_TYPE_MAPPING = {
     "ÖSDB": "Özel Sektör Devlet Bonusu",
 }
 
-# Standardized asset names (for GetAllFundAnalyzeData API which returns full Turkish names)
+# Standardized asset names (maps various API response names to standardized English names)
 # Maps various API response names to standardized English names
 ASSET_NAME_STANDARDIZATION = {
     # Direct mappings (API returns these exact names)
@@ -104,7 +104,8 @@ class TEFASProvider(BaseProvider):
     - Fund search
     """
 
-    BASE_URL = "https://www.tefas.gov.tr/api/DB"
+    BASE_URL = "https://www.tefas.gov.tr/api/funds"
+    BASE_URL_LEGACY = "https://www.tefas.gov.tr/api/DB"
 
     def __init__(self):
         super().__init__(verify=False)
@@ -176,7 +177,10 @@ class TEFASProvider(BaseProvider):
         headers: dict[str, str] | None = None,
         max_retries: int = 3,
     ) -> Any:
-        """POST to TEFAS and parse JSON, retrying transient WAF blocks.
+        """POST to TEFAS (form-urlencoded) and parse JSON, retrying transient WAF blocks.
+
+        Used for legacy ``/api/DB`` endpoints which expect
+        ``application/x-www-form-urlencoded`` payloads.
 
         TEFAS WAF intermittently returns empty bodies or HTML maintenance
         pages with HTTP 200. Retries with exponential backoff (0.5s, 1s, 2s)
@@ -195,6 +199,68 @@ class TEFASProvider(BaseProvider):
                 last_error = e
 
         assert last_error is not None  # loop always runs at least once
+        raise last_error
+
+    def _post_json_v2(
+        self,
+        endpoint_path: str,
+        payload: dict[str, Any],
+        endpoint_label: str,
+        max_retries: int = 3,
+    ) -> list[dict[str, Any]]:
+        """POST to the new TEFAS ``/api/funds/*`` endpoints with a JSON body.
+
+        The redesigned (2025+) TEFAS API uses ``Content-Type: application/json``
+        and returns a standard envelope::
+
+            {"errorCode": ..., "errorMessage": ..., "resultList": [...]}
+
+        This method handles that envelope, retries transient failures, and
+        returns the ``resultList`` directly.
+
+        Raises:
+            APIError: On non-retryable upstream errors or after exhausting
+                retries.
+        """
+        url = f"{self.BASE_URL}/{endpoint_path}"
+        headers = {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "User-Agent": self.DEFAULT_HEADERS["User-Agent"],
+        }
+
+        last_error: APIError | None = None
+        for attempt in range(max_retries):
+            if attempt > 0:
+                time.sleep(0.5 * (2 ** (attempt - 1)))
+
+            response = self._client.post(
+                url, json=payload, headers=headers,
+            )
+            response.raise_for_status()
+
+            try:
+                data = self._safe_json(response, endpoint_label)
+            except APIError as e:
+                last_error = e
+                continue
+
+            # Unwrap the v2 envelope
+            if isinstance(data, dict):
+                err_msg = data.get("errorMessage")
+                if err_msg:
+                    raise APIError(
+                        f"TEFAS {endpoint_label} returned error: {err_msg}"
+                    )
+                result_list = data.get("resultList")
+                if result_list is None:
+                    return []
+                return result_list
+
+            # Unexpected shape — return as-is wrapped in a list
+            return [data] if data else []
+
+        assert last_error is not None
         raise last_error
 
     def get_fund_detail(self, fund_code: str, fund_type: str = "YAT") -> dict[str, Any]:
@@ -217,83 +283,97 @@ class TEFASProvider(BaseProvider):
             return cached
 
         try:
-            url = f"{self.BASE_URL}/GetAllFundAnalyzeData"
-            data = {"dil": "TR", "fonkod": fund_code}
+            # --- 1. Core fund info from fonBilgiGetir ---
+            info_list = self._post_json_v2(
+                "fonBilgiGetir",
+                {"fonKodu": fund_code},
+                "fonBilgiGetir",
+            )
 
-            headers = {
-                "Content-Type": "application/x-www-form-urlencoded; charset=utf-8",
-                "User-Agent": self.DEFAULT_HEADERS["User-Agent"],
-                "Accept": "application/json, text/plain, */*",
-            }
-
-            result = self._post_json(url, data, "GetAllFundAnalyzeData", headers=headers)
-
-            if not result or not result.get("fundInfo"):
+            if not info_list:
                 raise DataNotAvailableError(f"No data for fund: {fund_code}")
 
-            fund_info = result["fundInfo"][0]
-            fund_return = result.get("fundReturn", [{}])[0] if result.get("fundReturn") else {}
-            fund_profile = result.get("fundProfile", [{}])[0] if result.get("fundProfile") else {}
-            fund_allocation = result.get("fundAllocation", [])
+            fund_info = info_list[0]
 
-            # Parse allocation data
-            allocation = None
-            if fund_allocation:
-                allocation = []
-                for item in fund_allocation:
-                    weight = float(item.get("PORTFOYORANI", 0) or 0)
-                    if weight > 0:
-                        asset_type_tr = item.get("KIYMETTIP", "")
-                        allocation.append({
-                            "asset_type": asset_type_tr,
-                            "asset_name": ASSET_NAME_STANDARDIZATION.get(asset_type_tr, asset_type_tr),
-                            "weight": weight,
-                        })
-                # Sort by weight descending
-                allocation.sort(key=lambda x: x["weight"], reverse=True)
+            # --- 2. Return data from fonGetiriBazliBilgiGetir ---
+            # This endpoint returns ALL funds; we filter client-side.
+            fund_return: dict[str, Any] = {}
+            try:
+                returns_cache_key = f"tefas:all_returns:{fund_type}"
+                all_returns = self._cache_get(returns_cache_key)
+                if all_returns is None:
+                    all_returns = self._post_json_v2(
+                        "fonGetiriBazliBilgiGetir",
+                        {
+                            "fonKodu": fund_code,
+                            "fonTipi": fund_type,
+                            "dil": "TR",
+                            "calismaTipi": 2,
+                            "donemGetiri1a": "1",
+                            "donemGetiri3a": "1",
+                            "donemGetiri6a": "1",
+                            "donemGetiriyb": "1",
+                            "donemGetiri1y": "1",
+                            "donemGetiri3y": "1",
+                            "donemGetiri5y": "1",
+                        },
+                        "fonGetiriBazliBilgiGetir",
+                    )
+                    self._cache_set(returns_cache_key, all_returns, TTL.FX_RATES)
+
+                for entry in all_returns:
+                    if entry.get("fonKodu") == fund_code:
+                        fund_return = entry
+                        break
+            except APIError:
+                pass  # Returns data is supplementary; don't fail the whole call
 
             detail = {
                 "fund_code": fund_code,
-                "name": fund_info.get("FONUNVAN", ""),
-                "date": fund_info.get("TARIH", ""),
-                "price": float(fund_info.get("SONFIYAT", 0) or 0),
-                "fund_size": float(fund_info.get("PORTBUYUKLUK", 0) or 0),
-                "investor_count": int(fund_info.get("YATIRIMCISAYI", 0) or 0),
-                "founder": fund_info.get("KURUCU", ""),
-                "manager": fund_info.get("YONETICI", ""),
-                "fund_type": fund_info.get("FONTUR", ""),
-                "category": fund_info.get("FONKATEGORI", ""),
-                "risk_value": int(fund_info.get("RISKDEGERI", 0) or 0),
-                # Performance metrics
-                "return_1m": fund_return.get("GETIRI1A"),
-                "return_3m": fund_return.get("GETIRI3A"),
-                "return_6m": fund_return.get("GETIRI6A"),
-                "return_ytd": fund_return.get("GETIRIYB"),
-                "return_1y": fund_return.get("GETIRI1Y"),
-                "return_3y": fund_return.get("GETIRI3Y"),
-                "return_5y": fund_return.get("GETIRI5Y"),
+                "name": fund_info.get("fonUnvan", ""),
+                "date": "",  # Not available in fonBilgiGetir
+                "price": float(fund_info.get("sonFiyat", 0) or 0),
+                "fund_size": float(fund_info.get("portBuyukluk", 0) or 0),
+                "investor_count": int(fund_info.get("yatirimciSayi", 0) or 0),
+                "founder": "",  # Not available in fonBilgiGetir
+                "manager": "",  # Not available in fonBilgiGetir
+                "fund_type": fund_return.get("fonTurAciklama", ""),
+                "category": fund_info.get("fonKategori", ""),
+                "risk_value": int(fund_return.get("riskDegeri", 0) or 0),
+                # Performance metrics (from fonGetiriBazliBilgiGetir)
+                "return_1m": fund_return.get("getiri1a"),
+                "return_3m": fund_return.get("getiri3a"),
+                "return_6m": fund_return.get("getiri6a"),
+                "return_ytd": fund_return.get("getiriyb"),
+                "return_1y": fund_return.get("getiri1y"),
+                "return_3y": fund_return.get("getiri3y"),
+                "return_5y": fund_return.get("getiri5y"),
                 # Daily/weekly change
-                "daily_return": fund_info.get("GUNLUKGETIRI"),
-                "weekly_return": fund_info.get("HAFTALIKGETIRI"),
+                "daily_return": fund_info.get("gunlukGetiri"),
+                "weekly_return": None,  # Not available in new API
                 # Category ranking
-                "category_rank": fund_info.get("KATEGORIDERECE"),
-                "category_fund_count": fund_info.get("KATEGORIFONSAY"),
-                "market_share": fund_info.get("PAZARPAYI"),
-                # Fund profile (from fundProfile)
-                "isin": fund_profile.get("ISINKOD"),
-                "last_trading_time": fund_profile.get("SONISSAAT"),
-                "min_purchase": fund_profile.get("MINALIS"),
-                "min_redemption": fund_profile.get("MINSATIS"),
-                "entry_fee": fund_profile.get("GIRISKOMISYONU"),
-                "exit_fee": fund_profile.get("CIKISKOMISYONU"),
-                "kap_link": fund_profile.get("KAPLINK"),
-                # Portfolio allocation (from fundAllocation)
-                "allocation": allocation,
+                "category_rank": fund_info.get("kategoriDerece"),
+                "category_fund_count": fund_info.get("kategoriFonSay"),
+                "market_share": fund_info.get("pazarPayi"),
+                # Fund profile — fonProfilDtyGetir currently returns empty
+                "isin": None,
+                "last_trading_time": None,
+                "min_purchase": None,
+                "min_redemption": None,
+                "entry_fee": None,
+                "exit_fee": None,
+                "kap_link": None,
+                # Portfolio allocation — not available from fonBilgiGetir
+                "allocation": None,
             }
 
             self._cache_set(cache_key, detail, TTL.FX_RATES)
             return detail
 
+        except DataNotAvailableError:
+            raise
+        except APIError:
+            raise
         except Exception as e:
             raise APIError(f"Failed to fetch fund detail for {fund_code}: {e}") from e
 
@@ -421,7 +501,7 @@ class TEFASProvider(BaseProvider):
     ) -> pd.DataFrame:
         """Fetch a single chunk of history data (max ~90 days)."""
         try:
-            url = f"{self.BASE_URL}/BindHistoryInfo"
+            url = f"{self.BASE_URL_LEGACY}/BindHistoryInfo"
 
             data = {
                 "fontip": fund_type,
@@ -511,7 +591,7 @@ class TEFASProvider(BaseProvider):
             return cached
 
         try:
-            url = f"{self.BASE_URL}/BindHistoryAllocation"
+            url = f"{self.BASE_URL_LEGACY}/BindHistoryAllocation"
 
             data = {
                 "fontip": fund_type,
@@ -607,47 +687,38 @@ class TEFASProvider(BaseProvider):
             >>> provider.screen_funds(fund_type="EMK", min_return_ytd=20)
         """
         try:
-            url = f"{self.BASE_URL}/BindComparisonFundReturns"
-
-            # Use calismatipi=2 for period-based returns (1A, 3A, 6A, YB, 1Y, 3Y, 5Y)
-            data = {
-                "calismatipi": "2",  # Period-based returns
-                "fontip": fund_type,
-                "sfontur": "Tümü",
-                "kurucukod": founder or "",
-                "fongrup": "",
-                "bastarih": "Başlangıç",  # Start (placeholder for period-based)
-                "bittarih": "Bitiş",  # End (placeholder for period-based)
-                "fonturkod": "",
-                "fonunvantip": "",
-                "strperiod": "1,1,1,1,1,1,1",  # All periods: 1A, 3A, 6A, YB, 1Y, 3Y, 5Y
-                "islemdurum": "1",  # Active funds only
-            }
-
-            headers = {
-                "Accept": "application/json, text/javascript, */*; q=0.01",
-                "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-                "Origin": "https://www.tefas.gov.tr",
-                "Referer": "https://www.tefas.gov.tr/FonKarsilastirma.aspx",
-                "User-Agent": self.DEFAULT_HEADERS["User-Agent"],
-                "X-Requested-With": "XMLHttpRequest",
-            }
-
-            result = self._post_json(url, data, "BindComparisonFundReturns", headers=headers)
-
-            all_funds = result.get("data", []) if isinstance(result, dict) else result
+            all_funds = self._post_json_v2(
+                "fonGetiriBazliBilgiGetir",
+                {
+                    "fonTipi": fund_type,
+                    "dil": "TR",
+                    "calismaTipi": 2,
+                    "donemGetiri1a": "1",
+                    "donemGetiri3a": "1",
+                    "donemGetiri6a": "1",
+                    "donemGetiriyb": "1",
+                    "donemGetiri1y": "1",
+                    "donemGetiri3y": "1",
+                    "donemGetiri5y": "1",
+                },
+                "fonGetiriBazliBilgiGetir",
+            )
 
             # Apply return-based filters
             filtered = []
             for fund in all_funds:
+                # Optionally filter by founder (client-side)
+                if founder and fund.get("kurucuKod", "") != founder:
+                    continue
+
                 # Extract return values
-                r1m = fund.get("GETIRI1A")
-                r3m = fund.get("GETIRI3A")
-                r6m = fund.get("GETIRI6A")
-                rytd = fund.get("GETIRIYB")
-                r1y = fund.get("GETIRI1Y")
-                r3y = fund.get("GETIRI3Y")
-                r5y = fund.get("GETIRI5Y")
+                r1m = fund.get("getiri1a")
+                r3m = fund.get("getiri3a")
+                r6m = fund.get("getiri6a")
+                rytd = fund.get("getiriyb")
+                r1y = fund.get("getiri1y")
+                r3y = fund.get("getiri3y")
+                r5y = fund.get("getiri5y")
 
                 # Apply filters
                 if min_return_1m is not None and (r1m is None or r1m < min_return_1m):
@@ -664,9 +735,9 @@ class TEFASProvider(BaseProvider):
                     continue
 
                 filtered.append({
-                    "fund_code": fund.get("FONKODU", ""),
-                    "name": fund.get("FONUNVAN", ""),
-                    "fund_type": fund.get("FONTURACIKLAMA", ""),
+                    "fund_code": fund.get("fonKodu", ""),
+                    "name": fund.get("fonUnvan", ""),
+                    "fund_type": fund.get("fonTurAciklama", ""),
                     "return_1m": r1m,
                     "return_3m": r3m,
                     "return_6m": r6m,
@@ -821,52 +892,22 @@ class TEFASProvider(BaseProvider):
             List of matching funds.
         """
         try:
-            url = f"{self.BASE_URL}/BindComparisonFundReturns"
-
-            data = {
-                "calismatipi": "2",
-                "fontip": "YAT",
-                "sfontur": "Tümü",
-                "kurucukod": "",
-                "fongrup": "",
-                "bastarih": "Başlangıç",
-                "bittarih": "Bitiş",
-                "fonturkod": "",
-                "fonunvantip": "",
-                "strperiod": "1,1,1,1,1,1,1",
-                "islemdurum": "1",
-            }
-
-            headers = {
-                "Accept": "application/json, text/javascript, */*; q=0.01",
-                "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-                "Origin": "https://www.tefas.gov.tr",
-                "Referer": "https://www.tefas.gov.tr/FonKarsilastirma.aspx",
-                "User-Agent": self.DEFAULT_HEADERS["User-Agent"],
-                "X-Requested-With": "XMLHttpRequest",
-            }
-
-            result = self._post_json(url, data, "BindComparisonFundReturns", headers=headers)
-
-            all_funds = result.get("data", []) if isinstance(result, dict) else result
-
-            # Normalize query for matching
-            query_lower = query.lower()
+            results = self._post_json_v2(
+                "fonUnvanAra",
+                {"aranan": query},
+                "fonUnvanAra",
+            )
 
             matching = []
-            for fund in all_funds:
-                code = fund.get("FONKODU", "").lower()
-                name = fund.get("FONUNVAN", "").lower()
-
-                if query_lower in code or query_lower in name:
-                    matching.append(
-                        {
-                            "fund_code": fund.get("FONKODU", ""),
-                            "name": fund.get("FONUNVAN", ""),
-                            "fund_type": fund.get("FONTURACIKLAMA", ""),
-                            "return_1y": fund.get("GETIRI1Y"),
-                        }
-                    )
+            for fund in results:
+                matching.append(
+                    {
+                        "fund_code": fund.get("fonKodu", ""),
+                        "name": fund.get("fonUnvan", ""),
+                        "fund_type": "",  # Not available from fonUnvanAra
+                        "return_1y": None,  # Not available from fonUnvanAra
+                    }
+                )
 
                 if len(matching) >= limit:
                     break
@@ -893,42 +934,27 @@ class TEFASProvider(BaseProvider):
             applied_fee, prospectus_fee, max_expense_ratio, annual_return.
         """
         try:
-            url = f"{self.BASE_URL}/BindComparisonManagementFees"
-
-            data = {
-                "fontip": fund_type,
-                "sfontur": "",
-                "kurucukod": founder or "",
-                "fongrup": "",
-                "fonturkod": "",
-                "fonunvantip": "",
-                "islemdurum": "1",
-            }
-
-            headers = {
-                "Accept": "application/json, text/javascript, */*; q=0.01",
-                "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-                "Origin": "https://www.tefas.gov.tr",
-                "Referer": "https://www.tefas.gov.tr/FonKarsilastirma.aspx",
-                "User-Agent": self.DEFAULT_HEADERS["User-Agent"],
-                "X-Requested-With": "XMLHttpRequest",
-            }
-
-            result = self._post_json(url, data, "BindComparisonManagementFees", headers=headers)
-
-            all_funds = result.get("data", []) if isinstance(result, dict) else result
+            all_funds = self._post_json_v2(
+                "fonYonetimBazliBilgiGetir",
+                {"fonTipi": fund_type, "dil": "TR"},
+                "fonYonetimBazliBilgiGetir",
+            )
 
             funds = []
             for fund in all_funds:
+                # Filter by founder if specified
+                if founder and fund.get("kurucuKod", "") != founder:
+                    continue
+
                 funds.append({
-                    "fund_code": fund.get("FONKODU", ""),
-                    "name": fund.get("FONUNVAN", ""),
-                    "fund_category": fund.get("FONTURACIKLAMA", ""),
-                    "founder_code": fund.get("KURUCUKODU", ""),
-                    "applied_fee": self._parse_turkish_decimal(fund.get("UYGULANANYU1Y")),
-                    "prospectus_fee": self._parse_turkish_decimal(fund.get("FONICTUZUKYU1G")),
-                    "max_expense_ratio": self._parse_turkish_decimal(fund.get("FONTOPGIDERKESORAN")),
-                    "annual_return": fund.get("YILLIKGETIRI"),
+                    "fund_code": fund.get("fonKodu", ""),
+                    "name": fund.get("fonUnvan", ""),
+                    "fund_category": fund.get("fonTurAciklama", ""),
+                    "founder_code": fund.get("kurucuKod", ""),
+                    "applied_fee": self._parse_turkish_decimal(fund.get("uygulananYu1Y")),
+                    "prospectus_fee": self._parse_turkish_decimal(fund.get("fonIcTuzukYu1G")),
+                    "max_expense_ratio": self._parse_turkish_decimal(fund.get("fonTopGiderKesoran")),
+                    "annual_return": fund.get("yillikGetiri"),
                 })
 
             return funds
