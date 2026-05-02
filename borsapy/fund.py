@@ -270,10 +270,10 @@ class Fund(TechnicalMixin, TwitterMixin):
 
         After the 2026-04 TEFAS migration, allocation data is only available
         through the Akamai-protected SSR HTML page. This property requires
-        Scrapling (Camoufox-based stealth browser)::
+        Scrapling (patchright-based stealth Chromium)::
 
             pip install borsapy[allocation]
-            camoufox fetch  # one-time browser binary download
+            playwright install chromium  # one-time browser binary download
 
         Only the current snapshot is returned (one row per asset class).
         Historical allocation is no longer available via TEFAS.

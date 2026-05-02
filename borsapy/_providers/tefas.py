@@ -608,13 +608,13 @@ class TEFASProvider(BaseProvider):
         the ``/tr/fon-detayli-analiz/<code>`` HTML page, which is protected
         by an Akamai TSPD JS challenge that pure-HTTP clients cannot solve.
 
-        This method uses Scrapling's :class:`StealthyFetcher` (Camoufox-based)
-        to render the page through a stealth Firefox build that bypasses
-        Akamai's bot detection, then extracts the inline ``varlikData``
-        JSON. Install with::
+        This method uses Scrapling's :class:`StealthyFetcher`, which is
+        built on patchright (a stealth Playwright/Chromium fork) that
+        bypasses Akamai's bot detection, then extracts the inline
+        ``varlikData`` JSON. Install with::
 
             pip install borsapy[allocation]
-            camoufox fetch  # one-time browser binary download
+            playwright install chromium  # one-time browser binary download
 
         Only a snapshot for the current day is returned. The legacy date-range
         parameters (``start``, ``end``) are accepted for backward compatibility
@@ -696,8 +696,8 @@ class TEFASProvider(BaseProvider):
 
         Plain headless Chromium gets blocked by Akamai's bot detection
         (TSPD JS challenge), so we use Scrapling's :class:`StealthyFetcher`
-        which is built on Camoufox (a stealth Firefox fork) and routinely
-        bypasses these protections.
+        which is built on patchright (a stealth Playwright/Chromium fork)
+        and routinely bypasses these protections.
 
         Separated from :meth:`get_allocation` so tests can stub it.
         """
@@ -708,7 +708,7 @@ class TEFASProvider(BaseProvider):
                 "Fund.allocation requires Scrapling since TEFAS migrated "
                 "(2026-04) to an Akamai-protected SSR site. Install with: "
                 "    pip install borsapy[allocation] && "
-                "camoufox fetch"
+                "playwright install chromium"
             ) from e
 
         url = f"https://www.tefas.gov.tr/tr/fon-detayli-analiz/{fund_code}"

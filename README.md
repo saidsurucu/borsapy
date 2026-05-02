@@ -615,12 +615,12 @@ print(fon.info['fund_class'])         # "YAT" veya "EMK"
 
 TEFAS Nisan 2026'da SSR mimarisine geçti ve allocation verisi artık Akamai
 korumalı HTML sayfasında embed olarak geliyor. Plain headless Chromium bot
-tespitine takıldığı için `Fund.allocation` artık Scrapling'in Camoufox tabanlı
-StealthyFetcher'ını kullanıyor:
+tespitine takıldığı için `Fund.allocation` artık Scrapling'in patchright
+tabanlı StealthyFetcher'ını (stealth Chromium fork) kullanıyor:
 
 ```bash
 pip install borsapy[allocation]
-camoufox fetch                      # tek seferlik tarayıcı binary indirme (~80 MB)
+playwright install chromium         # tek seferlik tarayıcı binary indirme
 ```
 
 ```python

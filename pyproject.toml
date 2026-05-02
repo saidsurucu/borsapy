@@ -61,8 +61,8 @@ twitter = [
 allocation = [
     # TEFAS migrated to an Akamai-protected SSR site in 2026-04. Plain
     # headless Chromium is detected, so we use Scrapling's StealthyFetcher
-    # (built on Camoufox — a stealth Firefox fork) to render the page.
-    # After install, run: camoufox fetch
+    # (built on patchright — a stealth Playwright/Chromium fork).
+    # After install, run: playwright install chromium
     "scrapling[fetchers]>=0.4.0",
 ]
 
