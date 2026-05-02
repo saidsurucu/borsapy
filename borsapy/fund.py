@@ -86,39 +86,21 @@ class Fund(TechnicalMixin, TwitterMixin):
         return self._detected_fund_type or "YAT"
 
     def _detect_fund_type(self) -> None:
-        """Auto-detect fund type by trying history API with different fund types."""
+        """Auto-detect fund_class ("YAT" vs "EMK") via :meth:`info`.
+
+        :class:`TEFASProvider.get_fund_detail` populates ``fund_class`` by
+        looking the fund up in the YAT and EMK returns lists, so we just
+        read it back here. Defaults to "YAT" when detection fails.
+        """
         if self._fund_type or self._detected_fund_type:
             return
 
-        from datetime import timedelta
-
-        end_dt = datetime.now()
-        start_dt = end_dt - timedelta(days=7)
-
-        # Try YAT first
         try:
-            df = self._provider._fetch_history_chunk(
-                self._fund_code, start_dt, end_dt, fund_type="YAT"
-            )
-            if not df.empty:
-                self._detected_fund_type = "YAT"
-                return
-        except DataNotAvailableError:
-            pass
+            detected = self.info.get("fund_class")
+        except (DataNotAvailableError, Exception):  # noqa: BLE001
+            detected = None
 
-        # Try EMK
-        try:
-            df = self._provider._fetch_history_chunk(
-                self._fund_code, start_dt, end_dt, fund_type="EMK"
-            )
-            if not df.empty:
-                self._detected_fund_type = "EMK"
-                return
-        except DataNotAvailableError:
-            pass
-
-        # Default to YAT if neither works
-        self._detected_fund_type = "YAT"
+        self._detected_fund_type = detected or "YAT"
 
     @property
     def info(self) -> dict[str, Any]:
@@ -284,20 +266,28 @@ class Fund(TechnicalMixin, TwitterMixin):
 
     @property
     def allocation(self) -> pd.DataFrame:
-        """
-        Get current portfolio allocation (asset breakdown) for last 7 days.
+        """Get the current portfolio allocation (asset breakdown).
 
-        For longer periods, use allocation_history() method.
+        After the 2026-04 TEFAS migration, allocation data is only available
+        through the WAF-protected SSR HTML page. This property requires
+        Playwright::
+
+            pip install borsapy[allocation]
+            playwright install chromium
+
+        Only the current snapshot is returned (one row per asset class).
+        Historical allocation is no longer available via TEFAS.
 
         Returns:
-            DataFrame with columns: Date, asset_type, asset_name, weight.
+            DataFrame with columns ``Date``, ``asset_type``, ``asset_name``,
+            ``weight``.
 
         Examples:
             >>> fund = Fund("AAK")
             >>> fund.allocation
-                             Date asset_type         asset_name  weight
-            0 2024-12-20         HS        Hisse Senedi   45.32
-            1 2024-12-20         DB        Devlet Bonusu  30.15
+                 Date              asset_type     asset_name   weight
+            0    2026-05-02        Hisse Senedi  Stocks         29.75
+            1    2026-05-02        Ters-Repo     Reverse Repo   18.40
             ...
         """
         return self._provider.get_allocation(self._fund_code, fund_type=self.fund_type)
@@ -308,45 +298,36 @@ class Fund(TechnicalMixin, TwitterMixin):
         start: datetime | str | None = None,
         end: datetime | str | None = None,
     ) -> pd.DataFrame:
-        """
-        Get historical portfolio allocation (asset breakdown).
+        """Get the current portfolio allocation snapshot.
 
-        Note: TEFAS API supports maximum ~100 days (3 months) of data.
+        .. deprecated:: 0.9.0
+            Historical allocation is no longer available from TEFAS — the
+            new Next.js architecture only renders the *current* allocation
+            snapshot in the SSR HTML. This method returns the same data as
+            :attr:`allocation` regardless of ``period``/``start``/``end``.
+            A ``DeprecationWarning`` is emitted on each call.
 
         Args:
-            period: How much data to fetch. Valid periods:
-                    1d, 5d, 1mo, 3mo (max ~100 days).
-                    Ignored if start is provided.
-            start: Start date (string or datetime).
-            end: End date (string or datetime). Defaults to today.
+            period: Ignored (kept for backward compatibility).
+            start: Ignored (kept for backward compatibility).
+            end: Ignored (kept for backward compatibility).
 
         Returns:
-            DataFrame with columns: Date, asset_type, asset_name, weight.
-
-        Examples:
-            >>> fund = Fund("AAK")
-            >>> fund.allocation_history(period="1mo")  # Last month
-            >>> fund.allocation_history(period="3mo")  # Last 3 months (max)
-            >>> fund.allocation_history(start="2024-10-01", end="2024-12-31")
+            DataFrame — same shape as :attr:`allocation`.
         """
-        start_dt = self._parse_date(start) if start else None
-        end_dt = self._parse_date(end) if end else None
+        import warnings
 
-        # If no start date, calculate from period
-        if start_dt is None:
-            from datetime import timedelta
-            end_dt = end_dt or datetime.now()
-            days = {"1d": 1, "5d": 5, "1mo": 30, "3mo": 90}.get(period, 30)
-            # Cap at 100 days (API limit)
-            days = min(days, 100)
-            start_dt = end_dt - timedelta(days=days)
-
-        return self._provider.get_allocation(
-            fund_code=self._fund_code,
-            start=start_dt,
-            end=end_dt,
-            fund_type=self.fund_type,
+        warnings.warn(
+            "Fund.allocation_history() is deprecated since v0.9.0: TEFAS no "
+            "longer exposes historical allocation. Returning the current "
+            "snapshot (same as Fund.allocation).",
+            DeprecationWarning,
+            stacklevel=2,
         )
+        # period/start/end are intentionally unused; only the snapshot is
+        # available now.
+        del period, start, end
+        return self.allocation
 
     def history(
         self,
@@ -354,25 +335,31 @@ class Fund(TechnicalMixin, TwitterMixin):
         start: datetime | str | None = None,
         end: datetime | str | None = None,
     ) -> pd.DataFrame:
-        """
-        Get historical price data.
+        """Get historical NAV (unit price) for the fund.
+
+        Backed by the new ``fonFiyatBilgiGetir`` endpoint (TEFAS v2 API,
+        2026-04). Maximum window is **5 years** — ``period="max"`` is capped
+        at 5y. Arbitrary ``start``/``end`` ranges are supported by fetching
+        the smallest covering bucket and filtering client-side.
 
         Args:
-            period: How much data to fetch. Valid periods:
-                    1d, 5d, 1mo, 3mo, 6mo, 1y.
-                    Ignored if start is provided.
+            period: One of ``1d``, ``5d``, ``1mo``, ``3mo``, ``6mo``, ``ytd``,
+                ``1y``, ``3y``, ``5y``, ``max``. Ignored when ``start`` is
+                given.
             start: Start date (string or datetime).
             end: End date (string or datetime). Defaults to now.
 
         Returns:
-            DataFrame with columns: Price, FundSize, Investors.
-            Index is the Date.
+            DataFrame indexed by ``Date`` with column ``Price``. The
+            ``FundSize`` and ``Investors`` columns are kept for backward
+            compatibility but are now NaN/0 — the new API no longer returns
+            these.
 
         Examples:
             >>> fund = Fund("AAK")
-            >>> fund.history(period="1mo")  # Last month
-            >>> fund.history(period="1y")  # Last year
-            >>> fund.history(start="2024-01-01", end="2024-06-30")  # Date range
+            >>> fund.history(period="1mo")
+            >>> fund.history(period="5y")  # max supported
+            >>> fund.history(start="2024-01-01", end="2024-06-30")
         """
         start_dt = self._parse_date(start) if start else None
         end_dt = self._parse_date(end) if end else None

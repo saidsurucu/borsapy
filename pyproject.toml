@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "borsapy"
-version = "0.8.7"
+version = "0.9.0"
 description = "Turkish financial markets data library - yfinance-like API for BIST stocks, forex, crypto, and more"
 readme = "README.md"
 license = { text = "Apache-2.0" }
@@ -57,6 +57,12 @@ dev = [
 ]
 twitter = [
     "Scweet>=4.0.0",
+]
+allocation = [
+    # TEFAS migrated to a WAF-protected SSR architecture in 2026-04;
+    # Fund.allocation now requires Playwright to render the page.
+    # After install, run: playwright install chromium
+    "playwright>=1.40.0",
 ]
 
 [project.scripts]

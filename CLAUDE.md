@@ -8,6 +8,51 @@ borsapy is a yfinance-like Python library for Turkish financial markets data.
 
 ## Changelog
 
+### v0.9.0 (2026-05-03)
+
+**Breaking change**: TEFAS production API geçişinin (Nisan 2026) tamamlanması.
+Tüm `/api/DB/*` legacy endpointleri 404 dönüyor; provider tamamen yeni
+`/api/funds/*` v2 mimarisine taşındı.
+
+#### Migration (TEFAS v2)
+- **`Fund.history()`**: Yeni `fonFiyatBilgiGetir` endpointi kullanılıyor
+  - Sabit `periyod` enum'una map ediliyor: `1d`/`5d` → 13 (haftalık), `1mo` → 1, `3mo` → 3, `6mo` → 6, `ytd` → 0, `1y` → 12, `3y` → 36, `5y` → 60, `max` → 60
+  - **Maksimum 5 yıl geçmiş** (eski `period="max"` artık kapsanan en uzun aralık 5y)
+  - Keyfi `start`/`end` aralıkları en küçük kapsayan bucket'ı çekip client-side filtreliyor
+  - DataFrame'in `Price` sütunu çalışıyor; `FundSize`/`Investors` sütunları geriye uyumluluk için NaN/0 dolduruluyor (yeni API döndürmüyor)
+- **`Fund.info`**: `fonProfilBilgiGetir` endpointi keşfedildi, profil alanları geri restore edildi
+  - Restore: `isin`, `kap_link`, `first_trading_time`, `last_trading_time`, `buy_valor`, `sell_valor`, `entry_fee`, `exit_fee`, `min_purchase`, `min_redemption`, `max_purchase`, `max_redemption`, `tefas_status`
+  - Yeni alan: `fund_class` ("YAT"/"EMK") — `_lookup_fund_returns` üzerinden iki listeye düşerek otomatik tespit
+  - Hâlâ yok: `weekly_return` (None döner — yeni API döndürmüyor)
+- **`Fund.allocation`**: Playwright tabanlı SSR scraper'a geçti
+  - TEFAS yeni Next.js sitesi allocation'ı SSR HTML içine embed ediyor (`varlikData`)
+  - Akamai TSPD JS challenge nedeniyle plain HTTP scrape edemiyor → headless Chromium gerekli
+  - `pip install borsapy[allocation]` + `playwright install chromium`
+  - Sadece güncel snapshot dönüyor (tek tarih), sıralı asset listesi
+- **`Fund.allocation_history()`**: Deprecated. TEFAS tarihsel allocation'ı artık hiçbir endpointte sunmuyor. `DeprecationWarning` ile `Fund.allocation`'ı döndürüyor
+- **`Fund.get_holdings(api_key=...)`**: `kap_link` artık restore olduğu için tekrar çalışıyor (PR #16'dan sonra `kap_link=None` olduğu için sessizce kırılmıştı)
+- **`Fund._detect_fund_type()`**: Eski `_fetch_history_chunk` çağrıları kaldırıldı — yeni `info["fund_class"]` üzerinden detect ediliyor
+
+#### Removed
+- `_get_history_chunked()`, `_fetch_history_chunk()` (eski 90 günlük chunk mantığı yeni API'de gerekli değil)
+- `BASE_URL_LEGACY` constant
+- `MAX_CHUNK_DAYS` constant
+
+#### Optional Dependency
+- `[allocation]` extra eklendi: `pip install borsapy[allocation]` → playwright>=1.40.0
+
+#### Technical Changes
+- `_providers/tefas.py`: `_PERIOD_TO_PERIYOD` dict, `_PERIYOD_MAX`, `_resolve_periyod()`, `_lookup_fund_returns()`, `_build_allocation_pattern()`, `_fetch_fund_page_html()` (Playwright wrapper)
+- `_providers/tefas.py`: `get_fund_detail()` artık 3 endpoint çağırıyor — `fonBilgiGetir`, `fonGetiriBazliBilgiGetir`, `fonProfilBilgiGetir`
+- `fund.py`: `_detect_fund_type()` basitleştirildi, history/allocation docstring'leri güncellendi
+- `pyproject.toml`: `[project.optional-dependencies] allocation = ["playwright>=1.40.0"]`
+- `tests/test_management_fees.py`: Mock'lar v2 envelope'a güncellendi (camelCase + `{errorCode, errorMessage, resultList}` zarfı)
+- `tests/test_tefas_v2.py`: 21 yeni unit test (periyod mapping, history mock, profile merge, fund_class detection, allocation HTML parsing, Playwright lazy import)
+
+Issue: closes #15.
+
+---
+
 ### v0.8.4 (2026-03-28)
 
 #### Bug Fixes

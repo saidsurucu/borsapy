@@ -1,8 +1,9 @@
 """TEFAS provider for mutual fund data."""
 
 import json
+import re
 import time
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any
 
 import httpx
@@ -105,7 +106,29 @@ class TEFASProvider(BaseProvider):
     """
 
     BASE_URL = "https://www.tefas.gov.tr/api/funds"
-    BASE_URL_LEGACY = "https://www.tefas.gov.tr/api/DB"
+
+    # Map borsapy period strings to the new fonFiyatBilgiGetir "periyod" enum.
+    # The new API only accepts these fixed codes — arbitrary day counts and
+    # date ranges return "Sistem Hatası!!". periyod=60 (5y) is the maximum.
+    _PERIOD_TO_PERIYOD: dict[str, int] = {
+        "1d": 13,    # weekly bucket — minimum granularity (~5 rows)
+        "5d": 13,
+        "1w": 13,
+        "1wk": 13,
+        "1mo": 1,
+        "3mo": 3,
+        "6mo": 6,
+        "ytd": 0,
+        "1y": 12,
+        "2y": 36,    # no native 2y bucket — round up to 3y
+        "3y": 36,
+        "5y": 60,
+        "max": 60,   # 5 years is the API's hard cap
+    }
+
+    # Maximum periyod code (5 years) — used as fallback for arbitrary date
+    # ranges, then filtered client-side.
+    _PERIYOD_MAX = 60
 
     def __init__(self):
         super().__init__(verify=False)
@@ -297,40 +320,36 @@ class TEFASProvider(BaseProvider):
 
             # --- 2. Return data from fonGetiriBazliBilgiGetir ---
             # This endpoint returns ALL funds; we filter client-side.
+            # Also used to detect fund_class ("YAT" vs "EMK") — if the requested
+            # fund_type list doesn't contain the code, fall back to the other.
             fund_return: dict[str, Any] = {}
+            detected_class: str | None = None
             try:
-                returns_cache_key = f"tefas:all_returns:{fund_type}"
-                all_returns = self._cache_get(returns_cache_key)
-                if all_returns is None:
-                    all_returns = self._post_json_v2(
-                        "fonGetiriBazliBilgiGetir",
-                        {
-                            "fonKodu": fund_code,
-                            "fonTipi": fund_type,
-                            "dil": "TR",
-                            "calismaTipi": 2,
-                            "donemGetiri1a": "1",
-                            "donemGetiri3a": "1",
-                            "donemGetiri6a": "1",
-                            "donemGetiriyb": "1",
-                            "donemGetiri1y": "1",
-                            "donemGetiri3y": "1",
-                            "donemGetiri5y": "1",
-                        },
-                        "fonGetiriBazliBilgiGetir",
-                    )
-                    self._cache_set(returns_cache_key, all_returns, TTL.FX_RATES)
-
-                for entry in all_returns:
-                    if entry.get("fonKodu") == fund_code:
-                        fund_return = entry
-                        break
+                fund_return, detected_class = self._lookup_fund_returns(
+                    fund_code, fund_type
+                )
             except APIError:
                 pass  # Returns data is supplementary; don't fail the whole call
 
+            # --- 3. Profile data from fonProfilBilgiGetir ---
+            # ISIN, KAP link, fees, valor — restored in v0.8.8 after we
+            # discovered the correct endpoint name (PR #16 used the empty
+            # fonProfilDtyGetir variant by mistake).
+            fund_profile: dict[str, Any] = {}
+            try:
+                profile_list = self._post_json_v2(
+                    "fonProfilBilgiGetir",
+                    {"fonKodu": fund_code, "dil": "TR"},
+                    "fonProfilBilgiGetir",
+                )
+                if profile_list:
+                    fund_profile = profile_list[0]
+            except APIError:
+                pass  # Profile data is supplementary
+
             detail = {
                 "fund_code": fund_code,
-                "name": fund_info.get("fonUnvan", ""),
+                "name": fund_info.get("fonUnvan", "") or fund_profile.get("fonUnvan", ""),
                 "date": "",  # Not available in fonBilgiGetir
                 "price": float(fund_info.get("sonFiyat", 0) or 0),
                 "fund_size": float(fund_info.get("portBuyukluk", 0) or 0),
@@ -338,8 +357,15 @@ class TEFASProvider(BaseProvider):
                 "founder": "",  # Not available in fonBilgiGetir
                 "manager": "",  # Not available in fonBilgiGetir
                 "fund_type": fund_return.get("fonTurAciklama", ""),
+                # fund_class is "YAT" or "EMK" — used by Fund.fund_type for
+                # downstream API calls that need this distinction.
+                "fund_class": detected_class or fund_type,
                 "category": fund_info.get("fonKategori", ""),
-                "risk_value": int(fund_return.get("riskDegeri", 0) or 0),
+                "risk_value": int(
+                    fund_profile.get("riskDegeri")
+                    or fund_return.get("riskDegeri")
+                    or 0
+                ),
                 # Performance metrics (from fonGetiriBazliBilgiGetir)
                 "return_1m": fund_return.get("getiri1a"),
                 "return_3m": fund_return.get("getiri3a"),
@@ -350,20 +376,27 @@ class TEFASProvider(BaseProvider):
                 "return_5y": fund_return.get("getiri5y"),
                 # Daily/weekly change
                 "daily_return": fund_info.get("gunlukGetiri"),
-                "weekly_return": None,  # Not available in new API
+                "weekly_return": None,  # Still not available in new API
                 # Category ranking
                 "category_rank": fund_info.get("kategoriDerece"),
                 "category_fund_count": fund_info.get("kategoriFonSay"),
                 "market_share": fund_info.get("pazarPayi"),
-                # Fund profile — fonProfilDtyGetir currently returns empty
-                "isin": None,
-                "last_trading_time": None,
-                "min_purchase": None,
-                "min_redemption": None,
-                "entry_fee": None,
-                "exit_fee": None,
-                "kap_link": None,
-                # Portfolio allocation — not available from fonBilgiGetir
+                # Fund profile (restored from fonProfilBilgiGetir)
+                "isin": fund_profile.get("isinKodu"),
+                "last_trading_time": fund_profile.get("sonIsSaat"),
+                "first_trading_time": fund_profile.get("basIsSaat"),
+                "min_purchase": fund_profile.get("minAlis"),
+                "min_redemption": fund_profile.get("minSatis"),
+                "max_purchase": fund_profile.get("maxAlis"),
+                "max_redemption": fund_profile.get("maxSatis"),
+                "buy_valor": fund_profile.get("fonGeriAlisValor"),
+                "sell_valor": fund_profile.get("fonSatisValor"),
+                "entry_fee": fund_profile.get("girisKomisyonu"),
+                "exit_fee": fund_profile.get("cikisKomisyonu"),
+                "kap_link": fund_profile.get("kapLink"),
+                "tefas_status": fund_profile.get("tefasDurum"),
+                # Portfolio allocation — only available via Fund.allocation
+                # (Playwright-based SSR scrape since 2026-04 TEFAS migration).
                 "allocation": None,
             }
 
@@ -377,8 +410,76 @@ class TEFASProvider(BaseProvider):
         except Exception as e:
             raise APIError(f"Failed to fetch fund detail for {fund_code}: {e}") from e
 
-    # WAF limit for TEFAS API - requests longer than ~90 days get blocked
-    MAX_CHUNK_DAYS = 90
+    def _lookup_fund_returns(
+        self, fund_code: str, fund_type: str
+    ) -> tuple[dict[str, Any], str | None]:
+        """Find a fund in the cached returns list, falling back to the other
+        fund_class if not present.
+
+        Returns ``(return_row, detected_class)`` where ``detected_class`` is
+        "YAT", "EMK", or None when no match is found.
+        """
+        for ftype in (fund_type, "EMK" if fund_type == "YAT" else "YAT"):
+            cache_key = f"tefas:all_returns:{ftype}"
+            all_returns = self._cache_get(cache_key)
+            if all_returns is None:
+                all_returns = self._post_json_v2(
+                    "fonGetiriBazliBilgiGetir",
+                    {
+                        "fonTipi": ftype,
+                        "dil": "TR",
+                        "calismaTipi": 2,
+                        "donemGetiri1a": "1",
+                        "donemGetiri3a": "1",
+                        "donemGetiri6a": "1",
+                        "donemGetiriyb": "1",
+                        "donemGetiri1y": "1",
+                        "donemGetiri3y": "1",
+                        "donemGetiri5y": "1",
+                    },
+                    "fonGetiriBazliBilgiGetir",
+                )
+                self._cache_set(cache_key, all_returns, TTL.FX_RATES)
+
+            for entry in all_returns:
+                if entry.get("fonKodu") == fund_code:
+                    return entry, ftype
+
+        return {}, None
+
+    def _resolve_periyod(
+        self,
+        period: str,
+        start: datetime | None,
+        end: datetime | None,
+    ) -> int:
+        """Pick the smallest periyod code that covers the requested window.
+
+        When ``start`` is given we fetch the maximum 5y window and let the
+        caller filter client-side. Without explicit dates we map ``period``
+        through :data:`_PERIOD_TO_PERIYOD`, defaulting to ``1`` (1 month) for
+        unrecognized values to match the legacy behavior.
+        """
+        if start is not None:
+            now = datetime.now()
+            span_days = (now - start).days
+            # Pick the smallest enum bucket large enough to cover the span.
+            for code, days in (
+                (13, 7),
+                (1, 31),
+                (3, 95),
+                (6, 190),
+                (12, 380),
+                (36, 365 * 3 + 5),
+                (60, 365 * 5 + 5),
+            ):
+                if span_days <= days:
+                    return code
+            return self._PERIYOD_MAX
+        if end is not None and start is None:
+            # Only end given — fetch max and let caller filter
+            return self._PERIYOD_MAX
+        return self._PERIOD_TO_PERIYOD.get(period, 1)
 
     def get_history(
         self,
@@ -388,176 +489,110 @@ class TEFASProvider(BaseProvider):
         end: datetime | None = None,
         fund_type: str = "YAT",
     ) -> pd.DataFrame:
-        """
-        Get historical price data for a fund.
+        """Get historical NAV (unit price) for a fund.
+
+        Uses ``fonFiyatBilgiGetir`` from the redesigned 2026-04 TEFAS API,
+        which only accepts a fixed set of period codes (see
+        :data:`_PERIOD_TO_PERIYOD`). Maximum window is **5 years**.
 
         Args:
-            fund_code: TEFAS fund code
-            period: Data period (1d, 5d, 1mo, 3mo, 6mo, 1y, 3y, 5y, max)
-            start: Start date
-            end: End date
-            fund_type: Fund type - "YAT" for investment funds, "EMK" for pension funds.
+            fund_code: TEFAS fund code.
+            period: Convenience period — ``1d``/``5d``/``1mo``/``3mo``/``6mo``/
+                ``ytd``/``1y``/``3y``/``5y``/``max``. Ignored if ``start`` is
+                set.
+            start: Start datetime; the smallest period bucket covering
+                ``start..now`` is fetched, then results are filtered.
+            end: End datetime for client-side filtering.
+            fund_type: Accepted for backward compatibility; the new endpoint
+                doesn't take ``fonTipi`` and works for both YAT and EMK funds.
 
         Returns:
-            DataFrame with price history.
-
-        Note:
-            For periods longer than 90 days, data is fetched in chunks
-            to avoid TEFAS WAF blocking.
+            DataFrame indexed by Date with a ``Price`` column. The legacy
+            ``FundSize`` and ``Investors`` columns are no longer provided by
+            the new API and are populated as NaN/0 for backward compatibility.
         """
         fund_code = fund_code.upper()
-        fund_type = fund_type.upper()
 
-        # Calculate date range
-        end_dt = end or datetime.now()
-        if start:
-            start_dt = start
-        else:
-            days = {
-                "1d": 1,
-                "5d": 5,
-                "1mo": 30,
-                "3mo": 90,
-                "6mo": 180,
-                "1y": 365,
-                "3y": 365 * 3,
-                "5y": 365 * 5,
-                "max": 365 * 5,  # Limited to 5y due to WAF constraints
-            }.get(period, 30)
-            start_dt = end_dt - timedelta(days=days)
+        periyod = self._resolve_periyod(period, start, end)
 
-        cache_key = f"tefas:history:{fund_code}:{fund_type}:{start_dt.date()}:{end_dt.date()}"
+        # Cache by periyod (not start/end) so multiple windows reuse the same
+        # upstream fetch.
+        cache_key = f"tefas:history:{fund_code}:periyod={periyod}"
         cached = self._cache_get(cache_key)
-        if cached is not None:
-            return cached
 
-        # Check if we need chunked requests
-        total_days = (end_dt - start_dt).days
-        if total_days > self.MAX_CHUNK_DAYS:
-            df = self._get_history_chunked(fund_code, start_dt, end_dt, fund_type)
-        else:
-            df = self._fetch_history_chunk(fund_code, start_dt, end_dt, fund_type)
-
-        self._cache_set(cache_key, df, TTL.OHLCV_HISTORY)
-        return df
-
-    def _get_history_chunked(
-        self,
-        fund_code: str,
-        start_dt: datetime,
-        end_dt: datetime,
-        fund_type: str = "YAT",
-    ) -> pd.DataFrame:
-        """
-        Fetch history in chunks to avoid WAF blocking.
-
-        TEFAS WAF blocks requests longer than ~90-100 days.
-        This method fetches data in chunks and combines them.
-        """
-        import time
-
-        all_records = []
-        chunk_start = start_dt
-        chunk_count = 0
-
-        while chunk_start < end_dt:
-            chunk_end = min(chunk_start + timedelta(days=self.MAX_CHUNK_DAYS), end_dt)
-
+        if cached is None:
             try:
-                # Add delay between requests to avoid rate limiting
-                if chunk_count > 0:
-                    time.sleep(0.3)
+                rows = self._post_json_v2(
+                    "fonFiyatBilgiGetir",
+                    {"fonKodu": fund_code, "dil": "TR", "periyod": periyod},
+                    "fonFiyatBilgiGetir",
+                )
+            except APIError as e:
+                raise APIError(
+                    f"Failed to fetch history for {fund_code}: {e}"
+                ) from e
 
-                chunk_df = self._fetch_history_chunk(fund_code, chunk_start, chunk_end, fund_type)
-                if not chunk_df.empty:
-                    all_records.append(chunk_df)
-                chunk_count += 1
-            except DataNotAvailableError:
-                # No data for this chunk, continue to next
-                pass
-            except APIError:
-                # WAF blocked - stop fetching older data
-                # Return what we have so far
-                break
-
-            # Move to next chunk
-            chunk_start = chunk_end + timedelta(days=1)
-
-        if not all_records:
-            raise DataNotAvailableError(f"No history for fund: {fund_code}")
-
-        # Combine all chunks
-        df = pd.concat(all_records)
-        df = df[~df.index.duplicated(keep="last")]  # Remove duplicate dates
-        df.sort_index(inplace=True)
-        return df
-
-    def _fetch_history_chunk(
-        self,
-        fund_code: str,
-        start_dt: datetime,
-        end_dt: datetime,
-        fund_type: str = "YAT",
-    ) -> pd.DataFrame:
-        """Fetch a single chunk of history data (max ~90 days)."""
-        try:
-            url = f"{self.BASE_URL_LEGACY}/BindHistoryInfo"
-
-            data = {
-                "fontip": fund_type,
-                "sfontur": "",
-                "fonkod": fund_code,
-                "fongrup": "",
-                "bastarih": start_dt.strftime("%d.%m.%Y"),
-                "bittarih": end_dt.strftime("%d.%m.%Y"),
-                "fonturkod": "",
-                "fonunvantip": "",
-                "kurucukod": "",
-            }
-
-            headers = {
-                "Accept": "application/json, text/javascript, */*; q=0.01",
-                "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-                "Origin": "https://www.tefas.gov.tr",
-                "Referer": "https://www.tefas.gov.tr/TarihselVeriler.aspx",
-                "User-Agent": self.DEFAULT_HEADERS["User-Agent"],
-                "X-Requested-With": "XMLHttpRequest",
-            }
-
-            result = self._post_json(url, data, "BindHistoryInfo", headers=headers)
-
-            if not result.get("data"):
+            if not rows:
                 raise DataNotAvailableError(f"No history for fund: {fund_code}")
 
             records = []
-            for item in result["data"]:
-                timestamp = int(item.get("TARIH", 0))
-                if timestamp > 0:
-                    dt = datetime.fromtimestamp(timestamp / 1000)
-                    records.append(
-                        {
-                            "Date": dt,
-                            "Price": float(item.get("FIYAT", 0)),
-                            "FundSize": float(item.get("PORTFOYBUYUKLUK", 0)),
-                            "Investors": int(item.get("KISISAYISI", 0)),
-                        }
-                    )
+            for row in rows:
+                tarih = row.get("tarih")
+                fiyat = row.get("fiyat")
+                if not tarih or fiyat is None:
+                    continue
+                try:
+                    dt = datetime.fromisoformat(str(tarih)[:10])
+                except ValueError:
+                    continue
+                records.append(
+                    {
+                        "Date": dt,
+                        "Price": float(fiyat),
+                        # Lost in the v2 API — kept for backward compat.
+                        "FundSize": float("nan"),
+                        "Investors": 0,
+                    }
+                )
 
             df = pd.DataFrame(records)
             if not df.empty:
                 df.set_index("Date", inplace=True)
                 df.sort_index(inplace=True)
 
-            return df
+            self._cache_set(cache_key, df, TTL.OHLCV_HISTORY)
+            cached = df
 
-        except DataNotAvailableError:
-            # Re-raise DataNotAvailableError so chunked fetch can handle it
-            raise
-        except APIError:
-            # Re-raise APIError (including WAF errors)
-            raise
-        except Exception as e:
-            raise APIError(f"Failed to fetch history for {fund_code}: {e}") from e
+        df = cached.copy()
+
+        # Client-side date filtering for explicit ranges.
+        if start is not None and not df.empty:
+            df = df[df.index >= pd.Timestamp(start)]
+        if end is not None and not df.empty:
+            df = df[df.index <= pd.Timestamp(end)]
+
+        if df.empty:
+            raise DataNotAvailableError(
+                f"No history for fund {fund_code} in requested range"
+            )
+
+        return df
+
+    # Regex used to pull allocation rows out of the SSR HTML payload.
+    # Next.js renders escaped JSON inside a <script> tag, e.g.
+    #   \"fonKodu\":\"AAK\",...\"kiymetTip\":\"Hisse Senedi\",\"portfoyOrani\":29.75
+    @staticmethod
+    def _build_allocation_pattern(fund_code: str) -> re.Pattern[str]:
+        # Built dynamically rather than via str.format because the regex
+        # contains literal ``{`` / ``}`` characters that would confuse
+        # ``str.format``.
+        code = re.escape(fund_code)
+        pattern = (
+            r'\\"fonKodu\\"\s*:\s*\\"' + code + r'\\"'
+            r'[^}]*?\\"kiymetTip\\"\s*:\s*\\"([^\\"]+)\\"'
+            r'[^}]*?\\"portfoyOrani\\"\s*:\s*([\d.]+)'
+        )
+        return re.compile(pattern, re.IGNORECASE)
 
     def get_allocation(
         self,
@@ -566,89 +601,133 @@ class TEFASProvider(BaseProvider):
         end: datetime | None = None,
         fund_type: str = "YAT",
     ) -> pd.DataFrame:
-        """
-        Get portfolio allocation (asset breakdown) for a fund.
+        """Get the current portfolio allocation (asset breakdown) for a fund.
+
+        After the 2026-04 TEFAS migration, allocation data is no longer
+        exposed through any JSON endpoint — it is rendered server-side into
+        the ``/tr/fon-detayli-analiz/<code>`` HTML page, which is protected
+        by an Akamai TSPD JS challenge that pure-HTTP clients cannot solve.
+
+        This method launches a headless Chromium via Playwright to render
+        the page, then extracts the inline ``varlikData`` JSON. Install with::
+
+            pip install borsapy[allocation]
+            playwright install chromium
+
+        Only a snapshot for the current day is returned. The legacy date-range
+        parameters (``start``, ``end``) are accepted for backward compatibility
+        but ignored — historical allocation is no longer available.
 
         Args:
-            fund_code: TEFAS fund code
-            start: Start date (default: 7 days ago)
-            end: End date (default: today)
-            fund_type: Fund type - "YAT" for investment funds, "EMK" for pension funds.
+            fund_code: TEFAS fund code.
+            start: Ignored (kept for backward compatibility).
+            end: Ignored (kept for backward compatibility).
+            fund_type: Ignored (kept for backward compatibility).
 
         Returns:
-            DataFrame with columns: Date, asset_type, asset_name, weight
+            DataFrame with columns ``Date``, ``asset_type``, ``asset_name``,
+            ``weight`` (percent). One row per asset class.
+
+        Raises:
+            ImportError: If Playwright is not installed.
+            DataNotAvailableError: If the page renders but contains no
+                allocation rows for this fund.
+            APIError: On network or rendering failures.
         """
         fund_code = fund_code.upper()
-        fund_type = fund_type.upper()
+        # start/end/fund_type are intentionally ignored — see docstring.
+        del start, end, fund_type
 
-        # Default date range (1 week)
-        end_dt = end or datetime.now()
-        start_dt = start or (end_dt - timedelta(days=7))
-
-        cache_key = f"tefas:allocation:{fund_code}:{fund_type}:{start_dt.date()}:{end_dt.date()}"
+        cache_key = f"tefas:allocation:{fund_code}"
         cached = self._cache_get(cache_key)
         if cached is not None:
             return cached
 
+        html = self._fetch_fund_page_html(fund_code)
+
+        pattern = self._build_allocation_pattern(fund_code)
+        matches = pattern.findall(html)
+
+        if not matches:
+            raise DataNotAvailableError(
+                f"No allocation data found in TEFAS HTML for fund: {fund_code}"
+            )
+
+        today = datetime.now()
+        records: list[dict[str, Any]] = []
+        seen: set[str] = set()
+        for asset_type_tr, weight_str in matches:
+            if asset_type_tr in seen:
+                continue
+            seen.add(asset_type_tr)
+            try:
+                weight = float(weight_str)
+            except ValueError:
+                continue
+            if weight <= 0:
+                continue
+            records.append(
+                {
+                    "Date": today,
+                    "asset_type": asset_type_tr,
+                    "asset_name": ASSET_NAME_STANDARDIZATION.get(
+                        asset_type_tr, asset_type_tr
+                    ),
+                    "weight": weight,
+                }
+            )
+
+        if not records:
+            raise DataNotAvailableError(
+                f"No allocation data found in TEFAS HTML for fund: {fund_code}"
+            )
+
+        df = pd.DataFrame(records)
+        df.sort_values("weight", ascending=False, inplace=True)
+        df.reset_index(drop=True, inplace=True)
+
+        self._cache_set(cache_key, df, TTL.FX_RATES)
+        return df
+
+    def _fetch_fund_page_html(self, fund_code: str) -> str:
+        """Render the WAF-protected TEFAS fund page via headless Playwright.
+
+        Separated from :meth:`get_allocation` so tests can stub it.
+        """
         try:
-            url = f"{self.BASE_URL_LEGACY}/BindHistoryAllocation"
+            from playwright.sync_api import sync_playwright
+        except ImportError as e:
+            raise ImportError(
+                "Fund.allocation requires Playwright since TEFAS migrated "
+                "(2026-04) to a WAF-protected SSR architecture. Install with: "
+                "    pip install borsapy[allocation] && "
+                "playwright install chromium"
+            ) from e
 
-            data = {
-                "fontip": fund_type,
-                "sfontur": "",
-                "fonkod": fund_code,
-                "fongrup": "",
-                "bastarih": start_dt.strftime("%d.%m.%Y"),
-                "bittarih": end_dt.strftime("%d.%m.%Y"),
-                "fonturkod": "",
-                "fonunvantip": "",
-                "kurucukod": "",
-            }
+        url = f"https://www.tefas.gov.tr/tr/fon-detayli-analiz/{fund_code}"
 
-            headers = {
-                "Accept": "application/json, text/javascript, */*; q=0.01",
-                "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-                "Origin": "https://www.tefas.gov.tr",
-                "Referer": "https://www.tefas.gov.tr/TarihselVeriler.aspx",
-                "User-Agent": self.DEFAULT_HEADERS["User-Agent"],
-                "X-Requested-With": "XMLHttpRequest",
-            }
-
-            result = self._post_json(url, data, "BindHistoryAllocation", headers=headers)
-
-            if not result.get("data"):
-                raise DataNotAvailableError(f"No allocation data for fund: {fund_code}")
-
-            records = []
-            for item in result["data"]:
-                timestamp = int(item.get("TARIH", 0))
-                if timestamp > 0:
-                    dt = datetime.fromtimestamp(timestamp / 1000)
-
-                    # Extract allocation percentages for each asset type
-                    for key, value in item.items():
-                        if key not in ["TARIH", "FONKODU", "FONUNVAN", "BilFiyat"] and value is not None:
-                            asset_name = ASSET_TYPE_MAPPING.get(key, key)
-                            weight = float(value)
-                            if weight > 0:  # Only include non-zero allocations
-                                records.append({
-                                    "Date": dt,
-                                    "asset_type": key,
-                                    "asset_name": asset_name,
-                                    "weight": weight,
-                                })
-
-            if not records:
-                raise DataNotAvailableError(f"No allocation data for fund: {fund_code}")
-
-            df = pd.DataFrame(records)
-            df.sort_values(["Date", "weight"], ascending=[False, False], inplace=True)
-
-            self._cache_set(cache_key, df, TTL.FX_RATES)
-            return df
-
+        try:
+            with sync_playwright() as p:
+                browser = p.chromium.launch(headless=True)
+                try:
+                    context = browser.new_context(
+                        user_agent=self.DEFAULT_HEADERS["User-Agent"],
+                        locale="tr-TR",
+                    )
+                    page = context.new_page()
+                    page.goto(url, wait_until="domcontentloaded", timeout=30_000)
+                    # The SSR JSON is in the initial HTML — no need to wait for
+                    # XHRs. domcontentloaded is enough once the WAF challenge
+                    # passes (Playwright executes its JS automatically).
+                    html = page.content()
+                finally:
+                    browser.close()
         except Exception as e:
-            raise APIError(f"Failed to fetch allocation for {fund_code}: {e}") from e
+            raise APIError(
+                f"Failed to render TEFAS allocation page for {fund_code}: {e}"
+            ) from e
+
+        return html
 
     def screen_funds(
         self,

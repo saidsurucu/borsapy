@@ -53,39 +53,42 @@ class TestParseTurkishDecimal:
 # =============================================================================
 
 
+# v2 envelope shape used by all /api/funds/* endpoints since 2026-04.
 MOCK_API_RESPONSE = {
-    "data": [
+    "errorCode": None,
+    "errorMessage": None,
+    "resultList": [
         {
-            "FONKODU": "AAK",
-            "FONUNVAN": "AK PORTFOY KISA VADELI BONO",
-            "FONTURACIKLAMA": "Kısa Vadeli Borçlanma",
-            "KURUCUKODU": "AKP",
-            "UYGULANANYU1Y": "1,0",
-            "FONICTUZUKYU1G": "2,2",
-            "FONTOPGIDERKESORAN": "3,65",
-            "YILLIKGETIRI": 45.5,
+            "fonKodu": "AAK",
+            "fonUnvan": "AK PORTFOY KISA VADELI BONO",
+            "fonTurAciklama": "Kısa Vadeli Borçlanma",
+            "kurucuKod": "AKP",
+            "uygulananYu1Y": "1,0",
+            "fonIcTuzukYu1G": "2,2",
+            "fonTopGiderKesoran": "3,65",
+            "yillikGetiri": 45.5,
         },
         {
-            "FONKODU": "BS1",
-            "FONUNVAN": "AHLATCI PORTFOY BIRINCI SERBEST",
-            "FONTURACIKLAMA": "Serbest",
-            "KURUCUKODU": "AHL",
-            "UYGULANANYU1Y": "0",
-            "FONICTUZUKYU1G": "2,2",
-            "FONTOPGIDERKESORAN": "3,65",
-            "YILLIKGETIRI": None,
+            "fonKodu": "BS1",
+            "fonUnvan": "AHLATCI PORTFOY BIRINCI SERBEST",
+            "fonTurAciklama": "Serbest",
+            "kurucuKod": "AHL",
+            "uygulananYu1Y": "0",
+            "fonIcTuzukYu1G": "2,2",
+            "fonTopGiderKesoran": "3,65",
+            "yillikGetiri": None,
         },
         {
-            "FONKODU": "XYZ",
-            "FONUNVAN": "TEST FON",
-            "FONTURACIKLAMA": "Test",
-            "KURUCUKODU": "TST",
-            "UYGULANANYU1Y": None,
-            "FONICTUZUKYU1G": None,
-            "FONTOPGIDERKESORAN": None,
-            "YILLIKGETIRI": None,
+            "fonKodu": "XYZ",
+            "fonUnvan": "TEST FON",
+            "fonTurAciklama": "Test",
+            "kurucuKod": "TST",
+            "uygulananYu1Y": None,
+            "fonIcTuzukYu1G": None,
+            "fonTopGiderKesoran": None,
+            "yillikGetiri": None,
         },
-    ]
+    ],
 }
 
 

@@ -590,22 +590,50 @@ print(emk.fund_type)                # "EMK"
 
 > **Not**: `fund_type` belirtilmezse otomatik algılama yapılır (önce YAT, sonra EMK denenir).
 
-### Varlık Dağılımı
+### Fon Profil Bilgileri (info)
+
+v0.9.0 ile birlikte ISIN, KAP linki, valör, komisyon ve işlem saatleri yeni
+`fonProfilBilgiGetir` endpointinden tekrar geliyor:
 
 ```python
-# Portföy varlık dağılımı
-print(fon.allocation)               # Son 7 günlük dağılım
-print(fon.allocation_history(period="3ay"))  # Son 3 ay (max ~100 gün)
-#         date     asset_type    asset_name  weight
-# 0 2024-01-15   Hisse Senedi        Stocks   45.2
-# 1 2024-01-15      Ters-Repo  Reverse Repo   30.1
-# ...
-
-# Not: Yeni TEFAS API'sinde info içerisinde allocation, isin ve weekly_return verileri bulunmamaktadır (None döner).
-# Portföy dağılımı için fon.allocation veya fon.allocation_history() kullanılmalıdır.
-print(fon.info['daily_return'])     # Günlük getiri
-print(fon.info['category_rank'])    # Kategori sırası (örn: 20/181)
+print(fon.info['isin'])               # "TRMAF1WWWWW4"
+print(fon.info['kap_link'])           # KAP fon bilgi sayfası
+print(fon.info['first_trading_time']) # "09:00"
+print(fon.info['last_trading_time'])  # "17:30"
+print(fon.info['buy_valor'])          # Alış valörü (gün)
+print(fon.info['sell_valor'])         # Satış valörü (gün)
+print(fon.info['entry_fee'])          # Giriş komisyonu
+print(fon.info['exit_fee'])           # Çıkış komisyonu
+print(fon.info['daily_return'])       # Günlük getiri
+print(fon.info['category_rank'])      # Kategori sırası (örn: 20/181)
+print(fon.info['fund_class'])         # "YAT" veya "EMK"
 ```
+
+> **Not**: `weekly_return` yeni TEFAS API'sinde mevcut değil — `None` döner.
+
+### Varlık Dağılımı (Playwright Gerekli)
+
+TEFAS Nisan 2026'da SSR mimarisine geçti ve allocation verisi artık WAF
+korumalı HTML sayfasında embed olarak geliyor. Bu yüzden `Fund.allocation`
+artık Playwright ile gerçek tarayıcıda render gerektiriyor:
+
+```bash
+pip install borsapy[allocation]
+playwright install chromium
+```
+
+```python
+print(fon.allocation)               # Güncel anlık varlık dağılımı
+#         Date          asset_type    asset_name  weight
+# 0  2026-05-02       Hisse Senedi        Stocks   29.75
+# 1  2026-05-02          Ters-Repo  Reverse Repo   18.40
+# ...
+```
+
+> **Önemli değişiklik (v0.9.0)**: TEFAS yeni mimaride tarihsel allocation'ı
+> hiçbir endpointte sunmuyor. Bu yüzden `Fund.allocation_history()` artık
+> `DeprecationWarning` ile aynı anlık snapshot'ı döndürüyor — date-range
+> argümanları kabul ediliyor ama yok sayılıyor.
 
 ### Fon Tarama
 
