@@ -136,6 +136,17 @@ from borsapy.calendar import EconomicCalendar, economic_calendar
 from borsapy.charts import calculate_heikin_ashi
 from borsapy.crypto import Crypto, crypto_pairs
 from borsapy.eurobond import Eurobond, eurobonds
+from borsapy.evds import (
+    EVDS,
+    EVDSSeries,
+    clear_evds_key,
+    evds_categories,
+    evds_download,
+    evds_search,
+    evds_series,
+    get_evds_key,
+    set_evds_key,
+)
 from borsapy.exceptions import (
     APIError,
     AuthenticationError,
@@ -197,7 +208,7 @@ from borsapy.ticker import Ticker
 from borsapy.twitter import search_tweets
 from borsapy.viop import VIOP
 
-__version__ = "0.9.0"
+__version__ = "0.10.0"
 __author__ = "Said Surucu"
 
 __all__ = [
@@ -214,6 +225,8 @@ __all__ = [
     "Bond",
     "Eurobond",
     "TCMB",
+    "EVDS",
+    "EVDSSeries",
     "EconomicCalendar",
     "Screener",
     "TradingViewStream",
@@ -246,6 +259,14 @@ __all__ = [
     "eurobonds",
     # TCMB functions
     "policy_rate",
+    # EVDS (TCMB Elektronik Veri Dağıtım Sistemi)
+    "evds_categories",
+    "evds_search",
+    "evds_series",
+    "evds_download",
+    "set_evds_key",
+    "clear_evds_key",
+    "get_evds_key",
     # Calendar functions
     "economic_calendar",
     # Screener functions

@@ -8,6 +8,137 @@ borsapy is a yfinance-like Python library for Turkish financial markets data.
 
 ## Changelog
 
+### v0.10.0 (2026-05-04)
+
+**Yeni modül**: TCMB EVDS3 (Elektronik Veri Dağıtım Sistemi) wrapper.
+**Veri çekme için ücretsiz EVDS API key zorunlu** (https://evds3.tcmb.gov.tr → BENİM SAYFAM → Kayıt Ol).
+
+#### Context
+
+TCMB, EVDS sistemini 2025 sonunda **evds3.tcmb.gov.tr**'ye taşıdı ve eski
+**evds2.tcmb.gov.tr** REST API'sini (`/service/evds/?key=...`) tamamen
+kapattı — tüm istekler v3 SPA HTML'ine 302 redirect oluyor. Bu PyPI'daki
+`evds`, `evdsAPI` benzeri tüm Python paketlerini kırdı. v3 backend'i
+`/igmevdsms-dis/...` prefix'inde yeni endpoint'ler sunuyor; resmi REST
+yolunun (key gerektirir) yanı sıra anonim katalog endpoint'leri de var.
+
+EVDS Türkiye'nin tek resmi makro veri kaynağı (faiz, döviz, enflasyon,
+ödemeler dengesi, para arzı, reel sektör, bekleyiş anketleri vs); borsapy
+bu boşluğu doldurur. Mevcut `Inflation` ve `TCMB` sınıfları yan yana çalışmaya
+devam eder (geriye uyumluluk).
+
+#### New Features
+
+- **`bp.EVDS()` sınıfı**: 145 kategori → on binlerce seri için tam katalog
+  navigasyonu, arama, dashboard'lar, Excel export.
+  ```python
+  import borsapy as bp
+
+  ev = bp.EVDS()
+  ev.categories                       # 145 kategori (DataFrame)
+  ev.datagroups(category_id=400401)   # Kısa Vadeli Dış Borç → 6 datagroup
+  ev.series_in_group("bie_dkdovizgn") # Günlük döviz → 137 seri
+  ev.search("dolar")                  # Kategori/datagroup'larda arama
+  ev.dashboard("baslica-gostergeler") # 9-chart "Başlıca Göstergeler"
+  ```
+
+- **`bp.EVDSSeries('TP.DK.USD.A')`**: yfinance.Ticker benzeri seri sarmalayıcı.
+  ```python
+  usd = ev.series("TP.DK.USD.A")
+  usd.info               # SERIE_NAME, FREQUENCY_STR, BIRIMI, DATAGROUP_CODE
+  usd.range              # (start_date, end_date)
+  usd.history(period="1y")
+  ```
+
+- **Modül-seviye shortcut'lar** (yfinance benzeri tek satır):
+  ```python
+  bp.evds_series("TP.DK.USD.A", period="1y")                # tek seri
+  bp.evds_series("TP.FG.J0", period="3y", formula="yoy_pct") # TÜFE yıllık
+  bp.evds_download(["TP.DK.USD.A", "TP.DK.EUR.A"], period="1mo")  # çoklu
+  bp.evds_categories()                                       # 145 kategori
+  bp.evds_search("kur", scope="datagroups")                  # arama
+  ```
+
+- **API Key Yönetimi**: Veri çekme için ücretsiz API key (TCMB →
+  https://evds3.tcmb.gov.tr → BENİM SAYFAM → Kayıt Ol).
+  ```python
+  bp.set_evds_key("YOUR_API_KEY")
+  # veya: export EVDS_API_KEY="..."
+  bp.get_evds_key()
+  bp.clear_evds_key()
+  ```
+
+#### Architecture (v3 Backend Reverse Engineering)
+
+İki paralel API katmanı:
+
+| Endpoint | Method | Auth | Durum |
+|----------|--------|------|-------|
+| `/?series=A-B-C&startDate=...&type=json&...` | GET | API key | ✅ asıl veri |
+| `/categories/withDatagroups/type=json` | GET | anonim | ✅ |
+| `/serieList/fe/type=json&code=X` | GET | anonim | ✅ |
+| `/dashboards/{slug}` | GET | anonim | ✅ |
+| `/genel-ayarlar?key=X` | GET | anonim | ✅ |
+| `/announcements` | GET | anonim | ✅ |
+| `/serieList/baslangicBitis` | POST | session cookie | ✅ |
+| ~~`/fe`~~ | ~~POST~~ | ~~session cookie~~ | ❌ kaldırıldı |
+| ~~`/fe/excel-indir`~~ | ~~POST~~ | ~~session cookie~~ | ❌ kaldırıldı |
+
+- **Sistem limitleri**: `MAX_SERIE_COUNT=400`, `MAX_GRID_COUNT=900`
+- **Series kodu**: kullanıcıdan dot-form (`TP.DK.USD.A`), backend underscore
+  (`TP_DK_USD_A`) — provider otomatik dönüştürür
+- **Tarih formatı**: DD-MM-YYYY (provider YYYY-MM-DD'i de kabul eder)
+- **Frequency enum**: snake_case (`"daily"|"monthly"|...`) → backend integer
+  (1=DAY, 5=MONTH, 8=YEAR). Bundle JS'sinden çıkarıldı:
+  `[1,"Date"],[2,"WORKDAY"],[5,"MONTH"],[6,"QUARTER"],[8,"YEAR"]`
+- **Aggregation**: `avg|min|max|first|last|sum`
+- **Formula**: `level|pct_change|diff|yoy_pct|yoy_diff|moving_avg|...`
+
+#### Veri Çekme Yolu (sadece REST GET)
+
+`bp.set_evds_key(...)` → `GET /igmevdsms-dis/?series=...&key=...` resmi REST
+endpoint'i (fatihmete/evds v0.4.0 ile aynı kontrat). API key olmadan
+`get_series_data()` net bir `APIError` fırlatır.
+
+**SPA-internal `POST /fe` ve `POST /fe/excel-indir` yolları KALDIRILDI**:
+TCMB gateway'i bu endpoint'lere her dış istemciye (curl, httpx, gerçek
+Chrome, Scrapling stealth) HTTP 500 dönüyor — SPA'nın kendi dashboard
+chart-refresh istekleri bile 500 alıyor. `[evds]` optional extra ve
+Scrapling/Camoufox fallback'i de gerek kalmadığından kaldırıldı.
+
+#### Mevcut Inflation/TCMB Modülleri ile İlişki
+
+EVDS bu iki modülü kapsayacak şekilde daha geniş ama **deprecate edilmedi**:
+- `bp.Inflation()` → TÜFE/ÜFE özel HTML scraper'ı (TCMB sayfası)
+- `bp.TCMB()` → Faiz oranları HTML scraper'ı
+- `bp.EVDS()` → tam EVDS katalog erişimi (TÜFE: `bp.evds_series('TP.FG.J0', formula='yoy_pct')`)
+
+Yeni kodlarda EVDS tercih edilmeli; eski modüller geriye uyumluluk için
+korundu.
+
+#### Technical Changes
+
+- `borsapy/_providers/evds.py` (NEW, ~620 satır): EVDSProvider, BaseProvider
+  miras, browser-like headers, sticky cookie session, FREQUENCY/AGGREGATION/
+  FORMULA enum'ları, dot↔underscore code transformer, anonim catalog GET'leri,
+  REST GET data (key zorunlu), POST `/serieList/baslangicBitis`
+- `borsapy/evds.py` (NEW, ~480 satır): EVDS class (`categories`, `datagroups`,
+  `series_in_group`, `search`, `series`, `dashboard`, `announcements`),
+  EVDSSeries wrapper (`info`, `range`, `native_frequency`, `history`),
+  evds_series/evds_download/evds_categories/evds_search shortcuts,
+  set_evds_key/get_evds_key/clear_evds_key
+- `borsapy/cache.py`: `TTL.EVDS_CATALOG=86400`, `TTL.EVDS_DATA=300`,
+  `TTL.EVDS_DASHBOARD=300`
+- `borsapy/__init__.py`: 9 yeni public sembol (EVDS, EVDSSeries, evds_*,
+  set/get/clear_evds_key)
+- `tests/test_evds.py`: 58 unit + 10 integration test (kod transformer,
+  date parsing, period→date, frequency mapping, REST routing, frame
+  parsing, EVDSSeries, search, key handling, live anonim API'ler, live REST)
+
+Issue: closes #N (TODO).
+
+---
+
 ### v0.9.0 (2026-05-03)
 
 **Breaking change**: TEFAS production API geçişinin (Nisan 2026) tamamlanması.
@@ -2319,6 +2450,7 @@ broker.buy_future("F_XU0300225", quantity=1, price=9500)
 | Bond | doviz.com | HTML scraping (/tahvil) |
 | TCMB | tcmb.gov.tr | HTML scraping (faiz oranları) |
 | Eurobond | ziraatbank.com.tr | JSON API (GetZBBonoTahvilOran) |
+| EVDS | TCMB EVDS3 | v3 backend (`/igmevdsms-dis/*`); REST GET (key) + anonim SPA endpoints |
 | Screener | İş Yatırım | getScreenerDataNEW JSON API |
 | Index | BIST + TradingView | hisse_endeks_ds.csv (components), WebSocket (OHLCV) |
 | ETF Holders | TradingView | HTML scraping (symbols/BIST-{}/etfs) |
@@ -2460,6 +2592,9 @@ gh release create vX.Y.Z --title "..." --notes "..."
 - [x] search(), search_bist(), search_crypto(), search_forex(), search_index() (borsapy-only, TradingView symbol search)
 - [x] ReplaySession, create_replay() (borsapy-only, backtesting için historical replay)
 - [x] search_tweets(), set_twitter_auth() (borsapy-only, Twitter/X tweet arama, optional dep)
+- [x] EVDS, EVDSSeries (borsapy-only, TCMB Elektronik Veri Dağıtım Sistemi v3 — 145 kategori, on binlerce makro seri)
+- [x] evds_series(), evds_download(), evds_categories(), evds_search() (borsapy-only, EVDS shortcut'lar)
+- [x] set_evds_key(), get_evds_key(), clear_evds_key() (borsapy-only, EVDS API key yönetimi — ücretsiz key https://evds3.tcmb.gov.tr)
 
 ### ✅ Yeni Eklenen - Yüksek Öncelik (Tamamlandı)
 - [x] isin (ISIN kodu - isinturkiye.com.tr)

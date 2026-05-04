@@ -56,6 +56,13 @@ print(fon.info)                      # Fon bilgileri
 # Enflasyon
 enf = bp.Inflation()
 print(enf.latest())                  # Son TÜFE verileri
+
+# EVDS — TCMB Elektronik Veri Dağıtım Sistemi (145 kategori, on binlerce makro seri)
+bp.set_evds_key("YOUR_EVDS_KEY")     # Ücretsiz key: https://evds3.tcmb.gov.tr
+print(bp.evds_series("TP.DK.USD.A.YTL", period="1y"))   # USD/TRY günlük
+print(bp.evds_series("TP.FG.J0", period="2y", formula="yoy_pct"))  # TÜFE YoY%
+print(bp.EVDS().categories)          # 145 kategori (key gerekmez)
+print(bp.EVDS().search("dolar"))     # Katalogda kelime arama
 ```
 
 ## Komut Satırı Arayüzü (CLI)
@@ -2013,6 +2020,356 @@ print(bp.policy_rate())             # Güncel politika faizi
 
 ---
 
+## EVDS (TCMB Elektronik Veri Dağıtım Sistemi)
+
+TCMB'nin EVDS sistemi: 145 kategori, binlerce veri grubu, **on binlerce makro
+veri serisi** (faiz, döviz, ödemeler dengesi, para arzı, enflasyon, reel
+sektör, beklenti anketleri, uluslararası istatistikler...). yfinance benzeri
+arayüz: tek satır seri çekme, çoklu seri, period selectors, katalog
+gezinme, fuzzy arama, TCMB önceden tanımlı dashboard'lar.
+
+> **Not (2025 sonu)**: TCMB EVDS sistemini `evds3.tcmb.gov.tr`'ye taşıdı; eski
+> `evds2.tcmb.gov.tr/service/evds/?key=...` URL'leri tamamen kapandı (302 → SPA
+> HTML). PyPI'daki eski `evds`/`evdsAPI` paketleri kırıldı. borsapy yeni v3
+> backend'i (`/igmevdsms-dis/...`) wrap eder.
+
+### API Anahtarı (Ücretsiz)
+
+EVDS verisi çekmek için ücretsiz API anahtarı gerekir:
+
+1. https://evds3.tcmb.gov.tr → "BENİM SAYFAM" → Kayıt Ol
+2. Profilim → API Key Kopyala
+3. Ya `bp.set_evds_key("YOUR_KEY")` ile programatik ya da `EVDS_API_KEY` env var ile yapılandır
+
+```python
+import borsapy as bp
+
+# Programatik
+bp.set_evds_key("YOUR_API_KEY")
+bp.get_evds_key()             # mevcut anahtar
+bp.clear_evds_key()           # temizle
+
+# veya export EVDS_API_KEY="..." env var
+```
+
+> Anahtar olmadan **katalog navigasyonu, search, dashboards, EVDSSeries.range**
+> çalışmaya devam eder (anonim endpoint'ler). Sadece **zaman serisi verisi**
+> çekmek için anahtar gerekir.
+
+### Hızlı Başlangıç
+
+```python
+import borsapy as bp
+bp.set_evds_key("YOUR_API_KEY")
+
+# Tek satır seri çekme (yfinance benzeri)
+df = bp.evds_series("TP.DK.USD.A.YTL", period="1y")        # USD/TRY günlük
+df = bp.evds_series("TP.FG.J0", period="3y", formula="yoy_pct")  # TÜFE YoY%
+df = bp.evds_series("TP.APIFON4", period="2y", aggregation="last") # TCMB Ağırlıklı Ortalama Fonlama Maliyeti
+
+# Çoklu seri (wide DataFrame, sütun başına bir seri)
+df = bp.evds_download(
+    ["TP.DK.USD.A.YTL", "TP.DK.EUR.A.YTL", "TP.DK.GBP.A.YTL"],
+    period="6mo",
+    frequency="daily",
+)
+```
+
+### EVDSSeries — Tek Seri Sarmalayıcı (yfinance.Ticker tarzı)
+
+```python
+ev = bp.EVDS()
+usd = ev.series("TP.DK.USD.A.YTL")
+
+usd.code                # "TP.DK.USD.A.YTL"
+usd.info                # SERIE_NAME, FREQUENCY, BIRIMI, DATAGROUP_CODE,
+                        # CATEGORY_TR, *ABLE flagleri (AVGABLE/MINABLE/...)
+usd.range               # (Timestamp('1950-01-02'), Timestamp('2026-...'))
+usd.native_frequency    # "daily" (otomatik tespit)
+usd.datagroup           # "bie_dkdovizgn"
+
+usd.history(period="1mo")                                    # son 1 ay günlük
+usd.history(period="1y", frequency="monthly", aggregation="last")
+usd.history(start="2024-01-01", end="2024-06-30", formula="pct_change")
+```
+
+### Katalog Navigasyonu (Anonim, Anahtar Gerekmez)
+
+```python
+ev = bp.EVDS()
+
+# Tüm kategoriler (145 satır)
+ev.categories
+#    CATEGORY_ID                     TOPIC_TITLE_TR              TOPIC_TITLE_EN  ...
+# 0       400401  KISA VADELİ DIŞ BORÇ İSTATİSTİKLERİ  SHORT TERM EXTERNAL DEBT  ...
+
+# Bir kategorinin veri grupları (zengin metadata: birim, kaynak, son güncelleme,
+# metodoloji linki, revizyon politikası linki, uygulama değişiklikleri linki, not)
+ev.datagroups(category_id=400401)
+# Sütunlar: DATAGROUP_CODE, DATAGROUP_TYPE, DATAGROUP_TYPE_EN, CATEGORY_ID,
+# CATEGORY_TR, FREQUENCY, FREQUENCY_STR, UNIT_TR, UNIT_EN, DATA_SOURCE,
+# DATA_SOURCE_EN, LAST_UPDATED, METADATA_LINK, METADATA_LINK_EN,
+# REV_POL_LINK, REV_POL_LINK_EN, APP_CHA_LINK, APP_CHA_LINK_EN, NOTE, NOTE_EN
+
+# Bir veri grubundaki seriler (137+ seri)
+ev.series_in_group("bie_dkdovizgn")
+#    SERIE_CODE                              SERIE_NAME FREQUENCY_STR DEFAULT_AGG_METHOD
+# 0  TP.DK.USD.A   (USD) ABD doları (Döviz Alış) (Arşiv)        GÜNLÜK                avg
+```
+
+### Search — Fuzzy Kelime Arama
+
+```python
+ev = bp.EVDS()
+
+ev.search("dolar")                           # her yerde (varsayılan)
+ev.search("dolar", scope="datagroups")       # sadece veri grubu adlarında
+ev.search("inflation", lang="en")            # İngilizce başlıklar
+ev.search("kredi faiz", scope="series")      # tüm serilerde (yavaş ilk çağrıda)
+
+bp.evds_search("dolar")                       # standalone shortcut
+```
+
+### Datagroup Verisi (Tek Çağrıda Tüm Seriler)
+
+```python
+# Bir veri grubundaki TÜM serileri tek HTTP call'da çek
+df = bp.EVDS().datagroup_data("bie_dkdovizgn", period="1mo")
+print(df.shape)        # (~30, 137) — 137 günlük döviz serisi
+print(df.columns[:5])  # ['TP.DK.USD.A', 'TP.DK.USD.S', 'TP.DK.EUR.A', ...]
+```
+
+`evds_download(["A","B","C",...])` ile aynı sonuç ama **tek HTTP call** —
+büyük datagroup'lar için çok daha hızlı.
+
+### Dashboard'lar (TCMB Önceden Tanımlı Panolar)
+
+```python
+ev = bp.EVDS()
+
+# "Başlıca Göstergeler" — 9-chart bilinen pano (TÜFE, ÜFE, kur, faiz, GSYH, ...)
+dash = ev.dashboard("baslica-gostergeler")
+print(dash["dashboardName"])    # "Başlıca Göstergeler"
+print(len(dash["chartsList"]))  # 9
+
+# Ana sayfa hazır panoları (10 tane TCMB tarafından küratörlü)
+panos = ev.home_page_dashboards()
+print(panos[["name", "chart_count"]])
+#                                                                         name  chart_count
+# 0                                Merkez Bankası Rezervleri (milyon ABD doları)            1
+# 1                                     Cari İşlemler Hesabı (milyon ABD doları)            1
+# 2  Yurt Dışı Yerleşiklerin Menkul Kıymet Portföy Hareketleri (milyon ABD doları)            1
+# 3                                                          Parasal Büyüklükler            1
+# 4                Banka Kartı ve Kredi Kartı Harcamaları (yıllık yüzde değişim)            1
+# 5                             TÜFE ve Temel Göstergeler (yıllık yüzde değişim)            1
+# 6                                    Finansal Hesaplar Toplam Borç-GSYİH Oranı            1
+# 7                                                      Yabancı Para Mevduatlar            1
+# 8                                     Türk Lirası Mevduat Faiz Oranları (Akım)            1
+# 9                                      Brüt Dış Borç Stoku (milyon ABD doları)            1
+
+# Tek bir panonun tam içeriği (encoded_id ile)
+dash = ev.dashboard_by_id(panos.iloc[5]["encoded_id"])  # TÜFE panosu
+```
+
+### Server-side Search — TCMB Resmi Full-text İndeksi
+
+`EVDS().search()` (client-side) cached katalog ağacında dolaşır; daha hızlı +
+**etiket** ve **rapor sayfası** sonuçları için TCMB'nin server-side
+indeksini kullanın:
+
+```python
+res = bp.EVDS().search_server("dolar")
+print(len(res["datagroups"]))  # 13 — eşleşen veri grupları
+print(len(res["series"]))      # 78 — eşleşen seriler (etiketler dahil)
+print(len(res["reports"]))     # 9  — eşleşen rapor sayfaları
+
+# Her sonuç tam metadata: serieCode, serieName, frequency, datagroup vb.
+print(res["series"][0]["serieCode"])  # 'TP.FA.D01'
+```
+
+> Backend her kategoriyi 100 kayıtla sınırlandırır. Daha spesifik aramak için
+> ya `EVDS().search(term, scope="...")` ile client-side filtre uygulayın ya da
+> arama kelimesini daha öz seçin.
+
+### Tüm `history()` Parametreleri
+
+```python
+bp.evds_series(
+    "TP.DK.USD.A.YTL",
+    period="1y",                # veya start="2024-01-01"  (end yoksa "01-01-2999"
+                                # — TCMB tavsiyesi: hep güncel veri)
+    start="2024-01-01",         # opsiyonel
+    end="2024-12-31",           # opsiyonel; verilmezse 01-01-2999 (always-current)
+    frequency="daily",          # "daily"|"workday"|"weekly"|"biweekly"|"monthly"
+                                # |"quarterly"|"semiannual"|"annual" veya 1..8
+    aggregation="avg",          # "avg"|"min"|"max"|"first"|"last"|"sum"
+    formula="level",            # "level"|"pct_change"|"diff"|"yoy_pct"|"yoy_diff"
+                                # |"moving_avg"|"moving_sum"|"yoy_moving_pct"|"yoy_moving_diff"
+                                # veya raw ID "0".."8"
+    decimals=2,
+    decimal_separator=".",      # "." (varsayılan) veya "," (TR-locale Excel için)
+)
+```
+
+> **Not**: 1000'den fazla gözlem isteyen sorgular **otomatik chunk'lanır**;
+> `period="max"` veya 10+ yıllık günlük serileri sorunsuz çekebilirsiniz.
+
+### Çoklu Seri — Per-Seri Aggregation/Formula
+
+```python
+df = bp.evds_download(
+    ["TP.DK.USD.A.YTL", "TP.FG.J0"],
+    period="6mo",
+    frequency="monthly",
+    aggregation=["last", "last"],     # her seri için ayrı yöntem
+    formula=["level", "yoy_pct"],     # USD düzey, TÜFE YoY%
+)
+#             TP.DK.USD.A.YTL  TP.FG.J0
+# Date
+# 2026-01-01            43.34     30.65
+# 2026-02-01            43.80       NaN
+# ...
+```
+
+### Sık Kullanılan Seri Kodları
+
+| Seri Kodu | Açıklama | Frekans |
+|-----------|----------|---------|
+| `TP.DK.USD.A.YTL` | USD/TRY (Döviz Alış) | Günlük |
+| `TP.DK.EUR.A.YTL` | EUR/TRY (Döviz Alış) | Günlük |
+| `TP.DK.GBP.A.YTL` | GBP/TRY (Döviz Alış) | Günlük |
+| `TP.FG.J0` | TÜFE (Tüketici Fiyat Endeksi) | Aylık |
+| `TP.TUFE1YI.T1` | Yİ-ÜFE (Yurt İçi Üretici Fiyat Endeksi) | Aylık |
+| `TP.APIFON4` | TCMB AOFM (Ağırlıklı Ortalama Fonlama Maliyeti) | Günlük |
+| `TP.MK.F.BILESIK.TUM` | BIST 100 endeksi | Günlük |
+
+> Tüm seri kodlarına `bp.EVDS().series_in_group(datagroup_code)` ile veya
+> `bp.evds_search("anahtar kelime")` ile ulaşabilirsiniz.
+
+### Frekans Kodları
+
+| snake_case | Backend INT | Açıklama |
+|------------|-------------|----------|
+| `daily` | 1 | Günlük |
+| `workday` | 2 | İş Günü |
+| `weekly` | 3 | Haftalık |
+| `biweekly` | 4 | İki Haftalık |
+| `monthly` | 5 | Aylık |
+| `quarterly` | 6 | 3 Aylık |
+| `semiannual` | 7 | 6 Aylık |
+| `annual` | 8 | Yıllık |
+
+### Formula Kodları
+
+| snake_case | ID | Açıklama |
+|------------|----|----------|
+| `level` | 0 | Düzey (ham değer) |
+| `pct_change` | 1 | Önceki Döneme Göre Yüzde Değişim |
+| `diff` | 2 | Önceki Döneme Göre Fark |
+| `yoy_pct` | 3 | Yıllık Yüzde Değişim |
+| `yoy_diff` | 4 | Yıllık Fark |
+| `moving_avg` | 5 | Hareketli Ortalama |
+| `moving_sum` | 6 | Hareketli Toplam |
+| `yoy_moving_pct` | 7 | Yıllık Hareketli Yüzde Değişim |
+| `yoy_moving_diff` | 8 | Yıllık Hareketli Fark |
+
+### Aggregation Yöntemleri
+
+| Değer | Açıklama |
+|-------|----------|
+| `avg` | Aritmetik ortalama (varsayılan) |
+| `min` | En düşük |
+| `max` | En yüksek |
+| `first` | Dönem başlangıç değeri |
+| `last` | Dönem bitiş değeri |
+| `sum` | Kümülatif toplam |
+
+### CSV / XML Çıktı Formatları
+
+JSON'a ek olarak TCMB REST endpoint'i `csv` ve `xml` formatlarını da
+destekler. Provider seviyesinde `output_format` parametresiyle kullanılır:
+
+```python
+import borsapy as bp
+import borsapy._providers.evds as evds_mod
+
+bp.set_evds_key("YOUR_API_KEY")
+p = evds_mod.get_evds_provider()
+
+# CSV — büyük datagroup'lar için pandas read_csv ile hızlı parse
+csv_text = p.get_series_data(
+    "TP.DK.USD.A.YTL",
+    start="2024-01-01", end="2024-12-31",
+    frequency="daily",
+    output_format="csv",
+)
+# csv_text: ham CSV string. Doğrudan diske yazabilir veya
+# pd.read_csv(io.StringIO(csv_text)) ile DataFrame'e dönüştürebilirsiniz.
+
+# XML — eski sistemlerle uyumluluk için
+xml_text = p.get_series_data(
+    "TP.DK.USD.A.YTL",
+    start="2024-01-01", end="2024-12-31",
+    frequency="daily",
+    output_format="xml",
+)
+```
+
+> CSV/XML modunda chunking devre dışıdır (raw text döndüğü için merge
+> mantığı gerekmez). 1000+ gözlem isteyen CSV sorguları arka planda
+> kesilir; bu durumlar için JSON modu (varsayılan) kullanın.
+
+### Resmi REST Katalog Endpoint'leri (Yedek)
+
+Varsayılan katalog erişimi (`EVDS().categories`, `series_in_group()`,
+`datagroups()`) anonim SPA-internal endpoint'lerini kullanır (key gerekmez).
+TCMB resmi REST API'sini de doğrudan çağırmak istersen:
+
+```python
+import borsapy._providers.evds as evds_mod
+p = evds_mod.get_evds_provider()
+# Hepsi key gerektirir.
+
+p.get_categories_rest()                    # /categories/type=json
+p.get_datagroups_rest()                    # /datagroups/mode=0&type=json
+p.get_datagroups_rest("bie_dkdovizgn")     # /datagroups/mode=1&code=...&type=json
+p.get_series_list_rest("bie_dkdovizgn")    # /serieList/type=json&code=...
+p.get_series_list_rest("TP.DK.USD.A")      # tek seri metadata'sı
+```
+
+Anonim endpoint'lere göre **eşit veriyi** ama resmi key-tabanlı yoldan döner.
+SPA-internal endpoint'i bir gün değişirse otomatik yedek olarak elinizde olur.
+
+### Sistem Limitleri
+
+- **Max seri sayısı/çağrı**: 400 (`MAX_SERIES_PER_CALL`)
+- **Max gözlem/çağrı**: 1000 — borsapy bu limiti aşan istekleri **otomatik chunk'lar** ve sonuçları birleştirir (`period="max"`, 10+ yıllık günlük veriler dahil). TCMB doğrudan çağrılırsa son 1000 gözlemi sessizce kesip getirir.
+- **Cache TTL**: katalog 24 saat, seri verisi 5 dakika
+
+### Frekansa-Ait-İlk-Gün Kuralı (Önemli)
+
+TCMB Web Servis kılavuzu: **"İstenilen frekansın görüntülenebilmesi için
+ilgili frekansa ait ilk gün yazılmalıdır."** Yani:
+
+- Yıllık seri (`frequency="annual"`): `start="2005-01-01"` → 2005'ten başlar; `start="2005-01-02"` → 2006'dan başlar (2005 atlanır)
+- Aylık seri (`frequency="monthly"`): `start="2025-04-01"` → Nisan 2025'ten; `start="2025-04-15"` → Mayıs 2025'ten
+- Çeyreklik (`frequency="quarterly"`): 2025 Q2 için `start="2025-04-01"` (çeyreğin ilk günü)
+
+Belirsizseniz dönem başlangıcına yapışın (1 Ocak / 1 Nisan / 1 Temmuz / 1 Ekim).
+
+### Mevcut Modüllerle İlişki
+
+| borsapy modülü | Kapsadığı | EVDS karşılığı |
+|----------------|-----------|----------------|
+| `bp.TCMB()` | Politika faizi (HTML scraping) | `bp.evds_series('TP.APIFON4')` |
+| `bp.Inflation()` | TÜFE/ÜFE (HTML scraping) | `bp.evds_series('TP.FG.J0', formula='yoy_pct')` |
+| `bp.Bond()` | Devlet tahvili faizleri | EVDS'te de var (`TP.YTUR.*`) |
+
+EVDS modülü daha kapsamlı ama mevcut modüller hızlı ve key gerektirmeden
+çalıştığı için yan yana yaşıyorlar.
+
+---
+
 ## Eurobond (Türk Devlet Tahvilleri)
 
 Yabancı para cinsinden (USD/EUR) Türk devlet tahvilleri.
@@ -2597,6 +2954,7 @@ print(sonuc)
 | VIOP | İş Yatırım, TradingView | Vadeli işlem/opsiyon; gerçek zamanlı streaming |
 | Bond | doviz.com | Devlet tahvili faiz oranları (2Y, 5Y, 10Y) |
 | TCMB | tcmb.gov.tr | Merkez Bankası faiz oranları (politika, gecelik, LON) |
+| EVDS | TCMB EVDS3 | Elektronik Veri Dağıtım Sistemi v3 — 145 kategori, on binlerce makro seri (faiz, döviz, ödemeler dengesi, para arzı, beklentiler...) |
 | Eurobond | ziraatbank.com.tr | Türk devlet eurobondları (USD/EUR, 38+ tahvil) |
 | EconomicCalendar | doviz.com | Ekonomik takvim (TR, US, EU, DE, GB, JP, CN) |
 | Screener | İş Yatırım | Hisse tarama (İş Yatırım gelişmiş hisse arama) |
@@ -2629,6 +2987,7 @@ print(sonuc)
 - **Crypto**: Kripto para (BtcTurk)
 - **Fund**: Yatırım fonları + varlık dağılımı + tarama/karşılaştırma + stopaj oranları (TEFAS)
 - **Inflation**: Enflasyon verileri ve hesaplayıcı (TCMB)
+- **EVDS**: TCMB Elektronik Veri Dağıtım Sistemi v3 — 145 kategori, on binlerce makro seri, yfinance benzeri arayüz (period/aggregation/formula), katalog navigasyonu, fuzzy arama, dashboard'lar (key gerekir, ücretsiz)
 - **VIOP**: Vadeli işlem/opsiyon + gerçek zamanlı streaming + kontrat arama
 - **Bond**: Devlet tahvili faiz oranları + risk_free_rate (doviz.com)
 - **TCMB**: Merkez Bankası faiz oranları - politika, gecelik, LON + geçmiş (tcmb.gov.tr)

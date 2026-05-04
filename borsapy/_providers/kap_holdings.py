@@ -6,7 +6,6 @@ from KAP "Portföy Dağılım Raporu" (Portfolio Distribution Report) disclosure
 Uses pymupdf4llm for PDF to markdown conversion and OpenRouter LLM for parsing.
 """
 
-import io
 import json
 import re
 import time
@@ -256,7 +255,7 @@ class KAPHoldingsProvider(BaseProvider):
         md_text = pymupdf4llm.to_markdown(doc)
 
         # Truncate if too long (balance between completeness and speed)
-        MAX_CHARS = 80000  # ~20K tokens - enough for most fund portfolios
+        MAX_CHARS = 80000  # noqa: N806  ~20K tokens - enough for most fund portfolios
         if len(md_text) > MAX_CHARS:
             md_text = md_text[:MAX_CHARS]
 

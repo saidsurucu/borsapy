@@ -76,6 +76,9 @@ class TTL:
     INFLATION_DATA = 86400  # 24 hours
     VIOP = 300  # 5 minutes (delayed data)
     SOCIAL_DATA = 300  # 5 minutes (tweets change fast)
+    EVDS_CATALOG = 86400  # 24 hours (categories, series lists, ranges, notes)
+    EVDS_DATA = 300  # 5 minutes (series observation data)
+    EVDS_DASHBOARD = 300  # 5 minutes (predefined dashboards like baslica-gostergeler)
 
 
 # Global cache instance

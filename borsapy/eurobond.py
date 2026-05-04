@@ -29,7 +29,6 @@ import pandas as pd
 from borsapy._providers.ziraat_eurobond import get_eurobond_provider
 from borsapy.exceptions import DataNotAvailableError
 
-
 _PERIOD_DAYS = {
     "1mo": 30,
     "3mo": 90,

@@ -236,7 +236,7 @@ class TradingViewScannerProvider(BaseProvider):
 
         # Build column-value mapping
         suffix = INTERVAL_MAP.get(interval, "")
-        raw_values = dict(zip(all_columns, values))
+        raw_values = dict(zip(all_columns, values, strict=False))
 
         # Extract exchange and symbol from full symbol
         if ":" in symbol_name:
