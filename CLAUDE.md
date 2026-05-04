@@ -116,26 +116,92 @@ EVDS bu iki modülü kapsayacak şekilde daha geniş ama **deprecate edilmedi**:
 Yeni kodlarda EVDS tercih edilmeli; eski modüller geriye uyumluluk için
 korundu.
 
+#### TCMB Resmi PDF Kılavuzlarından Eklenen Ek Özellikler
+
+İlk sürüm yayınlandıktan sonra TCMB'nin 4 resmi PDF kılavuzu (Web Servis,
+Python, Excel, ve `evds3.tcmb.gov.tr/dokumanlar`'daki Arama + Rapor Sayfası
+kılavuzları) detaylı incelendi. Buradan çıkan ek özellikler:
+
+**Veri çekme**:
+- `EVDS().datagroup_data(datagroup_code, period="...")` — `/datagroup=X&...`
+  endpoint'i ile bir veri grubundaki **tüm seriler tek HTTP call'da** (örn.
+  `bie_dkdovizgn` 137 günlük döviz serisi). 100+ seri için manuel
+  `evds_download(...)` listesinden çok daha hızlı.
+- **1000-gözlem auto-chunking** — TCMB silently keserdi; provider artık
+  client-side chunked + dedup yapıyor. `period="max"`, 10+ yıllık günlük
+  seriler tek çağrı gibi davranır. Helpers: `_estimate_observations`,
+  `_split_window`, `_merge_chunks`.
+- **`end=None` → `01-01-2999`** — TCMB tavsiyesi "always-current" sentinel.
+  `start` veriyi ama `end` vermezse provider 2999'u set eder.
+- `output_format="csv"|"xml"` — provider seviye CSV/XML çıktı (chunking
+  devre dışı bu modlarda).
+- `decimal_separator=","` — Türk locale Excel için (provider + user-facing).
+
+**Katalog/metadata**:
+- Datagroup metadata yeni alanlar (anonim `/categories/withDatagroups`'tan
+  zaten geliyordu, DataFrame'e eklendi): `METADATA_LINK`, `METADATA_LINK_EN`,
+  `REV_POL_LINK`, `REV_POL_LINK_EN`, `APP_CHA_LINK`, `APP_CHA_LINK_EN`,
+  `NOTE`, `NOTE_EN`, `DATA_SOURCE_EN`. Toplam 20 sütun.
+- `EVDS().search_server(term)` — TCMB resmi `/searchResults?searchVal=X`
+  full-text indeksi. Etiketleri (tags) ve rapor sayfalarını da indeksliyor.
+  Client-side `search()`'ten geniş; max 100 kayıt/kategori.
+- `EVDS().home_page_dashboards()` — `/dashboards/home-page-dashboards` ile
+  TCMB'nin ana sayfada gösterdiği 10 küratörlü pano (Rezervler, Cari
+  İşlemler, Yurt Dışı Portföy, Parasal Büyüklükler, Kart Harcamaları,
+  TÜFE, Borç-GSYİH, FX Mevduat, TL Faiz, Brüt Dış Borç).
+- `EVDS().dashboard_by_id(encoded_id)` — `/public/dashboards/portlet/{id}`
+  ile herhangi bir panoyu encoded_id ile çek.
+
+**Resmi REST katalog yedekleri** (key gerekli, anonim SPA endpoint'lerine
+yedek olarak sunulur):
+- `EVDSProvider.get_categories_rest()` — `/categories/type=json`
+- `EVDSProvider.get_datagroups_rest(code=None)` — `/datagroups/mode=0|1&...`
+- `EVDSProvider.get_series_list_rest(code)` — `/serieList/type=json&code=X`
+
+**Frekansa-Ait-İlk-Gün Kuralı** (README dokümantasyonu):
+TCMB Web Servis kılavuzu: yıllık/aylık/çeyreklik seriler için `start`
+parametresi dönemin ilk gününe set edilmeli (örn. yıllık için `01-01-YYYY`).
+Aksi halde dönem atlanır (kılavuz örneği: `02-01-2005` → 2005 atlanır,
+2006'dan başlar).
+
 #### Technical Changes
 
-- `borsapy/_providers/evds.py` (NEW, ~620 satır): EVDSProvider, BaseProvider
-  miras, browser-like headers, sticky cookie session, FREQUENCY/AGGREGATION/
-  FORMULA enum'ları, dot↔underscore code transformer, anonim catalog GET'leri,
-  REST GET data (key zorunlu), POST `/serieList/baslangicBitis`
-- `borsapy/evds.py` (NEW, ~480 satır): EVDS class (`categories`, `datagroups`,
-  `series_in_group`, `search`, `series`, `dashboard`, `announcements`),
-  EVDSSeries wrapper (`info`, `range`, `native_frequency`, `history`),
-  evds_series/evds_download/evds_categories/evds_search shortcuts,
-  set_evds_key/get_evds_key/clear_evds_key
+- `borsapy/_providers/evds.py` (NEW, ~900 satır): `EVDSProvider`,
+  `BaseProvider` miras, browser-like headers, sticky cookie session,
+  FREQUENCY/AGGREGATION/FORMULA enum'ları, `NUMERIC_FREQ_NORMALIZE`
+  (legacy v2 9/13/16/18 ↔ v3 1..8), dot↔underscore code transformer,
+  anonim catalog GET'leri, REST GET data (key zorunlu, path-style URL),
+  POST `/serieList/baslangicBitis`, `_estimate_observations` +
+  `_split_window` + `_merge_chunks` (1000-obs auto-chunking),
+  `_rest_data_get` (CSV/XML destekli generic GET), `get_datagroup_data`,
+  `get_home_page_dashboards`, `get_dashboard_by_encoded_id`,
+  `search_server`, `get_*_rest` (3 resmi REST katalog yedeği).
+- `borsapy/evds.py` (NEW, ~600 satır): `EVDS` class — `categories`,
+  `datagroups`, `series_in_group`, `search`, `search_server`, `series`,
+  `dashboard`, `dashboard_by_id`, `home_page_dashboards`, `datagroup_data`,
+  `announcements`. `EVDSSeries` wrapper — `code`, `info`, `range`,
+  `native_frequency`, `datagroup`, `history(period/start/end/frequency/
+  aggregation/formula/decimals/decimal_separator)`. `_resolve_window`
+  (end=None → 01-01-2999 sentinel), `_frame_from_payload` (Tarih/UNIXTIME
+  parse, formula suffix `-3` strip, single-series → "Value" rename).
+  Module shortcuts: `evds_series`, `evds_download`, `evds_categories`,
+  `evds_search`, `set_evds_key`, `get_evds_key`, `clear_evds_key`.
 - `borsapy/cache.py`: `TTL.EVDS_CATALOG=86400`, `TTL.EVDS_DATA=300`,
-  `TTL.EVDS_DASHBOARD=300`
+  `TTL.EVDS_DASHBOARD=300`.
 - `borsapy/__init__.py`: 9 yeni public sembol (EVDS, EVDSSeries, evds_*,
-  set/get/clear_evds_key)
-- `tests/test_evds.py`: 58 unit + 10 integration test (kod transformer,
-  date parsing, period→date, frequency mapping, REST routing, frame
-  parsing, EVDSSeries, search, key handling, live anonim API'ler, live REST)
+  set/get/clear_evds_key).
+- `tests/test_evds.py`: 58 unit + 10 integration test. README'deki 38
+  EVDS örneği canlı API ile birebir doğrulandı. PDF kılavuzlarından
+  eklenen 13 yeni özellik için ayrı smoke testleri.
+- `README.md`: kapsamlı EVDS bölümü (~280 satır) — API anahtarı alma
+  adımları (5 adım), katalog navigasyonu, search, dashboards, çoklu seri,
+  frekans/formula/aggregation tabloları, sistem limitleri, frekansa-ait-
+  ilk-gün kuralı, CSV/XML çıktı, resmi REST katalog yedekleri.
+- `pyproject.toml`: `0.10.0`. `[evds]` optional extra (Scrapling fallback)
+  başta eklendi, sonradan POST /fe yolunun kullanışsızlığı netleşince
+  kaldırıldı.
 
-Issue: closes #N (TODO).
+Release: `v0.10.0` GitHub release oluşturuldu, PyPI workflow tetiklendi.
 
 ---
 
@@ -2465,6 +2531,7 @@ borsapy/
 ├── crypto.py           # Cryptocurrency
 ├── fund.py             # Mutual funds
 ├── inflation.py        # TCMB inflation data
+├── evds.py             # TCMB EVDS3 (145 categories, full macro series)
 ├── market.py           # companies(), search_companies()
 ├── bond.py             # Government bond yields
 ├── tcmb.py             # TCMB interest rates
@@ -2493,6 +2560,7 @@ borsapy/
     ├── isin.py         # ISIN codes (isinturkiye.com.tr)
     ├── hedeffiyat.py   # Analyst price targets
     ├── tradingview_etf.py  # ETF holders (TradingView HTML scraping)
+    ├── evds.py         # EVDS3 backend (catalog + REST data + chunking)
     └── twitter.py      # Twitter/X via Scweet (optional dep)
 ```
 
@@ -2593,8 +2661,16 @@ gh release create vX.Y.Z --title "..." --notes "..."
 - [x] ReplaySession, create_replay() (borsapy-only, backtesting için historical replay)
 - [x] search_tweets(), set_twitter_auth() (borsapy-only, Twitter/X tweet arama, optional dep)
 - [x] EVDS, EVDSSeries (borsapy-only, TCMB Elektronik Veri Dağıtım Sistemi v3 — 145 kategori, on binlerce makro seri)
+- [x] EVDS().categories, datagroups, series_in_group, search, search_server, series, dashboard, dashboard_by_id, home_page_dashboards, datagroup_data, announcements (11 metod)
+- [x] EVDSSeries.code, info, range, native_frequency, datagroup, history(period/start/end/frequency/aggregation/formula/decimals/decimal_separator)
 - [x] evds_series(), evds_download(), evds_categories(), evds_search() (borsapy-only, EVDS shortcut'lar)
 - [x] set_evds_key(), get_evds_key(), clear_evds_key() (borsapy-only, EVDS API key yönetimi — ücretsiz key https://evds3.tcmb.gov.tr)
+- [x] EVDS auto-chunking (1000-obs limiti aşan sorgular client-side bölünüp birleştirilir)
+- [x] EVDS end=None → 01-01-2999 always-current sentinel
+- [x] EVDS frequency normalizasyonu (legacy v2 9/13/16/18 ↔ v3 1..8)
+- [x] EVDS dot↔underscore kod dönüşümü (kullanıcı her iki formatı verebilir)
+- [x] EVDS CSV/XML output_format desteği (provider seviye)
+- [x] EVDS resmi REST katalog yedekleri (get_categories_rest, get_datagroups_rest, get_series_list_rest)
 
 ### ✅ Yeni Eklenen - Yüksek Öncelik (Tamamlandı)
 - [x] isin (ISIN kodu - isinturkiye.com.tr)
