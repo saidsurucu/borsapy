@@ -428,7 +428,10 @@ class TradingViewProvider(BaseProvider):
                         series_data = params[1].get("$prices", {}).get("s", [])
                         for candle in series_data:
                             v = candle.get("v", [])
-                            if len(v) >= 6:
+                            # Some symbols (e.g. XGIDA and other indices) return
+                            # candles without a volume field: [time, O, H, L, C].
+                            # Require only time+OHLC; default missing volume to 0.0.
+                            if len(v) >= 5:
                                 ts = int(v[0])
                                 periods[ts] = {
                                     "time": ts,
@@ -436,7 +439,7 @@ class TradingViewProvider(BaseProvider):
                                     "high": v[2],
                                     "low": v[3],
                                     "close": v[4],
-                                    "volume": v[5],
+                                    "volume": v[5] if len(v) >= 6 else 0.0,
                                 }
                         data_received = True
 

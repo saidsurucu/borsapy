@@ -1214,14 +1214,17 @@ class TradingViewStream:
                     for bar in bars:
                         if isinstance(bar, dict) and "v" in bar:
                             v = bar["v"]
-                            if len(v) >= 6:
+                            # Some symbols (e.g. XGIDA and other indices) stream
+                            # candles without a volume field: [time, O, H, L, C].
+                            # Require only time+OHLC; default missing volume to 0.
+                            if len(v) >= 5:
                                 candle = {
                                     "time": int(v[0]),
                                     "open": float(v[1]),
                                     "high": float(v[2]),
                                     "low": float(v[3]),
                                     "close": float(v[4]),
-                                    "volume": float(v[5]) if v[5] else 0,
+                                    "volume": float(v[5]) if len(v) >= 6 and v[5] else 0,
                                 }
                                 candles.append(candle)
 
