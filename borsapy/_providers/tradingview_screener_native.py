@@ -771,15 +771,19 @@ class TVScreenerProvider:
         Returns:
             DataFrame with symbols matching all conditions
         """
+        from concurrent.futures import ThreadPoolExecutor
+
         from borsapy.technical import calculate_supertrend, calculate_tilson_t3
 
         if not symbols or not conditions:
             return pd.DataFrame()
 
-        results = []
+        def _process_symbol(symbol: str) -> dict[str, Any] | None:
+            """Fetch history, compute local indicators, and filter one symbol.
 
-        # Process each symbol
-        for symbol in symbols:
+            Returns the matching result row, or None if the symbol does not
+            match, has insufficient data, or fails to fetch.
+            """
             try:
                 # Fetch historical data
                 from borsapy.ticker import Ticker
@@ -788,7 +792,7 @@ class TVScreenerProvider:
                 df = ticker.history(period="3mo", interval=interval)
 
                 if df.empty or len(df) < 20:
-                    continue
+                    return None
 
                 # Calculate local indicators
                 indicators: dict[str, Any] = {}
@@ -815,20 +819,26 @@ class TVScreenerProvider:
                 indicators["price"] = df["Close"].iloc[-1]
 
                 # Check all conditions
-                matches = True
                 for cond in conditions:
                     if not self._evaluate_local_condition(cond, indicators):
-                        matches = False
-                        break
+                        return None
 
-                if matches:
-                    result_row = {"symbol": symbol}
-                    result_row.update(indicators)
-                    results.append(result_row)
+                result_row = {"symbol": symbol}
+                result_row.update(indicators)
+                return result_row
 
             except Exception:
                 # Skip symbols that fail
-                continue
+                return None
+
+        # Fetch + compute concurrently: each symbol triggers a blocking network
+        # fetch (Ticker.history), so threads overlap the I/O wait. Results are
+        # reassembled in the original symbol order to keep output deterministic.
+        max_workers = min(16, len(symbols))
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            rows = list(executor.map(_process_symbol, symbols))
+
+        results = [row for row in rows if row is not None]
 
         if not results:
             return pd.DataFrame()
