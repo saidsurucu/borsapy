@@ -591,7 +591,15 @@ class IsYatirimProvider(BaseProvider):
         if cached is not None:
             return cached
 
-        # Determine financial group
+        # Determine financial group. When the caller doesn't specify one,
+        # we auto-detect: try industrial (XI_29) first since most BIST
+        # tickers are non-financial, then fall back to the banking/
+        # financials group (UFRS) if no data came back. Banks, insurers,
+        # and other financial institutions report under UFRS and always
+        # return empty results under XI_29, so without this fallback
+        # `income_stmt`/`balance_sheet`/`cashflow` raise DataNotAvailableError
+        # for tickers like AKBNK, GARAN, ISCTR, YKBNK (see issue #20).
+        auto_detect_group = financial_group is None
         if financial_group is None:
             financial_group = self.FINANCIAL_GROUP_INDUSTRIAL
 
@@ -605,22 +613,34 @@ class IsYatirimProvider(BaseProvider):
             for i in range(0, len(periods), self._MAX_PERIODS_PER_CALL)
         ]
 
-        # Single API call per batch (API returns all tables combined;
-        # we filter by itemCode prefix in _parse_financial_response)
-        all_dfs = []
-        for batch_periods in batches:
-            try:
-                df = self._fetch_financial_table(
-                    symbol=symbol,
-                    financial_group=financial_group,
-                    periods=batch_periods,
-                    quarterly=quarterly,
-                    statement_type=statement_type,
-                )
-                if not df.empty:
-                    all_dfs.append(df)
-            except Exception:
-                continue
+        def _fetch_all(group: str) -> list[pd.DataFrame]:
+            # Single API call per batch (API returns all tables combined;
+            # we filter by itemCode prefix in _parse_financial_response)
+            dfs = []
+            for batch_periods in batches:
+                try:
+                    df = self._fetch_financial_table(
+                        symbol=symbol,
+                        financial_group=group,
+                        periods=batch_periods,
+                        quarterly=quarterly,
+                        statement_type=statement_type,
+                    )
+                    if not df.empty:
+                        dfs.append(df)
+                except Exception:
+                    continue
+            return dfs
+
+        all_dfs = _fetch_all(financial_group)
+
+        if not all_dfs and auto_detect_group and financial_group == self.FINANCIAL_GROUP_INDUSTRIAL:
+            # Retry once with the banking/financials group before giving up.
+            fallback_group = self.FINANCIAL_GROUP_BANK
+            fallback_dfs = _fetch_all(fallback_group)
+            if fallback_dfs:
+                financial_group = fallback_group
+                all_dfs = fallback_dfs
 
         if not all_dfs:
             raise DataNotAvailableError(f"No financial data available for {symbol}")
