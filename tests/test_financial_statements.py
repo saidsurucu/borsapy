@@ -7,6 +7,7 @@ import pandas as pd
 import pytest
 
 from borsapy._providers.isyatirim import IsYatirimProvider  # noqa: I001
+from borsapy.exceptions import DataNotAvailableError
 
 # =============================================================================
 # Unit Tests: _resolve_last_n
@@ -676,3 +677,98 @@ class TestItemCodeFiltering:
             data, periods, quarterly=False, statement_type="cashflow"
         )
         assert df.empty
+
+
+# =============================================================================
+# Unit Tests: Financial group auto-detection / fallback (issue #20)
+# =============================================================================
+
+
+class TestFinancialGroupFallback:
+    """Financial-sector tickers (banks, insurers, financials) report under
+    the UFRS financial group, not the default industrial (XI_29) group.
+    When the caller does not explicitly pass ``financial_group``,
+    ``get_financial_statements`` should transparently retry with UFRS
+    before raising ``DataNotAvailableError``.
+    """
+
+    def setup_method(self):
+        self.provider = IsYatirimProvider()
+
+    def _df(self, periods, quarterly=False):
+        data = {"Item": ["Revenue"]}
+        for year, period in periods:
+            col = f"{year}Q{period // 3}" if quarterly else str(year)
+            data[col] = [123.0]
+        return pd.DataFrame(data).set_index("Item")
+
+    @patch.object(IsYatirimProvider, "_cache_get", return_value=None)
+    @patch.object(IsYatirimProvider, "_cache_set")
+    def test_bank_ticker_falls_back_to_ufrs(self, mock_cache_set, mock_cache_get):
+        """AKBNK-like ticker: XI_29 returns nothing, UFRS succeeds."""
+
+        def side_effect(symbol, financial_group, periods, quarterly=False, statement_type=None):
+            if financial_group == IsYatirimProvider.FINANCIAL_GROUP_INDUSTRIAL:
+                return pd.DataFrame()
+            assert financial_group == IsYatirimProvider.FINANCIAL_GROUP_BANK
+            return self._df(periods, quarterly=quarterly)
+
+        with patch.object(self.provider, "_fetch_financial_table", side_effect=side_effect):
+            result = self.provider.get_financial_statements(
+                "AKBNK", "income_stmt", last_n=3
+            )
+
+        assert not result.empty
+        assert "Revenue" in result.index
+
+    @patch.object(IsYatirimProvider, "_cache_get", return_value=None)
+    @patch.object(IsYatirimProvider, "_cache_set")
+    def test_industrial_ticker_does_not_call_ufrs(self, mock_cache_set, mock_cache_get):
+        """A normal industrial ticker should succeed on the first attempt
+        and never trigger the UFRS fallback call."""
+        calls = []
+
+        def side_effect(symbol, financial_group, periods, quarterly=False, statement_type=None):
+            calls.append(financial_group)
+            return self._df(periods, quarterly=quarterly)
+
+        with patch.object(self.provider, "_fetch_financial_table", side_effect=side_effect):
+            result = self.provider.get_financial_statements(
+                "THYAO", "income_stmt", last_n=3
+            )
+
+        assert not result.empty
+        assert all(g == IsYatirimProvider.FINANCIAL_GROUP_INDUSTRIAL for g in calls)
+
+    @patch.object(IsYatirimProvider, "_cache_get", return_value=None)
+    @patch.object(IsYatirimProvider, "_cache_set")
+    def test_explicit_financial_group_skips_fallback(self, mock_cache_set, mock_cache_get):
+        """When the caller explicitly passes financial_group, no fallback
+        should be attempted even if it returns nothing."""
+        calls = []
+
+        def side_effect(symbol, financial_group, periods, quarterly=False, statement_type=None):
+            calls.append(financial_group)
+            return pd.DataFrame()
+
+        with patch.object(self.provider, "_fetch_financial_table", side_effect=side_effect):
+            with pytest.raises(DataNotAvailableError):
+                self.provider.get_financial_statements(
+                    "AKBNK", "income_stmt", last_n=3,
+                    financial_group=IsYatirimProvider.FINANCIAL_GROUP_INDUSTRIAL,
+                )
+
+        assert calls == [IsYatirimProvider.FINANCIAL_GROUP_INDUSTRIAL]
+
+    @patch.object(IsYatirimProvider, "_cache_get", return_value=None)
+    @patch.object(IsYatirimProvider, "_cache_set")
+    def test_neither_group_available_raises(self, mock_cache_set, mock_cache_get):
+        """If both XI_29 and UFRS come back empty, still raise
+        DataNotAvailableError (e.g. for a delisted or unknown ticker)."""
+
+        def side_effect(symbol, financial_group, periods, quarterly=False, statement_type=None):
+            return pd.DataFrame()
+
+        with patch.object(self.provider, "_fetch_financial_table", side_effect=side_effect):
+            with pytest.raises(DataNotAvailableError):
+                self.provider.get_financial_statements("FAKE1", "income_stmt", last_n=3)
