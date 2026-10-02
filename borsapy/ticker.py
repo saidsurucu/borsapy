@@ -986,7 +986,9 @@ class Ticker(TechnicalMixin, TwitterMixin):
         Get income statement data.
 
         Args:
-            quarterly: If True, return quarterly data. If False, return annual.
+            quarterly: If True, return cumulative year-to-date data at each
+                       quarter end (Q2 = six months, Q4 = full year).
+                       If False, return annual data.
             financial_group: Financial group code. Use "UFRS" for banks,
                            "XI_29" for industrial companies. If None, defaults to XI_29.
             last_n: Number of periods to fetch. None for default (5), int for exact
@@ -1021,7 +1023,9 @@ class Ticker(TechnicalMixin, TwitterMixin):
         Get cash flow statement data.
 
         Args:
-            quarterly: If True, return quarterly data. If False, return annual.
+            quarterly: If True, return cumulative year-to-date data at each
+                       quarter end (Q2 = six months, Q4 = full year).
+                       If False, return annual data.
             financial_group: Financial group code. Use "UFRS" for banks,
                            "XI_29" for industrial companies. If None, defaults to XI_29.
             last_n: Number of periods to fetch. None for default (5), int for exact
@@ -1064,7 +1068,7 @@ class Ticker(TechnicalMixin, TwitterMixin):
 
     @cached_property
     def quarterly_income_stmt(self) -> pd.DataFrame:
-        """Quarterly income statement (use get_income_stmt(quarterly=True) for more options)."""
+        """Cumulative YTD income statements at quarter ends; see get_income_stmt()."""
         return self.get_income_stmt(quarterly=True)
 
     @cached_property
@@ -1074,42 +1078,59 @@ class Ticker(TechnicalMixin, TwitterMixin):
 
     @cached_property
     def quarterly_cashflow(self) -> pd.DataFrame:
-        """Quarterly cash flow (use get_cashflow(quarterly=True) for more options)."""
+        """Cumulative YTD cash flow statements at quarter ends; see get_cashflow()."""
         return self.get_cashflow(quarterly=True)
 
     def _calculate_ttm(self, quarterly_df: pd.DataFrame) -> pd.DataFrame:
         """
-        Calculate trailing twelve months (TTM) by summing last 4 quarters.
+        Calculate TTM from the provider's cumulative year-to-date statements.
+
+        For interim periods: current YTD + previous full year - previous YTD
+        for the same quarter. At Q4, the full-year amount is already TTM.
+        Values are used as reported; no inflation or restatement adjustment
+        is performed to make different reporting periods comparable.
 
         Args:
-            quarterly_df: DataFrame with quarterly data (columns in YYYYQN format).
+            quarterly_df: DataFrame with cumulative data (columns in YYYYQN format).
 
         Returns:
-            DataFrame with single TTM column containing summed values.
+            DataFrame with a single TTM column. Missing required periods produce
+            an empty result; missing or nonnumeric line items remain NaN.
         """
-        if quarterly_df.empty or len(quarterly_df.columns) < 4:
+        if quarterly_df.empty:
             return pd.DataFrame(columns=["TTM"])
 
-        # First 4 columns = last 4 quarters (most recent first)
-        last_4_quarters = quarterly_df.iloc[:, :4]
+        latest = max(quarterly_df.columns)
+        year, quarter = latest.split("Q")
+        current_ytd = pd.to_numeric(quarterly_df[latest], errors="coerce")
+        if quarter == "4":
+            return current_ytd.to_frame(name="TTM")
 
-        # Convert to numeric, coercing errors to NaN
-        numeric_df = last_4_quarters.apply(pd.to_numeric, errors="coerce")
+        previous_year = int(year) - 1
+        previous_annual = f"{previous_year}Q4"
+        previous_ytd = f"{previous_year}Q{quarter}"
+        if previous_annual not in quarterly_df or previous_ytd not in quarterly_df:
+            return pd.DataFrame(columns=["TTM"])
 
-        return numeric_df.sum(axis=1).to_frame(name="TTM")
+        annual = pd.to_numeric(quarterly_df[previous_annual], errors="coerce")
+        comparable = pd.to_numeric(quarterly_df[previous_ytd], errors="coerce")
+        return (current_ytd + annual - comparable).to_frame(name="TTM")
 
     def get_ttm_income_stmt(self, financial_group: str | None = None) -> pd.DataFrame:
         """
         Get trailing twelve months (TTM) income statement.
 
-        Calculates TTM by summing the last 4 quarters of income statement data.
+        Uses current YTD + previous full year - previous comparable YTD.
+        At Q4, uses the full-year amount directly. Amounts are used as reported,
+        without reconciling inflation adjustments or restatements across periods.
 
         Args:
             financial_group: Financial group code. Use "UFRS" for banks,
                            "XI_29" for industrial companies. If None, defaults to XI_29.
 
         Returns:
-            DataFrame with TTM column containing summed values for each line item.
+            DataFrame with a TTM column; empty if required periods are missing.
+            Missing or nonnumeric line items remain NaN.
 
         Examples:
             >>> stock = bp.Ticker("THYAO")
@@ -1118,21 +1139,26 @@ class Ticker(TechnicalMixin, TwitterMixin):
             >>> bank = bp.Ticker("AKBNK")
             >>> bank.get_ttm_income_stmt(financial_group="UFRS")
         """
-        quarterly = self.get_income_stmt(quarterly=True, financial_group=financial_group)
+        quarterly = self.get_income_stmt(
+            quarterly=True, financial_group=financial_group, last_n=5
+        )
         return self._calculate_ttm(quarterly)
 
     def get_ttm_cashflow(self, financial_group: str | None = None) -> pd.DataFrame:
         """
         Get trailing twelve months (TTM) cash flow statement.
 
-        Calculates TTM by summing the last 4 quarters of cash flow data.
+        Uses current YTD + previous full year - previous comparable YTD.
+        At Q4, uses the full-year amount directly. Amounts are used as reported,
+        without reconciling inflation adjustments or restatements across periods.
 
         Args:
             financial_group: Financial group code. Use "UFRS" for banks,
                            "XI_29" for industrial companies. If None, defaults to XI_29.
 
         Returns:
-            DataFrame with TTM column containing summed values for each line item.
+            DataFrame with a TTM column; empty if required periods are missing.
+            Missing or nonnumeric line items remain NaN.
 
         Examples:
             >>> stock = bp.Ticker("THYAO")
@@ -1141,7 +1167,9 @@ class Ticker(TechnicalMixin, TwitterMixin):
             >>> bank = bp.Ticker("AKBNK")
             >>> bank.get_ttm_cashflow(financial_group="UFRS")
         """
-        quarterly = self.get_cashflow(quarterly=True, financial_group=financial_group)
+        quarterly = self.get_cashflow(
+            quarterly=True, financial_group=financial_group, last_n=5
+        )
         return self._calculate_ttm(quarterly)
 
     # Legacy property aliases

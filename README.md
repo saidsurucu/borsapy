@@ -187,7 +187,9 @@ print(banka.get_ttm_income_stmt(financial_group="UFRS"))
 >
 > UFRS banka formatında nakit akış tablosu (`get_cashflow`) bulunmamaktadır. `get_cashflow(financial_group="UFRS")` çağrısı `DataNotAvailableError` fırlatır.
 >
-> `last_n` parametresi: `None` (varsayılan 5 dönem), `int` (tam sayı kadar dönem), `"all"` (tüm mevcut dönemler). 5'ten fazla dönem istendiğinde otomatik olarak birden fazla API çağrısı yapılır.
+> `last_n` parametresi: `None` (varsayılan 5 dönem), `int` (tam sayı kadar dönem), `"all"` (tüm mevcut dönemler). 4'ten fazla dönem istendiğinde otomatik olarak birden fazla API çağrısı yapılır.
+>
+> Çeyreklik gelir ve nakit akış tabloları **yılbaşından itibaren birikimli** tutarları içerir: Q2 altı aylık, Q4 yıllıktır. Bilanço ise dönem sonundaki durumu gösterir. TTM hesabı ara dönemlerde `cari YTD + önceki yılın tamamı − önceki yılın aynı YTD dönemi` formülünü, Q4'te doğrudan yıllık tutarı kullanır. Gerekli dönem eksikse boş tablo, bir satırdaki gerekli tutar eksikse `NaN` döner. Farklı raporların enflasyon düzeltmeleri ve yeniden düzenlemeleri otomatik olarak ortak bir baza getirilmez; karşılaştırılabilirlik ayrıca doğrulanmalıdır.
 
 ### Temettü ve Sermaye Artırımları
 
