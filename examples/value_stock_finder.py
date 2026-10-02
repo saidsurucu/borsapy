@@ -2,8 +2,8 @@
 Değer Hissesi Bulucu
 ====================
 
-Benjamin Graham ve Warren Buffett tarzı değer yatırımı kriterleriyle
-ucuz ve kaliteli hisseleri bulur:
+Basit değer yatırımı kriterleriyle incelemeye aday hisseleri listeler.
+Puanlar şirketin gerçek değerini hesaplamaz; eksik veriler puan kazandırmaz.
 
 Kriterler:
 - Düşük F/K oranı (< 15)
@@ -16,9 +16,31 @@ Kullanım:
     python examples/value_stock_finder.py
 """
 
+from math import isfinite
+
 import pandas as pd
 
 import borsapy as bp
+
+_SCORE_KEYS = ('pe', 'pb', 'dividend_yield', 'debt_to_equity')
+
+
+def _finite_number(value) -> float | None:
+    """Eksik veya sonlu olmayan değerleri None olarak koru."""
+    try:
+        number = float(value)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    return number if isfinite(number) else None
+
+
+def _first_number(info, *keys) -> float | None:
+    """İlk geçerli değeri al; sıfır değeri yedek alanla değiştirme."""
+    for key in keys:
+        value = _finite_number(info.get(key))
+        if value is not None:
+            return value
+    return None
 
 
 def analyze_value_metrics(symbol: str) -> dict | None:
@@ -33,10 +55,10 @@ def analyze_value_metrics(symbol: str) -> dict | None:
         info = ticker.info
 
         # Temel metrikler
-        pe = info.get('pe') or info.get('trailingPE')
-        pb = info.get('pb') or info.get('priceToBook')
-        dividend_yield = info.get('dividend_yield') or info.get('dividendYield', 0)
-        market_cap = info.get('market_cap') or info.get('marketCap', 0)
+        pe = _first_number(info, 'pe', 'trailingPE')
+        pb = _first_number(info, 'pb', 'priceToBook')
+        dividend_yield = _first_number(info, 'dividend_yield', 'dividendYield')
+        market_cap = _first_number(info, 'market_cap', 'marketCap')
 
         # Finansal tablolardan ek metrikler
         try:
@@ -53,12 +75,12 @@ def analyze_value_metrics(symbol: str) -> dict | None:
                 for idx in balance_sheet.index:
                     idx_lower = str(idx).lower()
                     if 'finansal borç' in idx_lower or 'financial debt' in idx_lower:
-                        total_debt = balance_sheet.loc[idx].iloc[0]
+                        total_debt = _finite_number(balance_sheet.loc[idx].iloc[0])
                     if 'özkaynaklar' in idx_lower or 'equity' in idx_lower:
                         if 'ana ortaklık' in idx_lower or 'parent' in idx_lower:
-                            total_equity = balance_sheet.loc[idx].iloc[0]
+                            total_equity = _finite_number(balance_sheet.loc[idx].iloc[0])
 
-                if total_debt and total_equity and total_equity > 0:
+                if total_debt is not None and total_equity is not None and total_equity > 0:
                     debt_to_equity = total_debt / total_equity
 
             # Net kar marjı
@@ -70,11 +92,11 @@ def analyze_value_metrics(symbol: str) -> dict | None:
                 for idx in income_stmt.index:
                     idx_lower = str(idx).lower()
                     if 'satış gelirleri' in idx_lower:
-                        revenue = income_stmt.loc[idx].iloc[0]
+                        revenue = _finite_number(income_stmt.loc[idx].iloc[0])
                     if 'ana ortaklık payları' in idx_lower:
-                        net_income = income_stmt.loc[idx].iloc[0]
+                        net_income = _finite_number(income_stmt.loc[idx].iloc[0])
 
-                if revenue and net_income and revenue > 0:
+                if revenue is not None and net_income is not None and revenue > 0:
                     net_margin = (net_income / revenue) * 100
 
         except Exception:
@@ -84,12 +106,12 @@ def analyze_value_metrics(symbol: str) -> dict | None:
         # Sonuç
         return {
             'symbol': symbol,
-            'pe': round(pe, 2) if pe else None,
-            'pb': round(pb, 2) if pb else None,
-            'dividend_yield': round(dividend_yield, 2) if dividend_yield else 0,
-            'debt_to_equity': round(debt_to_equity, 2) if debt_to_equity else None,
-            'net_margin': round(net_margin, 2) if net_margin else None,
-            'market_cap_m': round(market_cap / 1_000_000, 0) if market_cap else None,
+            'pe': round(pe, 2) if pe is not None else None,
+            'pb': round(pb, 2) if pb is not None else None,
+            'dividend_yield': round(dividend_yield, 2) if dividend_yield is not None else None,
+            'debt_to_equity': round(debt_to_equity, 2) if debt_to_equity is not None else None,
+            'net_margin': round(net_margin, 2) if net_margin is not None else None,
+            'market_cap_m': round(market_cap / 1_000_000, 0) if market_cap is not None else None,
         }
 
     except Exception:
@@ -100,10 +122,12 @@ def calculate_value_score(metrics: dict) -> float:
     """
     Değer skoru hesapla (0-100).
 
-    Düşük F/K, düşük PD/DD, yüksek temettü, düşük borç = yüksek skor
+    Her ölçüt en fazla 25 puan kazandırır. Eksik/geçersiz ölçütler sıfır puan
+    kazandırır; kalan ölçütler yeniden ağırlıklandırılmaz. Bu nedenle veri
+    kaybı bir şirketin puanını yükseltemez.
     """
     score = 0
-    weights = 0
+    metrics = {key: _finite_number(metrics.get(key)) for key in _SCORE_KEYS}
 
     # F/K skoru (düşük = iyi)
     if metrics['pe'] and metrics['pe'] > 0:
@@ -115,7 +139,6 @@ def calculate_value_score(metrics: dict) -> float:
             score += 15
         elif metrics['pe'] < 20:
             score += 10
-        weights += 25
 
     # PD/DD skoru (düşük = iyi)
     if metrics['pb'] and metrics['pb'] > 0:
@@ -127,7 +150,6 @@ def calculate_value_score(metrics: dict) -> float:
             score += 15
         elif metrics['pb'] < 2.0:
             score += 10
-        weights += 25
 
     # Temettü skoru (yüksek = iyi)
     if metrics['dividend_yield']:
@@ -139,10 +161,9 @@ def calculate_value_score(metrics: dict) -> float:
             score += 15
         elif metrics['dividend_yield'] > 1:
             score += 10
-        weights += 25
 
     # Borç/Özsermaye skoru (düşük = iyi)
-    if metrics['debt_to_equity'] is not None:
+    if metrics['debt_to_equity'] is not None and metrics['debt_to_equity'] >= 0:
         if metrics['debt_to_equity'] < 0.3:
             score += 25
         elif metrics['debt_to_equity'] < 0.5:
@@ -151,12 +172,8 @@ def calculate_value_score(metrics: dict) -> float:
             score += 15
         elif metrics['debt_to_equity'] < 2.0:
             score += 10
-        weights += 25
 
-    # Normalize
-    if weights > 0:
-        return round(score / weights * 100, 1)
-    return 0
+    return float(score)
 
 
 def scan_value_stocks(
@@ -169,7 +186,7 @@ def scan_value_stocks(
     """Değer hissesi taraması."""
 
     if verbose:
-        print(f"📊 Değer Hissesi Tarama (Graham/Buffett Tarzı)")
+        print("📊 Değer Hissesi Aday Taraması")
         print(f"   - Endeks: {index}")
         print(f"   - Max F/K: {pe_max}")
         print(f"   - Max PD/DD: {pb_max}")
@@ -197,13 +214,16 @@ def scan_value_stocks(
         # Filtreleme
         passes_pe = metrics['pe'] is not None and 0 < metrics['pe'] <= pe_max
         passes_pb = metrics['pb'] is not None and 0 < metrics['pb'] <= pb_max
-        passes_div = metrics['dividend_yield'] >= dividend_min
+        passes_div = metrics['dividend_yield'] is not None and metrics['dividend_yield'] >= dividend_min
 
         # En az 2 kriteri geçenler
         passed_count = sum([passes_pe, passes_pb, passes_div])
 
         if passed_count >= 2:
             metrics['value_score'] = calculate_value_score(metrics)
+            metrics['metrics_available'] = sum(
+                _finite_number(metrics.get(key)) is not None for key in _SCORE_KEYS
+            )
             metrics['criteria_passed'] = passed_count
             results.append(metrics)
 
@@ -222,22 +242,24 @@ def scan_value_stocks(
     df = df.sort_values('value_score', ascending=False).reset_index(drop=True)
 
     if verbose:
-        print(f"🎯 {len(df)} Değer Hissesi Bulundu:")
+        print(f"🎯 {len(df)} Değer Hissesi Adayı Bulundu:")
         print()
-        print(f"{'Sembol':<8} {'F/K':>8} {'PD/DD':>8} {'Temettü':>10} {'Borç/Öz':>10} {'Skor':>8}")
+        print(f"{'Sembol':<8} {'F/K':>8} {'PD/DD':>8} {'Temettü':>10} {'Borç/Öz':>10} {'Skor':>8} {'Veri':>6}")
         print("-" * 60)
 
         for _, row in df.head(20).iterrows():
-            pe_str = f"{row['pe']:.1f}" if row['pe'] else "N/A"
-            pb_str = f"{row['pb']:.2f}" if row['pb'] else "N/A"
-            div_str = f"%{row['dividend_yield']:.1f}"
-            de_str = f"{row['debt_to_equity']:.2f}" if row['debt_to_equity'] else "N/A"
+            pe_str = f"{row['pe']:.1f}" if pd.notna(row['pe']) else "N/A"
+            pb_str = f"{row['pb']:.2f}" if pd.notna(row['pb']) else "N/A"
+            div_str = f"%{row['dividend_yield']:.1f}" if pd.notna(row['dividend_yield']) else "N/A"
+            de_str = f"{row['debt_to_equity']:.2f}" if pd.notna(row['debt_to_equity']) else "N/A"
+            coverage_str = f"{int(row['metrics_available'])}/4"
 
-            print(f"{row['symbol']:<8} {pe_str:>8} {pb_str:>8} {div_str:>10} {de_str:>10} {row['value_score']:>7.1f}")
+            print(f"{row['symbol']:<8} {pe_str:>8} {pb_str:>8} {div_str:>10} {de_str:>10} {row['value_score']:>7.1f} {coverage_str:>6}")
 
         print()
         print("💡 Değer Skoru: F/K, PD/DD, Temettü ve Borç/Özsermaye oranlarının")
-        print("   birleşik değerlendirmesi (0-100, yüksek = daha iyi değer)")
+        print("   ön eleme puanı (0-100); eksik veriler puan kazandırmaz.")
+        print("   Veri sütunu mevcut ölçüt sayısını gösterir; şirketin gerçek değeri değildir.")
 
     return df
 
