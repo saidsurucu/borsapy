@@ -599,7 +599,7 @@ class IsYatirimProvider(BaseProvider):
         current_year = datetime.now().year
         periods = self._get_periods(current_year, quarterly, count=count)
 
-        # Split into batches of 5 (API limit)
+        # Split into batches of 4 (API limit).
         batches = [
             periods[i : i + self._MAX_PERIODS_PER_CALL]
             for i in range(0, len(periods), self._MAX_PERIODS_PER_CALL)
@@ -738,7 +738,7 @@ class IsYatirimProvider(BaseProvider):
         quarterly: bool = False,
         statement_type: str | None = None,
     ) -> pd.DataFrame:
-        """Fetch financial data for up to 5 periods and filter by statement type."""
+        """Fetch financial data for up to 4 periods and filter by statement type."""
         url = f"{self.BASE_URL}/Data.aspx/MaliTablo"
 
         # Build params with multiple year/period pairs
@@ -748,7 +748,16 @@ class IsYatirimProvider(BaseProvider):
             "financialGroup": financial_group,
         }
 
-        for i, (year, period) in enumerate(periods[:self._MAX_PERIODS_PER_CALL], 1):
+        request_periods = list(periods[:self._MAX_PERIODS_PER_CALL])
+        if not request_periods:
+            return pd.DataFrame()
+        # MaliTablo requires all four year/period pairs, even for a short batch.
+        # Repeat the final requested period for unused slots; only the original
+        # periods are parsed below, so padding never adds result columns.
+        request_periods += [request_periods[-1]] * (
+            self._MAX_PERIODS_PER_CALL - len(request_periods)
+        )
+        for i, (year, period) in enumerate(request_periods, 1):
             params[f"year{i}"] = year
             params[f"period{i}"] = period
 
