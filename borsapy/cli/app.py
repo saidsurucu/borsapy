@@ -33,6 +33,7 @@ from borsapy.cli.commands import (
     viop,
     watch,
 )
+from borsapy.cli.commands.research import research
 
 app = typer.Typer(
     name="borsapy",
@@ -78,6 +79,7 @@ app.command(name="search")(search.search)
 app.command(name="history")(history.history)
 app.command(name="scan")(scan.scan)
 app.command(name="screen")(screen.screen)
+app.command(name="research")(research)
 app.command(name="technical")(technical.technical)
 app.command(name="compare")(compare.compare)
 app.command(name="watch")(watch.watch)

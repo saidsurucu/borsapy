@@ -70,6 +70,7 @@ borsapy watch THYAO GARAN ASELS
 | `scan` | Teknik tarama | `borsapy scan "macd > signal"` |
 | `compare` | Hisse karşılaştırma | `borsapy compare THYAO PGSUS TAVHL` |
 | `search` | Sembol arama | `borsapy search banka` |
+| `research` | KAP kaynaklı sektör ve enflasyon bazı araştırması | `borsapy research` |
 
 ### Endeks ve Şirketler
 
@@ -122,6 +123,68 @@ borsapy watch THYAO GARAN ASELS
 ---
 
 ## Komut Detayları
+
+### research - BIST 100 Şirket Araştırması
+
+```bash
+# Resmî güncel BIST 100 evreni; HTML, CSV ve kaynakları içeren JSON
+borsapy research --output-dir output/research
+
+# Küçük bir deneme; akranlar yalnızca seçilen şirketler arasından hesaplanır
+borsapy research --symbols BIMAS,MGROS,SOKM --output-dir output/research/sample
+
+# En az 3 diğer şirket; en fazla 4 eşzamanlı veri isteği işçisi
+borsapy research --workers 2 --min-peers 4
+```
+
+`bist100-research.html` dosyasını tarayıcıda açın. Şirket/sektör araması, durum filtresi,
+KAP ve PDF kaynak bağlantıları ile eksik verinin nedenleri raporda bulunur.
+İlk tarama, şirket raporlarını indirdiği için birkaç dakika sürebilir. KAP belgeleri
+sunucuyu zorlamamak için tüm işçiler arasında en fazla 40 istek/dakika ile alınır.
+Geçici bağlantı hataları en fazla iki kez yeniden denenir; HTTP 429 ve Retry-After
+yanıtları tekrar denenmeden rapora hata olarak işlenir. KAP belgeleri
+bildirim kimliğine göre `cache/` altında saklanır; piyasa çarpanları her çalıştırmada
+yeniden istenir. Belgeleri tekrar indirmek için bu önbelleği silebilirsiniz.
+
+Hesaplama kuralları:
+
+- Evren ve sektör endeksleri Borsa İstanbul'un güncel bileşen dosyasından alınır.
+  Eksik evrenle tarama başlatılmaz. Geçmişe dönük performans testi yapılmaz.
+- KAP tablolarındaki para birimi, birim, konsolidasyon niteliği ve dönemler okunur.
+  Türkçe PDF'nin ilk 12 sayfasında tarihli satın alma gücü başlığı ve en az iki
+  eşleşen tablo tutarı aranır. Doğrulanamayan bazlarda reel büyüme ve TTM boş kalır.
+- Reel satış büyümesi, aynı rapordaki düzeltilmiş cari/önceki dönem satışlarından
+  hesaplanır. Karşılaştırmalı rakama ikinci kez TÜFE uygulanmaz.
+- Ara dönem son 12 ay (TTM) tahmini: `cari YTD + önceki yıllık × TÜFE oranı − aynı
+  rapordaki önceki YTD`. Yalnızca bazı doğrulanmış önceki yıllık tutar, TCMB TÜFE
+  endeks düzeylerinin oranıyla cari rapor ayına taşınır. Takvim yılı dışındaki
+  hesap dönemleri desteklenmez. Kapsam ve para birimi eşleşmesi gerekir;
+  yeniden sınıflandırmalar ve konsolidasyon kapsamındaki değişiklikler uzlaştırılmaz.
+- Ortak baz F/K = kaynak piyasa değeri / ortak baz TTM ana ortaklık kârı.
+  Pozitif F/K değerleri, aynı sektör ve satın alma gücü ayındaki en az üç **diğer**
+  şirketin medyanıyla karşılaştırılır. 220 günden eski raporlar dışlanır.
+- Medyanın altında çarpan, pozitif toplam kâr ve faaliyet nakdi olan sanayi/hizmet
+  şirketleri **inceleme adayı** olur. Bu bir gerçek değer hesabı değildir;
+  göreli indirim hedef fiyat veya beklenen getiri anlamına gelmez.
+- Banka ve diğer finans şirketlerinde kaynak PD/DD gösterilir; sermaye kalitesi ve
+  özkaynak kârlılığı ayrıca incelenmelidir. Holding/GYO/yatırım ortaklıkları net aktif
+  değer analizi gerektirir. Bu iki grup otomatik aday listesine alınmaz.
+
+Sektör endeksleri geniş gruplardır; iş modeli farkları ayrıca incelenmelidir.
+Negatif ve eksik veriler olumlu puana dönüşmez. Piyasa verisinin işlem zamanı
+kaynak tarafından verilmediği için rapor zamanı, fiyatın zamanı olarak sunulmaz.
+JSON dosyası ham parasal kalemleri, KAP bildirim tarihlerini, PDF kanıtını,
+TÜFE endeks düzeylerini ve hesap bileşenlerini saklar.
+
+Python kullanımı:
+
+```python
+from borsapy.value_research import run_value_research
+
+result = run_value_research(cache_dir="output/research/cache")
+print(result.companies[["symbol", "sector", "common_basis_pe", "status"]])
+result.save("output/research")
+```
 
 ### price - Hızlı Fiyat Sorgulama
 

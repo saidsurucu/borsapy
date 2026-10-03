@@ -87,6 +87,9 @@ borsapy scan "rsi < 30 and volume > 1000000" --index XU100
 
 # Temel tarama
 borsapy screen --template high_dividend --index XU030
+
+# KAP raporları ve sektör akranlarıyla BIST 100 araştırma raporu
+borsapy research --output-dir output/research
 ```
 
 **[CLI Dokümantasyonu →](CLI.md)** | 25+ komut: fiyat, geçmiş, teknik analiz, mali tablolar, tarama ve daha fazlası.
