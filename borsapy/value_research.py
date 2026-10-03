@@ -270,7 +270,7 @@ def run_value_research(
     now = datetime.now(ZoneInfo("Europe/Istanbul"))
     index = get_bist_index_provider()
     components = index.get_components("XU100")
-    if len({item["symbol"] for item in components}) != 100:
+    if len(components) != 100 or len({item["symbol"] for item in components}) != 100:
         raise DataNotAvailableError(
             "The official BIST 100 list could not be verified; scan stopped"
         )

@@ -255,12 +255,14 @@ def test_scan_and_exports_preserve_failed_companies_and_growth(
     assert "latest_report" not in paths["csv"].read_text(encoding="utf-8-sig").splitlines()[0]
 
 
-def test_unverified_index_membership_stops_scan(monkeypatch):
+@pytest.mark.parametrize("duplicate", [False, True])
+def test_unverified_index_membership_stops_scan(monkeypatch, duplicate):
     import borsapy.value_research as research
     from borsapy.exceptions import DataNotAvailableError
 
     index = Mock()
-    index.get_components.return_value = []
+    components = [{"symbol": f"S{i}", "name": f"Company {i}"} for i in range(100)]
+    index.get_components.return_value = [*components, components[0]] if duplicate else []
     monkeypatch.setattr(research, "get_bist_index_provider", lambda: index)
     with pytest.raises(DataNotAvailableError, match="official BIST 100"):
         research.run_value_research()
